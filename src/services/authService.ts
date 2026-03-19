@@ -17,3 +17,4 @@ export const login = async (employee_code: string, password: string) => {
 
   return data;
 };
+
