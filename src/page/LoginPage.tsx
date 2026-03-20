@@ -17,8 +17,16 @@ export default function LoginPage() {
       setLoading(true);
       const { user } = await login(employeeCode, password);
 
-      // เก็บแค่ role สำหรับ ProtectedRoute ตรวจสอบ (ไม่เก็บ token แล้ว)
+      // เก็บ role + user info ใน localStorage
       localStorage.setItem("role", user.role);
+      localStorage.setItem("user", JSON.stringify({
+        full_name:     user.full_name,
+        employee_code: user.employee_code,
+        department:    user.department,
+      }));
+      if (user.role === "admin") {
+        localStorage.setItem("adminName", user.full_name);
+      }
 
       navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
     } catch (err: any) {
@@ -41,31 +49,16 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <input
-              type="text"
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="รหัสพนักงาน (เช่น EMP-0001)"
-              value={employeeCode}
-              onChange={(e) => setEmployeeCode(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <input
-              type="password"
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="รหัสผ่าน"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors"
-          >
+          <input type="text"
+            className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="รหัสพนักงาน (เช่น EMP-0001)"
+            value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} required />
+          <input type="password"
+            className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="รหัสผ่าน"
+            value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <button type="submit" disabled={loading}
+            className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors">
             {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
           </button>
         </form>
