@@ -1,20 +1,24 @@
-import { API_URL } from "./api";
+// services/authService.ts
+import api from "./api";
 
-export const login = async (employee_code: string, password: string) => {
-  const res = await fetch(`${API_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ employee_code, password }),
-  });
+export interface AuthUser {
+  id:            number;
+  employee_code: string;
+  full_name:     string;
+  department:    string;
+  role:          "admin" | "user";
+}
 
-  const data = await res.json();
+export async function login(employee_code: string, password: string): Promise<{ user: AuthUser }> {
+  const res = await api.post("/api/auth/login", { employee_code, password });
+  return res.data;
+}
 
-  if (!res.ok) {
-    throw new Error(data.message || "Login failed");
-  }
+export async function logout(): Promise<void> {
+  await api.post("/api/auth/logout");
+}
 
-  return data;
-};
-
+export async function getMe(): Promise<AuthUser> {
+  const res = await api.get("/api/auth/me");
+  return res.data;
+}
