@@ -7,9 +7,9 @@ import {
   getAdminLeaveRequests, approveLeaveRequest, rejectLeaveRequest,
   getAdminUserPool, updateLeavePool,
 } from "../../services/leaveService";
-import type { LeaveRequest, LeaveStatus, LeaveType, LeavePool } from "../../services/leaveService";
+import type { LeaveRequest, LeaveStatus, LeavePool } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
-import { ToastContainer, toast } from "../../components/Toast"; // ✅ import Toast
+import { ToastContainer, toast } from "../../components/Toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -238,7 +238,6 @@ export default function AdminDashboard() {
   const [selected,      setSelected]      = useState<LeaveRequest | null>(null);
   const [confirm,       setConfirm]       = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
   const [activeTab,     setActiveTab]     = useState<"requests" | "employees">("requests");
-  const [leaveTypes,    setLeaveTypes]    = useState<LeaveType[]>([]);
   const [balanceModal,  setBalanceModal]  = useState<{
     user: { id: number; full_name: string; employee_code: string; department: string };
     pool: LeavePool;
@@ -254,12 +253,8 @@ export default function AdminDashboard() {
   const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const [data, types] = await Promise.all([
-        getAdminLeaveRequests(),
-        api.get("/api/leave-types").then((r: any) => r.data).catch(() => []),
-      ]);
+      const data = await getAdminLeaveRequests();
       setRequests(data);
-      setLeaveTypes(types);
     } catch (err: any) {
       setError(err.response?.data?.message || "โหลดข้อมูลไม่สำเร็จ");
     } finally {
@@ -296,7 +291,6 @@ export default function AdminDashboard() {
     if (activeTab === "employees") fetchEmployees();
   }, [activeTab, fetchEmployees]);
 
-  // ✅ ใช้ toast แทน alert ทุกจุด
   const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
     try {
       setActionLoading(true);
@@ -391,7 +385,6 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      {/* ✅ Toast container — ต้องมีแค่ที่เดียวต่อหน้า */}
       <ToastContainer />
 
       {confirm && (
@@ -473,10 +466,10 @@ export default function AdminDashboard() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "รออนุมัติ",   value: pending,  color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-100",  click: "pending"  },
-                { label: "อนุมัติแล้ว", value: approved, color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", click: "approved" },
-                { label: "ปฏิเสธ",      value: rejected, color: "text-red-500",     bg: "bg-red-50",     border: "border-red-100",     click: "rejected" },
-              ].map(({ label, value, color, bg, border, click }) => (
+                { label: "รออนุมัติ",   value: pending,  color: "text-amber-600",   border: "border-amber-100",  click: "pending"  },
+                { label: "อนุมัติแล้ว", value: approved, color: "text-emerald-600", border: "border-emerald-100", click: "approved" },
+                { label: "ปฏิเสธ",      value: rejected, color: "text-red-500",     border: "border-red-100",     click: "rejected" },
+              ].map(({ label, value, color, border, click }) => (
                 <button key={label} onClick={() => setStatusFilter(click as LeaveStatus)}
                   className={`bg-white rounded-2xl border p-5 text-left hover:shadow-md transition-all ${border} ${statusFilter === click ? "ring-2 ring-offset-1 ring-slate-300" : ""}`}>
                   <p className={`text-3xl font-bold ${color}`}>{value}</p>

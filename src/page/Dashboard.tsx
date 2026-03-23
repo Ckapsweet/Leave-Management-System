@@ -10,7 +10,7 @@ import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPaylo
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import { LeaveReport } from "../components/LeaveReport";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
-import { ToastContainer } from "../components/Toast";
+import { ToastContainer, toast } from "../components/Toast";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -52,9 +52,9 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
   return <span className="text-sm font-semibold text-gray-700">{req.total_days} วัน</span>;
 }
 
-// ── RequestRow ─────────────────────────────────────────────────────────\\
+// ── RequestRow ────────────────────────────────────────────────────────────────
 
-function RequestRow({ req, onClick }: { req: LeaveRequest; onClick: () => void }) {
+function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: () => void; onCancel: () => void }) {
   const meta      = STATUS_META[req.status];
   const typeColor = TYPE_COLORS[req.leave_type_id] ?? "bg-gray-100 text-gray-600";
   const isHourly  = req.leave_unit === "hour";
@@ -81,6 +81,19 @@ function RequestRow({ req, onClick }: { req: LeaveRequest; onClick: () => void }
           {meta.label}
         </div>
       </td>
+      <td className="px-5 py-4">
+        {req.status === "pending" && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onCancel(); }}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg transition-colors whitespace-nowrap"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+            </svg>
+            ยกเลิก
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
@@ -100,9 +113,73 @@ function StatusBanner({ status, approved_at }: { status: LeaveStatus; approved_a
   );
 }
 
+// ── CancelConfirmDialog ───────────────────────────────────────────────────────
+
+function CancelConfirmDialog({
+  onConfirm,
+  onClose,
+  loading,
+}: {
+  onConfirm: () => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">ยืนยันการยกเลิกคำขอลา</h3>
+            <p className="text-xs text-gray-500 mt-0.5">การดำเนินการนี้ไม่สามารถย้อนกลับได้</p>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="px-4 py-2 text-sm bg-red-500 text-white rounded-xl hover:bg-red-600 font-medium transition-colors flex items-center gap-2 disabled:opacity-60"
+          >
+            {loading ? (
+              <>
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                กำลังยกเลิก...
+              </>
+            ) : "ยืนยันยกเลิก"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── DetailDrawer ──────────────────────────────────────────────────────────────
 
-function DetailDrawer({ req, onClose }: { req: LeaveRequest; onClose: () => void }) {
+function DetailDrawer({
+  req,
+  onClose,
+  onCancel,
+  cancelling,
+}: {
+  req: LeaveRequest;
+  onClose: () => void;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
   const isHourly = req.leave_unit === "hour";
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -152,10 +229,12 @@ function DetailDrawer({ req, onClose }: { req: LeaveRequest; onClose: () => void
                 : <span className="font-bold text-gray-900 text-base">{req.total_days} วัน</span>}
             </div>
           </div>
+
           <div>
             <p className="text-xs font-medium text-gray-400 mb-2">เหตุผล</p>
             <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 rounded-xl p-4">{req.reason}</p>
           </div>
+
           {req.approver_name && (
             <div>
               <p className="text-xs font-medium text-gray-400 mb-2">ผู้อนุมัติ / ผู้ตรวจสอบ</p>
@@ -167,6 +246,7 @@ function DetailDrawer({ req, onClose }: { req: LeaveRequest; onClose: () => void
               </div>
             </div>
           )}
+
           {req.comment && (
             <div>
               <p className="text-xs font-medium text-gray-400 mb-2">หมายเหตุจากผู้อนุมัติ</p>
@@ -175,8 +255,36 @@ function DetailDrawer({ req, onClose }: { req: LeaveRequest; onClose: () => void
               </div>
             </div>
           )}
+
           <p className="text-xs text-gray-400 text-center">ส่งคำขอเมื่อ {fmtDatetime(req.created_at)}</p>
         </div>
+
+        {/* Cancel button — แสดงเฉพาะ status === "pending" */}
+        {req.status === "pending" && (
+          <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+            <button
+              onClick={onCancel}
+              disabled={cancelling}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelling ? (
+                <>
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  กำลังยกเลิก...
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                  </svg>
+                  ยกเลิกคำขอลา
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -195,13 +303,15 @@ export default function UserLeaveDashboard() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState("");
 
-  const [selected,      setSelected]      = useState<LeaveRequest | null>(null);
-  const [showModal,     setShowModal]     = useState(false);
-  const [submitting,    setSubmitting]    = useState(false); // ✅ ใช้ state นี้ส่งไปให้ Modal
-  const [statusFilter,  setStatusFilter]  = useState<"all" | LeaveStatus>("all");
-  const [viewMode,      setViewMode]      = useState<"all" | "monthly" | "yearly">("all");
-  const [selectedYear,  setSelectedYear]  = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selected,         setSelected]         = useState<LeaveRequest | null>(null);
+  const [showModal,        setShowModal]         = useState(false);
+  const [submitting,       setSubmitting]        = useState(false);
+  const [cancelling,       setCancelling]        = useState(false);
+  const [confirmCancelId,  setConfirmCancelId]   = useState<number | null>(null);
+  const [statusFilter,     setStatusFilter]      = useState<"all" | LeaveStatus>("all");
+  const [viewMode,         setViewMode]          = useState<"all" | "monthly" | "yearly">("all");
+  const [selectedYear,     setSelectedYear]      = useState<number>(new Date().getFullYear());
+  const [selectedMonth,    setSelectedMonth]     = useState<number>(new Date().getMonth() + 1);
 
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -228,8 +338,6 @@ export default function UserLeaveDashboard() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── Submit new leave ────────────────────────────────────────
-  // ✅ fetch เกิดที่นี่ที่เดียว — Modal แค่ส่ง form มาให้
-  // ✅ throw error ออกไป ให้ Modal จัดการ toast.success / toast.error เอง
   const handleAddLeave = async (form: LeaveRequestForm): Promise<void> => {
     setSubmitting(true);
     try {
@@ -240,6 +348,23 @@ export default function UserLeaveDashboard() {
       throw err;
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ── Cancel leave ────────────────────────────────────────────
+  const handleCancelLeave = async () => {
+    if (confirmCancelId === null) return;
+    setCancelling(true);
+    try {
+      await cancelLeaveRequest(confirmCancelId);
+      setRequests((prev) => prev.filter((r) => r.id !== confirmCancelId));
+      toast.success("ยกเลิกคำขอลาสำเร็จ");
+      setConfirmCancelId(null);
+      setSelected(null);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "ยกเลิกคำขอไม่สำเร็จ กรุณาลองใหม่");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -292,10 +417,26 @@ export default function UserLeaveDashboard() {
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      {selected  && <DetailDrawer req={selected} onClose={() => setSelected(null)} />}
+      {/* Confirm cancel dialog */}
+      {confirmCancelId !== null && (
+        <CancelConfirmDialog
+          onConfirm={handleCancelLeave}
+          onClose={() => setConfirmCancelId(null)}
+          loading={cancelling}
+        />
+      )}
+
+      {selected && (
+        <DetailDrawer
+          req={selected}
+          onClose={() => setSelected(null)}
+          onCancel={() => setConfirmCancelId(selected.id)}
+          cancelling={cancelling}
+        />
+      )}
+
       <ToastContainer />
 
-      {/* ✅ ส่ง isLoading={submitting} ให้ Modal แสดง spinner และ disable ปุ่ม */}
       {showModal && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
@@ -515,14 +656,14 @@ export default function UserLeaveDashboard() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-slate-50 border-b border-gray-100 text-left">
-                      {["วันที่ / เวลา", "ประเภท", "จำนวน", "เหตุผล", "สถานะ"].map((h) => (
+                      {["วันที่ / เวลา", "ประเภท", "จำนวน", "เหตุผล", "สถานะ", ""].map((h) => (
                         <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filtered.map((r) => (
-                      <RequestRow key={r.id} req={r} onClick={() => setSelected(r)} />
+                      <RequestRow key={r.id} req={r} onClick={() => setSelected(r)} onCancel={() => setConfirmCancelId(r.id)} />
                     ))}
                   </tbody>
                 </table>
