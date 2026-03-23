@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
-import { toast } from "./Toast"; // ✅ import toast
+import { toast } from "./Toast";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ export interface LeaveRequestForm {
 
 export interface LeaveRequestModalProps {
   leaveTypes: LeaveType[];
-  onSubmit: (form: LeaveRequestForm) => Promise<void>; // ✅ return Promise เพื่อให้ Modal รู้ผล
+  onSubmit: (form: LeaveRequestForm) => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
 }
@@ -44,6 +44,12 @@ function calcHours(startTime: Dayjs | null, endTime: Dayjs | null): number {
   if (!startTime || !endTime) return 0;
   const diff = endTime.diff(startTime, "minute");
   return Math.max(0, Math.round((diff / 60) * 10) / 10);
+}
+
+function isWeekend(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const day = new Date(dateStr).getUTCDay(); // 0 = อาทิตย์, 6 = เสาร์
+  return day === 0 || day === 6;
 }
 
 const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5";
@@ -63,19 +69,34 @@ interface FormErrors {
 
 function validate(form: LeaveRequestForm): FormErrors {
   const errors: FormErrors = {};
+
   if (!form.leave_type_id) errors.leave_type_id = "กรุณาเลือกประเภทการลา";
-  if (!form.start_date) errors.start_date = "กรุณาระบุวันที่";
-  if (form.leave_unit === "day") {
-    if (!form.end_date) errors.end_date = "กรุณาระบุวันสิ้นสุด";
-    else if (form.end_date < form.start_date) errors.end_date = "วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น";
+
+  if (!form.start_date) {
+    errors.start_date = "กรุณาระบุวันที่";
+  } else if (isWeekend(form.start_date)) {
+    errors.start_date = "ไม่สามารถเลือกวันเสาร์หรืออาทิตย์ได้";
   }
+
+  if (form.leave_unit === "day") {
+    if (!form.end_date) {
+      errors.end_date = "กรุณาระบุวันสิ้นสุด";
+    } else if (isWeekend(form.end_date)) {
+      errors.end_date = "ไม่สามารถเลือกวันเสาร์หรืออาทิตย์ได้";
+    } else if (form.end_date < form.start_date) {
+      errors.end_date = "วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น";
+    }
+  }
+
   if (form.leave_unit === "hour") {
     if (!form.start_time || !form.start_time.isValid()) errors.start_time = "กรุณาระบุเวลาเริ่ม";
     if (!form.end_time || !form.end_time.isValid()) errors.end_time = "กรุณาระบุเวลาสิ้นสุด";
     else if (form.start_time && form.start_time.isValid() && form.end_time.isBefore(form.start_time))
       errors.end_time = "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม";
   }
+
   if (!form.reason.trim()) errors.reason = "กรุณาระบุเหตุผล";
+
   return errors;
 }
 
@@ -165,7 +186,6 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
     if (submitted) setErrors(validate(updated));
   };
 
-  // ✅ รอ Promise จาก parent แล้วแสดง Toast ตามผล
   const handleSubmit = async () => {
     setSubmitted(true);
     const errs = validate(form);
@@ -254,12 +274,23 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={LABEL_CLASS}>วันที่เริ่มลา <span className="text-red-400">*</span></label>
-                <input type="date" className={INPUT_CLASS} value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
+                <input
+                  type="date"
+                  className={`${INPUT_CLASS} ${errors.start_date ? "border-red-300 focus:ring-red-200" : ""}`}
+                  value={form.start_date}
+                  onChange={(e) => set("start_date", e.target.value)}
+                />
                 {errors.start_date && <p className={ERROR_CLASS}>{errors.start_date}</p>}
               </div>
               <div>
                 <label className={LABEL_CLASS}>วันที่สิ้นสุด <span className="text-red-400">*</span></label>
-                <input type="date" className={INPUT_CLASS} value={form.end_date} min={form.start_date} onChange={(e) => set("end_date", e.target.value)} />
+                <input
+                  type="date"
+                  className={`${INPUT_CLASS} ${errors.end_date ? "border-red-300 focus:ring-red-200" : ""}`}
+                  value={form.end_date}
+                  min={form.start_date}
+                  onChange={(e) => set("end_date", e.target.value)}
+                />
                 {errors.end_date && <p className={ERROR_CLASS}>{errors.end_date}</p>}
               </div>
             </div>
@@ -267,7 +298,12 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
             <div className="space-y-4">
               <div>
                 <label className={LABEL_CLASS}>วันที่ลา <span className="text-red-400">*</span></label>
-                <input type="date" className={INPUT_CLASS} value={form.start_date} onChange={(e) => set("start_date", e.target.value)} />
+                <input
+                  type="date"
+                  className={`${INPUT_CLASS} ${errors.start_date ? "border-red-300 focus:ring-red-200" : ""}`}
+                  value={form.start_date}
+                  onChange={(e) => set("start_date", e.target.value)}
+                />
                 {errors.start_date && <p className={ERROR_CLASS}>{errors.start_date}</p>}
               </div>
               <LocalizationProvider dateAdapter={AdapterDayjs}>

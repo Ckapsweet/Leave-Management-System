@@ -78,4 +78,14 @@ test validate
 npx vitest run src/components/__tests__/LeaveRequestModal.validate.tsx
 test LeaveRequestModal
 npx vitest run src/components/__tests__/LeaveRequestModal.test.tsx
+
+
+depen
+nginx
+git
+PM2
+mysql-server
+phpmyadmin
+Java
+Jenkins
 ```

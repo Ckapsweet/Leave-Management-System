@@ -52,7 +52,7 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
   return <span className="text-sm font-semibold text-gray-700">{req.total_days} วัน</span>;
 }
 
-// ── RequestRow ────────────────────────────────────────────────────────────────
+// ── RequestRow ─────────────────────────────────────────────────────────\\
 
 function RequestRow({ req, onClick }: { req: LeaveRequest; onClick: () => void }) {
   const meta      = STATUS_META[req.status];
