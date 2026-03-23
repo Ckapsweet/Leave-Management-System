@@ -10,6 +10,7 @@ import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPaylo
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import { LeaveReport } from "../components/LeaveReport";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
+import { ToastContainer } from "../components/Toast";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -194,12 +195,12 @@ export default function UserLeaveDashboard() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState("");
 
-  const [selected,     setSelected]     = useState<LeaveRequest | null>(null);
-  const [showModal,    setShowModal]    = useState(false);
-  const [submitting,   setSubmitting]   = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
-  const [viewMode,     setViewMode]     = useState<"all" | "monthly" | "yearly">("all");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selected,      setSelected]      = useState<LeaveRequest | null>(null);
+  const [showModal,     setShowModal]     = useState(false);
+  const [submitting,    setSubmitting]    = useState(false); // ✅ ใช้ state นี้ส่งไปให้ Modal
+  const [statusFilter,  setStatusFilter]  = useState<"all" | LeaveStatus>("all");
+  const [viewMode,      setViewMode]      = useState<"all" | "monthly" | "yearly">("all");
+  const [selectedYear,  setSelectedYear]  = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
   // ── Fetch all data ──────────────────────────────────────────
@@ -215,7 +216,6 @@ export default function UserLeaveDashboard() {
       setLeavePool(poolRes);
       setRequests(reqRes);
 
-      // get user info from first request or localStorage
       const storedUser = localStorage.getItem("user");
       if (storedUser) setUser(JSON.parse(storedUser));
     } catch (err: any) {
@@ -228,14 +228,16 @@ export default function UserLeaveDashboard() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── Submit new leave ────────────────────────────────────────
-  const handleAddLeave = async (form: LeaveRequestForm) => {
+  // ✅ fetch เกิดที่นี่ที่เดียว — Modal แค่ส่ง form มาให้
+  // ✅ throw error ออกไป ให้ Modal จัดการ toast.success / toast.error เอง
+  const handleAddLeave = async (form: LeaveRequestForm): Promise<void> => {
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      const newReq = await createLeaveRequest(form as unknown as LeaveRequestPayload);
+      const newReq = await createLeaveRequest(form as LeaveRequestPayload);
       setRequests((prev) => [newReq, ...prev]);
       setShowModal(false);
-    } catch (err: any) {
-      alert(err.response?.data?.message);
+    } catch (err) {
+      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -257,7 +259,7 @@ export default function UserLeaveDashboard() {
     const matchDate =
       viewMode === "all" ? true :
       viewMode === "yearly"  ? reqYear === selectedYear :
-      /* monthly */ reqYear === selectedYear && reqMonth === selectedMonth;
+      reqYear === selectedYear && reqMonth === selectedMonth;
     return matchStatus && matchDate;
   });
 
@@ -290,8 +292,18 @@ export default function UserLeaveDashboard() {
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-      {selected   && <DetailDrawer req={selected} onClose={() => setSelected(null)} />}
-      {showModal  && <LeaveRequestModal leaveTypes={leaveTypes} onSubmit={handleAddLeave} onClose={() => setShowModal(false)} />}
+      {selected  && <DetailDrawer req={selected} onClose={() => setSelected(null)} />}
+      <ToastContainer />
+
+      {/* ✅ ส่ง isLoading={submitting} ให้ Modal แสดง spinner และ disable ปุ่ม */}
+      {showModal && (
+        <LeaveRequestModal
+          leaveTypes={leaveTypes}
+          onSubmit={handleAddLeave}
+          onClose={() => setShowModal(false)}
+          isLoading={submitting}
+        />
+      )}
 
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
@@ -365,7 +377,6 @@ export default function UserLeaveDashboard() {
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ ปี {year}</h3>
           {leavePool ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-              {/* Pool summary */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center flex-shrink-0">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -406,9 +417,7 @@ export default function UserLeaveDashboard() {
                 </div>
               </div>
 
-              {/* Breakdown by leave type */}
               {leaveTypes.length > 0 && (() => {
-                // นับวันที่ approved แยกตามประเภทจาก requests
                 const breakdown = leaveTypes.map((t) => {
                   const used = requests
                     .filter((r) => r.status === "approved" && r.leave_type_id === t.id)
@@ -468,7 +477,6 @@ export default function UserLeaveDashboard() {
                 ))}
               </div>
             </div>
-            {/* Date filter */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
                 {(["all", "yearly", "monthly"] as const).map((v) => (
@@ -523,8 +531,6 @@ export default function UserLeaveDashboard() {
           </div>
           <p className="text-xs text-gray-400 text-right mt-2 px-1">คลิกแถวเพื่อดูรายละเอียด</p>
         </div>
-
-
       </main>
     </div>
   );

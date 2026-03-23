@@ -9,6 +9,7 @@ import {
 } from "../../services/leaveService";
 import type { LeaveRequest, LeaveStatus, LeaveType, LeavePool } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
+import { ToastContainer, toast } from "../../components/Toast"; // ✅ import Toast
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -295,6 +296,7 @@ export default function AdminDashboard() {
     if (activeTab === "employees") fetchEmployees();
   }, [activeTab, fetchEmployees]);
 
+  // ✅ ใช้ toast แทน alert ทุกจุด
   const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
     try {
       setActionLoading(true);
@@ -309,8 +311,9 @@ export default function AdminDashboard() {
       );
       setConfirm(null);
       setSelected(null);
+      toast.success(type === "approve" ? "อนุมัติคำขอลาเรียบร้อย" : "ปฏิเสธคำขอลาเรียบร้อย");
     } catch (err: any) {
-      alert(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
+      toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
     } finally {
       setActionLoading(false);
     }
@@ -321,18 +324,23 @@ export default function AdminDashboard() {
       const pool = await getAdminUserPool(user.id, year);
       setBalanceModal({ user, pool });
     } catch {
-      alert("โหลดข้อมูลวันลาไม่สำเร็จ");
+      toast.error("โหลดข้อมูลวันลาไม่สำเร็จ");
     }
   };
 
   const handleUpdateBalance = async (remaining_days: number) => {
     if (!balanceModal) return;
-    const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
-    setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
-    if (activeTab === "employees") {
-      setEmployees((prev) => prev.map((e) =>
-        e.id === balanceModal.user.id ? { ...e, pool: updated } : e
-      ));
+    try {
+      const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
+      setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
+      if (activeTab === "employees") {
+        setEmployees((prev) => prev.map((e) =>
+          e.id === balanceModal.user.id ? { ...e, pool: updated } : e
+        ));
+      }
+      toast.success("อัปเดตวันลาเรียบร้อย");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "อัปเดตวันลาไม่สำเร็จ");
     }
   };
 
@@ -382,6 +390,9 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+      {/* ✅ Toast container — ต้องมีแค่ที่เดียวต่อหน้า */}
+      <ToastContainer />
 
       {confirm && (
         <ConfirmModal
@@ -625,7 +636,6 @@ export default function AdminDashboard() {
         {/* ── Employees Tab ────────────────────────────────────── */}
         {activeTab === "employees" && (
           <div className="space-y-4">
-            {/* Search + filter */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
@@ -650,7 +660,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Employee table */}
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">

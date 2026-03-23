@@ -51,11 +51,12 @@ export interface LeaveRequest {
   };
 }
 
+// ✅ LeaveRequestPayload ใช้ string แทน Dayjs เพื่อให้ตรงกับ LeaveRequestForm จาก Modal
 export interface LeaveRequestPayload {
   leave_type_id: number;
   leave_unit:    LeaveUnit;
-  start_date:    Dayjs | null;
-  end_date:      Dayjs | null;
+  start_date:    string;
+  end_date:      string;
   start_time?:   Dayjs | null;
   end_time?:     Dayjs | null;
   reason:        string;
@@ -84,38 +85,36 @@ export async function getMyLeaveRequests(): Promise<LeaveRequest[]> {
   return res.data;
 }
 
+// ✅ รับ LeaveRequestPayload ที่ start_date/end_date เป็น string แล้ว
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
+
+  // คำนวณ total_hours จาก Dayjs start_time/end_time
   const total_hours = isHour && payload.start_time && payload.end_time
     ? Math.max(0, Math.round((payload.end_time.diff(payload.start_time, "minute") / 60) * 10) / 10)
     : null;
 
+  // คำนวณ total_days จาก string start_date/end_date
+  const total_days = isHour
+    ? 0
+    : (() => {
+        const from = new Date(payload.start_date).getTime();
+        const to   = new Date(payload.end_date).getTime();
+        return Math.max(1, Math.ceil((to - from) / 86_400_000) + 1);
+      })();
+
   const body: Record<string, unknown> = {
     leave_type_id: payload.leave_type_id,
-    start_date:    payload.start_date?.format("YYYY-MM-DD"),
-    end_date:      isHour
-      ? payload.start_date?.format("YYYY-MM-DD")
-      : payload.end_date?.format("YYYY-MM-DD"),
+    start_date:    payload.start_date,
+    end_date:      isHour ? payload.start_date : payload.end_date,
     reason:        payload.reason,
+    total_days,
+    start_time:    isHour && payload.start_time?.isValid() ? payload.start_time.format("HH:mm") : null,
+    end_time:      isHour && payload.end_time?.isValid()   ? payload.end_time.format("HH:mm")   : null,
+    total_hours:   isHour ? total_hours : null,
   };
 
-  if (isHour) {
-    body.start_time  = payload.start_time?.format("HH:mm") ?? null;
-    body.end_time    = payload.end_time?.format("HH:mm") ?? null;
-    body.total_hours = total_hours;
-    body.total_days  = 0;
-  } else {
-    const days = payload.end_date && payload.start_date
-      ? Math.max(1, payload.end_date.diff(payload.start_date, "day") + 1)
-      : 1;
-    body.total_days = days;
-    body.start_time = null;
-    body.end_time   = null;
-  }
-
-    console.log("[createLeaveRequest] body:", body);
-    const res = await api.post("/api/leave-requests", body);
-    console.log("[createLeaveRequest] response:", res.data);
+  const res = await api.post("/api/leave-requests", body);
   return res.data;
 }
 

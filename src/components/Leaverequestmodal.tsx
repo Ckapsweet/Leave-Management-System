@@ -3,6 +3,7 @@ import type { Dayjs } from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
+import { toast } from "./Toast"; // ✅ import toast
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,8 +28,9 @@ export interface LeaveRequestForm {
 
 export interface LeaveRequestModalProps {
   leaveTypes: LeaveType[];
-  onSubmit: (form: LeaveRequestForm) => void;
+  onSubmit: (form: LeaveRequestForm) => Promise<void>; // ✅ return Promise เพื่อให้ Modal รู้ผล
   onClose: () => void;
+  isLoading?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -59,7 +61,6 @@ interface FormErrors {
   reason?: string;
 }
 
-
 function validate(form: LeaveRequestForm): FormErrors {
   const errors: FormErrors = {};
   if (!form.leave_type_id) errors.leave_type_id = "กรุณาเลือกประเภทการลา";
@@ -71,7 +72,8 @@ function validate(form: LeaveRequestForm): FormErrors {
   if (form.leave_unit === "hour") {
     if (!form.start_time || !form.start_time.isValid()) errors.start_time = "กรุณาระบุเวลาเริ่ม";
     if (!form.end_time || !form.end_time.isValid()) errors.end_time = "กรุณาระบุเวลาสิ้นสุด";
-    else if (form.start_time && form.start_time.isValid() && form.end_time.isBefore(form.start_time)) errors.end_time = "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม";
+    else if (form.start_time && form.start_time.isValid() && form.end_time.isBefore(form.start_time))
+      errors.end_time = "เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม";
   }
   if (!form.reason.trim()) errors.reason = "กรุณาระบุเหตุผล";
   return errors;
@@ -125,7 +127,7 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
       </div>
     );
   }
-  const hours = calcHours(form.start_time as Dayjs | null, form.end_time as Dayjs | null);
+  const hours = calcHours(form.start_time, form.end_time);
   if (!hours) return null;
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
@@ -137,7 +139,7 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function LeaveRequestModal({ leaveTypes, onSubmit, onClose }: LeaveRequestModalProps) {
+export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = false }: LeaveRequestModalProps) {
   const [form, setForm] = useState<LeaveRequestForm>({
     leave_type_id: 0,
     leave_unit: "day",
@@ -150,15 +152,11 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose }: LeaveReques
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
 
-  // sync end_date = start_date when switching to hour
   useEffect(() => {
-    if (form.leave_unit === "hour" && form.start_date) {
+    if (form.leave_unit === "hour" && form.start_date)
       setForm((f) => ({ ...f, end_date: f.start_date }));
-    }
-    // reset time when switching unit
-    if (form.leave_unit === "day") {
+    if (form.leave_unit === "day")
       setForm((f) => ({ ...f, start_time: null, end_time: null }));
-    }
   }, [form.leave_unit]);
 
   const set = <K extends keyof LeaveRequestForm>(key: K, value: LeaveRequestForm[K]) => {
@@ -167,16 +165,21 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose }: LeaveReques
     if (submitted) setErrors(validate(updated));
   };
 
-  const handleSubmit = () => {
+  // ✅ รอ Promise จาก parent แล้วแสดง Toast ตามผล
+  const handleSubmit = async () => {
     setSubmitted(true);
     const errs = validate(form);
     setErrors(errs);
-    if (Object.keys(errs).length === 0) {
-      onSubmit(form);
+    if (Object.keys(errs).length > 0) return;
+
+    try {
+      await onSubmit(form);
+      toast.success("ส่งคำขอลาสำเร็จ!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
     }
   };
 
-  // close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -341,22 +344,37 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose }: LeaveReques
             />
             {errors.reason && <p className={ERROR_CLASS}>{errors.reason}</p>}
           </div>
-
         </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end flex-shrink-0">
-          <button onClick={onClose} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium">
+          <button
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             ยกเลิก
           </button>
           <button
             onClick={handleSubmit}
-            className="px-5 py-2.5 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium transition-colors flex items-center gap-2"
+            disabled={isLoading}
+            className="px-5 py-2.5 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M5 12l5 5L20 7"/>
-            </svg>
-            ส่งคำขอลา
+            {isLoading ? (
+              <>
+                <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                กำลังส่ง...
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M5 12l5 5L20 7"/>
+                </svg>
+                ส่งคำขอลา
+              </>
+            )}
           </button>
         </div>
       </div>
