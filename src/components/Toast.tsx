@@ -1,5 +1,5 @@
 // components/Toast.tsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -72,10 +72,13 @@ function ToastCard({ item, onRemove }: { item: ToastItem; onRemove: (id: number)
     setTimeout(() => onRemove(item.id), 300);
   }, [item.id, onRemove]);
 
+  // ✅ เปลี่ยนจาก requestAnimationFrame → useLayoutEffect
+  // ทำงานได้ทั้ง browser และ jsdom test environment
+  useLayoutEffect(() => {
+    setVisible(true);
+  }, []);
+
   useEffect(() => {
-    // mount → slide in
-    requestAnimationFrame(() => setVisible(true));
-    // auto dismiss
     const t = setTimeout(dismiss, duration);
     return () => clearTimeout(t);
   }, [dismiss, duration]);
@@ -114,6 +117,7 @@ function ToastCard({ item, onRemove }: { item: ToastItem; onRemove: (id: number)
 
         {/* Close */}
         <button
+          aria-label="ปิด"
           onClick={dismiss}
           className={`flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg opacity-50 hover:opacity-100 transition-opacity ${cfg.text}`}
         >
@@ -147,7 +151,6 @@ export function ToastContainer() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // ลงทะเบียน addToast ให้ global toast() ใช้ได้
   useEffect(() => {
     _addToast = addToast;
     return () => { _addToast = null; };
