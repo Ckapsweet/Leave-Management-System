@@ -78,7 +78,7 @@ function BarChart({ data, maxVal }: { data: { label: string; value: number; by_t
   );
 }
 
-// ── Legend ────────────────────────────────────────────────────
+// ── Legend ──────────────────────────────────────────────────── \\
 
 function Legend({ types }: { types: string[] }) {
   return (
