@@ -2,9 +2,11 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
+type Role = "user" | "hr" | "admin" | "super_admin";
+
 type Props = {
   children:      ReactNode;
-  requiredRole?: "admin" | "user";
+  requiredRole?: Role | Role[];   // รับได้ทั้ง string เดียวและ array
 };
 
 // ── หมายเหตุ ──────────────────────────────────────────────────
@@ -13,15 +15,23 @@ type Props = {
 // ถ้าใครแก้ role ใน localStorage ก็จะเข้าหน้าได้ แต่ทุก API call
 // จะ return 401/403 เพราะ cookie ไม่มี / role ไม่ตรง
 
+function roleToPath(role: string): string {
+  if (role === "super_admin") return "/super-admin";
+  if (role === "admin")       return "/admin";
+  return "/dashboard";
+}
+
 export default function ProtectedRoute({ children, requiredRole }: Props) {
-  const role = localStorage.getItem("role");
+  const role = localStorage.getItem("role") as Role | null;
 
   // ไม่มี role = ยังไม่ได้ login
   if (!role) return <Navigate to="/" replace />;
 
-  // มี requiredRole และ role ไม่ตรง → redirect ไปหน้าที่ควรอยู่
-  if (requiredRole && role !== requiredRole) {
-    return <Navigate to={role === "admin" ? "/admin" : "/dashboard"} replace />;
+  if (requiredRole) {
+    const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!allowed.includes(role)) {
+      return <Navigate to={roleToPath(role)} replace />;
+    }
   }
 
   return <>{children}</>;
