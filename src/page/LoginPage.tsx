@@ -28,7 +28,12 @@ export default function LoginPage() {
         localStorage.setItem("adminName", user.full_name);
       }
 
-      navigate(user.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+      const roleToPath: Record<string, string> = {
+        super_admin: "/super-admin",
+        admin:       "/admin",
+      };
+      navigate(roleToPath[user.role] ?? "/dashboard", { replace: true });
+
     } catch (err: any) {
       setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
     } finally {

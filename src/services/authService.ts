@@ -6,7 +6,7 @@ export interface AuthUser {
   employee_code: string;
   full_name:     string;
   department:    string;
-  role:          "admin" | "user";
+  role:          "user" | "hr" | "admin" | "super_admin";
 }
 
 export async function login(employee_code: string, password: string): Promise<{ user: AuthUser }> {
