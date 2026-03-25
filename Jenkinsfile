@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    //  agent any
+    //   agent any
+    //    agent any
+    //     agent any
 
     environment {
         DEPLOY_PATH = '/var/www/html'
