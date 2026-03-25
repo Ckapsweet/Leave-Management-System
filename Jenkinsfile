@@ -4,7 +4,6 @@ pipeline {
     environment {
         DEPLOY_PATH = '/var/www/html'
         CONFIG_FILE_ID = 'ckap-leave-env'
-        APP_DIR = 'ckap-leave-management-system'
     }
 
     stages {
@@ -16,24 +15,21 @@ pipeline {
 
         stage('Install & Build') {
             steps {
-                dir("${APP_DIR}") {
-                    configFileProvider([configFile(fileId: "${CONFIG_FILE_ID}", targetLocation: '.env')]) {
-                        sh '''
-                        set -e
-                        echo "Node version: $(node -v)"
-                        echo "NPM version: $(npm -v)"
+                configFileProvider([configFile(fileId: "${CONFIG_FILE_ID}", targetLocation: '.env')]) {
+                    sh '''
+                    set -e
+                    echo "Node version: $(node -v)"
+                    echo "NPM version: $(npm -v)"
 
-                        npm install
-                        npm run build
+                    npm install
+                    npm run build
 
-                        # ✅ Verify ทันทีก่อนออกจาก configFileProvider block
-                        if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-                            echo "ERROR: dist/ is empty or missing! Build may have failed." >&2
-                            exit 1
-                        fi
-                        echo "✅ dist/ verified — ready to deploy."
-                        '''
-                    }
+                    if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+                        echo "ERROR: dist/ is empty or missing! Build may have failed." >&2
+                        exit 1
+                    fi
+                    echo "✅ dist/ verified — ready to deploy."
+                    '''
                 }
             }
         }
@@ -41,21 +37,19 @@ pipeline {
         stage('Deploy Static Files') {
             when { branch 'main' }
             steps {
-                dir("${APP_DIR}") {
-                    sh '''
-                    set -e
+                sh '''
+                set -e
 
-                    if [ -z "${DEPLOY_PATH}" ]; then
-                        echo "ERROR: DEPLOY_PATH is not set!" >&2
-                        exit 1
-                    fi
+                if [ -z "${DEPLOY_PATH}" ]; then
+                    echo "ERROR: DEPLOY_PATH is not set!" >&2
+                    exit 1
+                fi
 
-                    if [ -d "${DEPLOY_PATH}" ]; then
-                        sudo rm -rf "${DEPLOY_PATH:?}/"*
-                    fi
-                    sudo cp -r dist/* "${DEPLOY_PATH}/"
-                    '''
-                }
+                if [ -d "${DEPLOY_PATH}" ]; then
+                    sudo rm -rf "${DEPLOY_PATH:?}/"*
+                fi
+                sudo cp -r dist/* "${DEPLOY_PATH}/"
+                '''
             }
         }
 
@@ -72,9 +66,9 @@ pipeline {
     }
 
     post {
-        // always {
-        //     cleanWs()
-        // }
+        always {
+            cleanWs()
+        }
         success {
             echo "✅ Deployment completed successfully! Build #${BUILD_NUMBER}"
         }
