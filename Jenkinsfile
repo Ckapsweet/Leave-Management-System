@@ -44,6 +44,7 @@ pipeline {
         }
 
         stage('Deploy Static Files') {
+            when { branch 'main' }
             steps {
                 sh '''
                 set -e
@@ -64,6 +65,7 @@ pipeline {
         }
 
         stage('Reload Nginx') {
+            when { branch 'main' }
             steps {
                 sh '''
                 set -e
