@@ -73,7 +73,7 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            // cleanWs()
         }
         success {
             echo "✅ Deployment completed successfully! Build #${BUILD_NUMBER}"
