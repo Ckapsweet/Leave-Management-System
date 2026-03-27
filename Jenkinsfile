@@ -52,8 +52,8 @@ pipeline {
         stage('Deploy Static Files') {
             steps {
                 sh '''
-                rm -rf ${DEPLOY_DIR}/*
-                cp -r ${BASE_DIR}/Leave-Management-System/dist/* ${DEPLOY_DIR}/
+                sudo rm -rf ${DEPLOY_DIR}/*
+                sudo cp -r ${BASE_DIR}/Leave-Management-System/dist/* ${DEPLOY_DIR}/
                 echo "✅ Files deployed to ${DEPLOY_DIR}"
                 '''
             }
