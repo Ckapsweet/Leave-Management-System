@@ -2,64 +2,69 @@ pipeline {
     agent { label 'leave-frontend' }
 
     environment {
-        DEPLOY_PATH = '/var/www/html'
-        CONFIG_FILE_ID = 'ckap-leave-env'
+        BASE_DIR   = '/home/adminis'
+        DEPLOY_DIR = '/var/www/html'
+        REPO_URL   = 'github.com/Ckapsweet/Leave-Management-System.git'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone Repository') {
             steps {
-                checkout scm
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github',
+                        usernameVariable: 'githubUser',
+                        passwordVariable: 'githubPwd'
+                    )
+                ]) {
+                    sh '''
+                    cd ${BASE_DIR}
+                    pwd && ls -l
+                    if [ -d "Leave-Management-System" ]; then
+                        rm -rf Leave-Management-System
+                    fi
+                    git clone https://${githubUser}:${githubPwd}@${REPO_URL}
+                    '''
+                }
             }
         }
 
         stage('Install & Build') {
             steps {
-                configFileProvider([configFile(fileId: "${CONFIG_FILE_ID}", targetLocation: '.env')]) {
+                configFileProvider([configFile(fileId: 'ckap-leave-env', targetLocation: "${BASE_DIR}/Leave-Management-System/.env")]) {
                     sh '''
-                    set -e
+                    cd ${BASE_DIR}/Leave-Management-System
                     echo "Node version: $(node -v)"
                     echo "NPM version: $(npm -v)"
-
                     npm install
                     npm run build
 
                     if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
-                        echo "ERROR: dist/ is empty or missing! Build may have failed." >&2
+                        echo "ERROR: dist/ is empty or missing!" >&2
                         exit 1
                     fi
-                    echo "✅ dist/ verified — ready to deploy."
+                    echo "✅ Build verified — ready to deploy."
                     '''
                 }
             }
         }
 
         stage('Deploy Static Files') {
-            when { branch 'main' }
             steps {
                 sh '''
-                set -e
-
-                if [ -z "${DEPLOY_PATH}" ]; then
-                    echo "ERROR: DEPLOY_PATH is not set!" >&2
-                    exit 1
-                fi
-
-                if [ -d "${DEPLOY_PATH}" ]; then
-                    sudo rm -rf "${DEPLOY_PATH:?}/"*
-                fi
-                sudo cp -r dist/* "${DEPLOY_PATH}/"
+                rm -rf ${DEPLOY_DIR}/*
+                cp -r ${BASE_DIR}/Leave-Management-System/dist/* ${DEPLOY_DIR}/
+                echo "✅ Files deployed to ${DEPLOY_DIR}"
                 '''
             }
         }
 
         stage('Reload Nginx') {
-            when { branch 'main' }
             steps {
                 sh '''
-                set -e
                 sudo nginx -t
                 sudo systemctl reload nginx
+                echo "✅ Nginx reloaded"
                 '''
             }
         }
