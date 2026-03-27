@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'leave-frontend' }
 
     environment {
         DEPLOY_PATH = '/var/www/html'
