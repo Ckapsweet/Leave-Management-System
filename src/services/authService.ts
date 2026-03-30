@@ -2,11 +2,11 @@
 import api from "./api";
 
 export interface AuthUser {
-  id:            number;
+  id: number;
   employee_code: string;
-  full_name:     string;
-  department:    string;
-  role:          "user" | "hr" | "admin" | "super_admin";
+  full_name: string;
+  department: string;
+  role: "user" | "manager" | "hr";
 }
 
 export async function login(employee_code: string, password: string): Promise<{ user: AuthUser }> {

@@ -5,9 +5,9 @@ import { login } from "../services/authService";
 
 export default function LoginPage() {
   const [employeeCode, setEmployeeCode] = useState("");
-  const [password,     setPassword]     = useState("");
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,17 +20,14 @@ export default function LoginPage() {
       // เก็บ role + user info ใน localStorage
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify({
-        full_name:     user.full_name,
+        full_name: user.full_name,
         employee_code: user.employee_code,
-        department:    user.department,
+        department: user.department,
       }));
-      if (user.role === "admin") {
-        localStorage.setItem("adminName", user.full_name);
-      }
-
+      // redirect ตาม role ให้ตรงกับ route ใน App.tsx
       const roleToPath: Record<string, string> = {
-        super_admin: "/super-admin",
-        admin:       "/admin",
+        manager: "/manager",
+        hr:      "/hr",
       };
       navigate(roleToPath[user.role] ?? "/dashboard", { replace: true });
 

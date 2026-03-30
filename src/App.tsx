@@ -1,10 +1,10 @@
 // App.tsx
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import LoginPage            from "./page/LoginPage";
-import Dashboard            from "./page/Dashboard";
-import AdminDashboard       from "./page/admin/AdminDashboard";
-import SuperAdminDashboard  from "./page/admin/SuperAdminDashboard";
-import ProtectedRoute       from "./ProtectedRoute";
+import LoginPage from "./page/LoginPage";
+import Dashboard from "./page/Dashboard";
+import AdminDashboard from "./page/admin/AdminDashboard";
+import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
+import ProtectedRoute from "./ProtectedRoute";
 
 export default function App() {
   return (
@@ -17,7 +17,7 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requiredRole={["user", "hr", "admin", "super_admin"]}>
+            <ProtectedRoute requiredRole={["user", "manager", "hr"]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -25,9 +25,9 @@ export default function App() {
 
         {/* Admin */}
         <Route
-          path="/admin"
+          path="/manager"
           element={
-            <ProtectedRoute requiredRole={["admin", "super_admin"]}>
+            <ProtectedRoute requiredRole={["manager"]}>
               <AdminDashboard />
             </ProtectedRoute>
           }
@@ -35,9 +35,9 @@ export default function App() {
 
         {/* Super Admin */}
         <Route
-          path="/super-admin"
+          path="/hr"
           element={
-            <ProtectedRoute requiredRole={["super_admin"]}>
+            <ProtectedRoute requiredRole={["hr"]}>
               <SuperAdminDashboard />
             </ProtectedRoute>
           }

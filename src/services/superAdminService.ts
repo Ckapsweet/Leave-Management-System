@@ -4,61 +4,61 @@ import api from "./api";
 // ── Types ─────────────────────────────────────────────────────
 
 export type AuditAction =
-  | "leave.create"   | "leave.cancel"
-  | "leave.approve"  | "leave.reject"
+  | "leave.create" | "leave.cancel"
+  | "leave.approve" | "leave.reject"
   | "balance.update"
-  | "user.create"    | "user.update"
-  | "user.delete"    | "user.role_change"
-  | "auth.login"     | "auth.logout"     | "auth.login_failed";
+  | "user.create" | "user.update"
+  | "user.delete" | "user.role_change"
+  | "auth.login" | "auth.logout" | "auth.login_failed";
 
 export interface AuditLog {
-  id:           number;
-  created_at:   string;
-  action:       AuditAction | string;
-  target_type:  string | null;
-  target_id:    number | null;
-  before_data:  Record<string, unknown> | null;
-  after_data:   Record<string, unknown> | null;
-  note:         string | null;
-  ip_address:   string | null;
-  actor_id:     number;
-  actor_role:   string;
-  actor_name:   string;
-  actor_code:   string;
-  actor_dept:   string | null;
+  id: number;
+  created_at: string;
+  action: AuditAction | string;
+  target_type: string | null;
+  target_id: number | null;
+  before_data: Record<string, unknown> | null;
+  after_data: Record<string, unknown> | null;
+  note: string | null;
+  ip_address: string | null;
+  actor_id: number;
+  actor_role: string;
+  actor_name: string;
+  actor_code: string;
+  actor_dept: string | null;
 }
 
 export interface AuditLogPagination {
-  data:       AuditLog[];
+  data: AuditLog[];
   pagination: {
-    total:      number;
-    page:       number;
-    limit:      number;
+    total: number;
+    page: number;
+    limit: number;
     totalPages: number;
   };
 }
 
-export type UserRole = "user" | "hr" | "admin" | "super_admin";
+export type UserRole = "user" | "manager" | "hr";
 
 export interface SuperAdminUser {
-  id:            number;
+  id: number;
   employee_code: string;
-  full_name:     string;
-  department:    string | null;
-  role:          UserRole;
-  created_at:    string;
+  full_name: string;
+  department: string | null;
+  role: UserRole;
+  created_at: string;
 }
 
 // ── Audit Logs ────────────────────────────────────────────────
 
 export interface AuditLogParams {
-  action?:      string;
-  actor_id?:    number;
+  action?: string;
+  actor_id?: number;
   target_type?: string;
-  date_from?:   string;
-  date_to?:     string;
-  page?:        number;
-  limit?:       number;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
 }
 
 export async function getAuditLogs(params?: AuditLogParams): Promise<AuditLogPagination> {
@@ -84,10 +84,10 @@ export async function getSuperAdminUsers(params?: {
 
 export async function createUser(payload: {
   employee_code: string;
-  full_name:     string;
-  department?:   string;
-  password:      string;
-  role:          UserRole;
+  full_name: string;
+  department?: string;
+  password: string;
+  role: UserRole;
 }): Promise<SuperAdminUser> {
   const res = await api.post("/api/super-admin/users", payload);
   return res.data;

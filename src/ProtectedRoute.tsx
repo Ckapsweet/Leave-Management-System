@@ -2,10 +2,10 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
-type Role = "user" | "hr" | "admin" | "super_admin";
+type Role = "user" | "manager" | "hr";
 
 type Props = {
-  children:      ReactNode;
+  children: ReactNode;
   requiredRole?: Role | Role[];   // รับได้ทั้ง string เดียวและ array
 };
 
@@ -16,8 +16,8 @@ type Props = {
 // จะ return 401/403 เพราะ cookie ไม่มี / role ไม่ตรง
 
 function roleToPath(role: string): string {
-  if (role === "super_admin") return "/super-admin";
-  if (role === "admin")       return "/admin";
+  if (role === "hr") return "/hr";
+  if (role === "manager") return "/manager";
   return "/dashboard";
 }
 

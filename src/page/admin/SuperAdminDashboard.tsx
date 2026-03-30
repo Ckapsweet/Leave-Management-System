@@ -139,8 +139,8 @@ export default function SuperAdminDashboard() {
   // ── Derived ────────────────────────────────────────────────────────────────
   const userStats = {
     total: users.length,
-    admins: users.filter((u) => u.role === "admin").length,
-    superAdmins: users.filter((u) => u.role === "super_admin").length,
+    managers: users.filter((u) => u.role === "manager").length,
+    hr: users.filter((u) => u.role === "hr").length,
   };
 
   // ── Error state ────────────────────────────────────────────────────────────
@@ -366,8 +366,8 @@ export default function SuperAdminDashboard() {
             <div className="grid grid-cols-3 gap-4">
               {[
                 { label: "ผู้ใช้ทั้งหมด", value: userStats.total, color: "text-slate-200" },
-                { label: "Admin", value: userStats.admins, color: "text-violet-400" },
-                { label: "Super Admin", value: userStats.superAdmins, color: "text-rose-400" },
+                { label: "Manager", value: userStats.managers, color: "text-violet-400" },
+                { label: "HR", value: userStats.hr, color: "text-rose-400" },
               ].map(({ label, value, color }) => (
                 <div key={label} className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
                   <p className={`text-3xl font-bold font-mono ${color}`}>{value}</p>
