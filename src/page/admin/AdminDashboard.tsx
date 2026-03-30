@@ -10,245 +10,51 @@ import {
 import type { LeaveRequest, LeaveStatus, LeavePool } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
 import { ToastContainer, toast } from "../../components/Toast";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Employee {
-  id:            number;
-  employee_code: string;
-  full_name:     string;
-  department:    string;
-  role:          string;
-}
-
-interface EmployeeWithBalance extends Employee {
-  pool: LeavePool | null;
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const STATUS_META: Record<LeaveStatus, { label: string; color: string; bg: string; dot: string; icon: string }> = {
-  pending:  { label: "รออนุมัติ",   color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",    dot: "bg-amber-400",   icon: "⏳" },
-  approved: { label: "อนุมัติแล้ว", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-400", icon: "✓"  },
-  rejected: { label: "ปฏิเสธ",      color: "text-red-700",     bg: "bg-red-50 border-red-200",         dot: "bg-red-400",     icon: "✗"  },
-};
-
-const TYPE_COLORS: Record<number, string> = {
-  1: "bg-sky-100 text-sky-700",
-  2: "bg-teal-100 text-teal-700",
-  3: "bg-violet-100 text-violet-700",
-  4: "bg-orange-100 text-orange-700",
-};
-
-const DEPT_AVATAR: Record<string, string> = {
-  "วิศวกรรมซอฟต์แวร์": "bg-violet-100 text-violet-700",
-  "การตลาด":            "bg-pink-100 text-pink-700",
-  "การเงิน":            "bg-amber-100 text-amber-700",
-  "ปฏิบัติการ":          "bg-teal-100 text-teal-700",
-  "ทรัพยากรบุคคล":      "bg-blue-100 text-blue-700",
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
-}
-function fmtDatetime(d: string) {
-  return new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-}
-function avatarColor(dept = "") {
-  return DEPT_AVATAR[dept] ?? "bg-gray-100 text-gray-600";
-}
-
-// ── Confirm Modal ─────────────────────────────────────────────────────────────
-
-interface ConfirmModalProps {
-  type: "approve" | "reject";
-  request: LeaveRequest;
-  onConfirm: (comment: string) => void;
-  onClose: () => void;
-  loading: boolean;
-}
-
-function ConfirmModal({ type, request, onConfirm, onClose, loading }: ConfirmModalProps) {
-  const [comment, setComment] = useState("");
-  const isApprove = type === "approve";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${isApprove ? "bg-emerald-100" : "bg-red-100"}`}>
-              {isApprove ? "✓" : "✗"}
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">{isApprove ? "ยืนยันการอนุมัติ" : "ยืนยันการปฏิเสธ"}</h3>
-              <p className="text-xs text-gray-400">คำขอ #{request.id} — {request.user?.full_name}</p>
-            </div>
-          </div>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
-            <div className="flex justify-between"><span className="text-gray-500">ประเภท</span><span className="font-medium">{request.leave_type.name}</span></div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">วันที่</span>
-              <span className="font-medium">
-                {fmtDate(request.start_date)}
-                {request.start_date !== request.end_date ? ` – ${fmtDate(request.end_date)}` : ""}
-                {request.leave_unit === "hour" && request.start_time ? ` (${request.start_time}–${request.end_time} น.)` : ""}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">จำนวน</span>
-              <span className="font-medium">{request.leave_unit === "hour" ? `${request.total_hours} ชั่วโมง` : `${request.total_days} วัน`}</span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1.5">
-              หมายเหตุ {!isApprove && <span className="text-red-400">*</span>}
-            </label>
-            <textarea className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              rows={3} placeholder={isApprove ? "หมายเหตุ (ถ้ามี)..." : "ระบุเหตุผลที่ปฏิเสธ..."}
-              value={comment} onChange={(e) => setComment(e.target.value)} />
-          </div>
-        </div>
-        <div className="px-6 pb-6 flex gap-3 justify-end">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">ยกเลิก</button>
-          <button
-            onClick={() => { if (!isApprove && !comment.trim()) return; onConfirm(comment); }}
-            disabled={loading || (!isApprove && !comment.trim())}
-            className={`px-5 py-2.5 text-sm text-white rounded-xl font-medium transition-colors flex items-center gap-2 ${isApprove ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-500 hover:bg-red-600"} disabled:opacity-40 disabled:cursor-not-allowed`}
-          >
-            {loading ? (
-              <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />{isApprove ? "กำลังอนุมัติ..." : "กำลังปฏิเสธ..."}</>
-            ) : (isApprove ? "อนุมัติ" : "ปฏิเสธ")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Detail Drawer ─────────────────────────────────────────────────────────────
-
-interface DetailDrawerProps {
-  request: LeaveRequest;
-  onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-}
-
-function DetailDrawer({ request: req, onClose, onApprove, onReject }: DetailDrawerProps) {
-  const typeColor = TYPE_COLORS[req.leave_type_id] ?? "bg-gray-100 text-gray-600";
-  const meta      = STATUS_META[req.status];
-  const isHourly  = req.leave_unit === "hour";
-  const ac        = avatarColor(req.user?.department);
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-sm h-full flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-900">คำขอ #{req.id}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 text-xl">×</button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-4">
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${ac}`}>
-              {req.user?.full_name?.slice(0, 2) ?? "??"}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-900 text-sm">{req.user?.full_name}</p>
-              <p className="text-xs text-gray-500">{req.user?.department} · {req.user?.employee_code}</p>
-            </div>
-          </div>
-          <div className={`flex items-center gap-3 p-4 rounded-xl border ${meta.bg}`}>
-            <span className="text-xl">{meta.icon}</span>
-            <div>
-              <p className={`font-semibold text-sm ${meta.color}`}>{meta.label}</p>
-              {req.approved_at && <p className="text-xs text-gray-500">{fmtDatetime(req.approved_at)}</p>}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-400 mb-2">ประเภทการลา</p>
-            <div className="flex items-center gap-2">
-              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${typeColor}`}>{req.leave_type.name}</span>
-              {isHourly && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                  ลาชั่วโมง
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">วันที่ลา</span><span className="font-medium text-gray-800">{fmtDate(req.start_date)}</span></div>
-            {!isHourly && req.start_date !== req.end_date && (
-              <div className="flex justify-between"><span className="text-gray-500">ถึงวันที่</span><span className="font-medium text-gray-800">{fmtDate(req.end_date)}</span></div>
-            )}
-            {isHourly && req.start_time && (
-              <div className="flex justify-between"><span className="text-gray-500">ช่วงเวลา</span><span className="font-medium text-gray-800">{req.start_time} – {req.end_time} น.</span></div>
-            )}
-            <div className="border-t border-gray-200 pt-3 flex justify-between">
-              <span className="text-gray-500">รวม</span>
-              <span className="font-bold text-gray-900">{isHourly ? `${req.total_hours} ชั่วโมง` : `${req.total_days} วัน`}</span>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-400 mb-2">เหตุผล</p>
-            <p className="text-sm text-gray-700 bg-gray-50 rounded-xl p-4 leading-relaxed">{req.reason}</p>
-          </div>
-          {req.comment && (
-            <div>
-              <p className="text-xs font-medium text-gray-400 mb-2">หมายเหตุ</p>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <p className="text-sm text-amber-800">"{req.comment}"</p>
-                {req.approver_name && <p className="text-xs text-amber-600 mt-1">— {req.approver_name}</p>}
-              </div>
-            </div>
-          )}
-          <p className="text-xs text-gray-400 text-center">ส่งคำขอเมื่อ {fmtDatetime(req.created_at)}</p>
-        </div>
-        {req.status === "pending" && (
-          <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-            <button onClick={onReject}  className="flex-1 py-2.5 text-sm border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-medium transition-colors">ปฏิเสธ</button>
-            <button onClick={onApprove} className="flex-1 py-2.5 text-sm bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium transition-colors">อนุมัติ</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Main Dashboard ────────────────────────────────────────────────────────────
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { DetailDrawer } from "../../components/DetailDrawer";
+import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
+import {
+  STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
+  type Employee, type EmployeeWithBalance,
+} from "../../components/adminHelpers";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  const [requests,      setRequests]      = useState<LeaveRequest[]>([]);
-  const [loading,       setLoading]       = useState(true);
+  // ── Leave requests state ───────────────────────────────────────────────────
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error,         setError]         = useState("");
-  const [statusFilter,  setStatusFilter]  = useState<"all" | LeaveStatus>("pending");
-  const [deptFilter,    setDeptFilter]    = useState("all");
-  const [search,        setSearch]        = useState("");
-  const [viewMode,      setViewMode]      = useState<"all" | "yearly" | "monthly">("all");
-  const [selYear,       setSelYear]       = useState<number>(new Date().getFullYear());
-  const [selMonth,      setSelMonth]      = useState<number>(new Date().getMonth() + 1);
-  const [selected,      setSelected]      = useState<LeaveRequest | null>(null);
-  const [confirm,       setConfirm]       = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
-  const [activeTab,     setActiveTab]     = useState<"requests" | "employees">("requests");
-  const [balanceModal,  setBalanceModal]  = useState<{
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"all" | "yearly" | "monthly">("all");
+  const [selYear, setSelYear] = useState<number>(new Date().getFullYear());
+  const [selMonth, setSelMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selected, setSelected] = useState<LeaveRequest | null>(null);
+  const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
+
+  // ── Employees state ────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"requests" | "employees">("requests");
+  const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
+  const [empLoading, setEmpLoading] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
+  const [empDeptFilter, setEmpDeptFilter] = useState("all");
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithBalance | null>(null);
+  const [empLeaveRequests, setEmpLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [empLeaveLoading, setEmpLeaveLoading] = useState(false);
+
+  // ── Balance modal state ────────────────────────────────────────────────────
+  const [balanceModal, setBalanceModal] = useState<{
     user: { id: number; full_name: string; employee_code: string; department: string };
     pool: LeavePool;
   } | null>(null);
-  const [employees,     setEmployees]     = useState<EmployeeWithBalance[]>([]);
-  const [empLoading,    setEmpLoading]    = useState(false);
-  const [empSearch,     setEmpSearch]     = useState("");
-  const [empDeptFilter, setEmpDeptFilter] = useState("all");
 
   const adminName = localStorage.getItem("adminName") ?? "Admin";
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
+
+  // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -291,11 +97,13 @@ export default function AdminDashboard() {
     if (activeTab === "employees") fetchEmployees();
   }, [activeTab, fetchEmployees]);
 
+  // ── Actions ────────────────────────────────────────────────────────────────
+
   const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
     try {
       setActionLoading(true);
       if (type === "approve") await approveLeaveRequest(id, comment);
-      else                    await rejectLeaveRequest(id, comment);
+      else await rejectLeaveRequest(id, comment);
       setRequests((prev) =>
         prev.map((r) =>
           r.id === id
@@ -338,30 +146,54 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleEmployeeClick = async (emp: EmployeeWithBalance) => {
+    setSelectedEmployee(emp);
+    setEmpLeaveRequests([]);
+    setEmpLeaveLoading(true);
+    try {
+      const data = await getAdminLeaveRequests({ user_id: emp.id });
+      setEmpLeaveRequests(data);
+    } catch {
+      setEmpLeaveRequests(requests.filter((r) => r.user_id === emp.id));
+    } finally {
+      setEmpLeaveLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     await logout();
     localStorage.removeItem("role");
     navigate("/", { replace: true });
   };
 
+  // ── Derived data ───────────────────────────────────────────────────────────
+
   const departments = ["all", ...Array.from(new Set(requests.map((r) => r.user?.department ?? "")))];
 
   const filtered = requests.filter((r) => {
     const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const matchDept   = deptFilter   === "all" || r.user?.department === deptFilter;
+    const matchDept = deptFilter === "all" || r.user?.department === deptFilter;
     const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
-    const reqYear  = new Date(r.start_date).getFullYear();
+    const reqYear = new Date(r.start_date).getFullYear();
     const reqMonth = new Date(r.start_date).getMonth() + 1;
     const matchDate =
-      viewMode === "all"    ? true :
-      viewMode === "yearly" ? reqYear === selYear :
-                              reqYear === selYear && reqMonth === selMonth;
+      viewMode === "all" ? true :
+        viewMode === "yearly" ? reqYear === selYear :
+          reqYear === selYear && reqMonth === selMonth;
     return matchStatus && matchDept && matchSearch && matchDate;
   });
 
-  const pending  = requests.filter((r) => r.status === "pending").length;
+  const pending = requests.filter((r) => r.status === "pending").length;
   const approved = requests.filter((r) => r.status === "approved").length;
   const rejected = requests.filter((r) => r.status === "rejected").length;
+
+  const filteredEmployees = employees.filter((e) => {
+    const ms = empDeptFilter === "all" || e.department === empDeptFilter;
+    const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
+    return ms && mq;
+  });
+
+  // ── Loading / Error states ─────────────────────────────────────────────────
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -381,12 +213,15 @@ export default function AdminDashboard() {
     </div>
   );
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <ToastContainer />
 
+      {/* Modals & Drawers */}
       {confirm && (
         <ConfirmModal
           type={confirm.type}
@@ -413,14 +248,28 @@ export default function AdminDashboard() {
           onReject={() => setConfirm({ type: "reject", req: selected })}
         />
       )}
+      {selectedEmployee && !balanceModal && (
+        <EmployeeLeaveDrawer
+          employee={selectedEmployee}
+          leaveRequests={empLeaveRequests}
+          loading={empLeaveLoading}
+          onClose={() => { setSelectedEmployee(null); setEmpLeaveRequests([]); }}
+          onOpenBalance={() => openBalanceModal({
+            id: selectedEmployee.id,
+            full_name: selectedEmployee.full_name,
+            employee_code: selectedEmployee.employee_code,
+            department: selectedEmployee.department,
+          })}
+        />
+      )}
 
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           </div>
           <div>
@@ -428,9 +277,11 @@ export default function AdminDashboard() {
             <p className="text-xs text-gray-400">ปี {year}</p>
           </div>
         </div>
+
+        {/* Tab switcher */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
           {([
-            { key: "requests",  label: "คำขอลา"  },
+            { key: "requests", label: "คำขอลา" },
             { key: "employees", label: "พนักงาน" },
           ] as const).map(({ key, label }) => (
             <button key={key} onClick={() => setActiveTab(key)}
@@ -442,6 +293,8 @@ export default function AdminDashboard() {
             </button>
           ))}
         </div>
+
+        {/* User info */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
@@ -460,15 +313,15 @@ export default function AdminDashboard() {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
-        {/* ── Requests Tab ────────────────────────────────────── */}
+        {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (
           <div className="space-y-6">
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "รออนุมัติ",   value: pending,  color: "text-amber-600",   border: "border-amber-100",  click: "pending"  },
+                { label: "รออนุมัติ", value: pending, color: "text-amber-600", border: "border-amber-100", click: "pending" },
                 { label: "อนุมัติแล้ว", value: approved, color: "text-emerald-600", border: "border-emerald-100", click: "approved" },
-                { label: "ปฏิเสธ",      value: rejected, color: "text-red-500",     border: "border-red-100",     click: "rejected" },
+                { label: "ปฏิเสธ", value: rejected, color: "text-red-500", border: "border-red-100", click: "rejected" },
               ].map(({ label, value, color, border, click }) => (
                 <button key={label} onClick={() => setStatusFilter(click as LeaveStatus)}
                   className={`bg-white rounded-2xl border p-5 text-left hover:shadow-md transition-all ${border} ${statusFilter === click ? "ring-2 ring-offset-1 ring-slate-300" : ""}`}>
@@ -483,7 +336,7 @@ export default function AdminDashboard() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
                     placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -532,14 +385,14 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Table */}
+            {/* Requests table */}
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-700">
                   รายการคำขอลา <span className="ml-2 text-gray-400 font-normal">({filtered.length} รายการ)</span>
                 </h2>
                 <button onClick={fetchRequests} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
                   รีเฟรช
                 </button>
               </div>
@@ -557,9 +410,9 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filtered.map((r) => {
-                        const meta     = STATUS_META[r.status];
-                        const tc       = TYPE_COLORS[r.leave_type_id] ?? "bg-gray-100 text-gray-600";
-                        const ac       = avatarColor(r.user?.department);
+                        const meta = STATUS_META[r.status];
+                        const tc = TYPE_COLORS[r.leave_type_id] ?? "bg-gray-100 text-gray-600";
+                        const ac = avatarColor(r.user?.department);
                         const isHourly = r.leave_unit === "hour";
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/70 cursor-pointer transition-colors" onClick={() => setSelected(r)}>
@@ -579,7 +432,7 @@ export default function AdminDashboard() {
                                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${tc}`}>{r.leave_type.name}</span>
                                 {isHourly && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium w-fit">
-                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
                                     ลาชั่วโมง
                                   </span>
                                 )}
@@ -626,14 +479,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ── Employees Tab ────────────────────────────────────── */}
+        {/* ── Employees Tab ──────────────────────────────────────────────────── */}
         {activeTab === "employees" && (
           <div className="space-y-4">
+            {/* Employee filters */}
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
                     placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={empSearch}
@@ -647,23 +501,18 @@ export default function AdminDashboard() {
                   ))}
                 </select>
                 <button onClick={fetchEmployees} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
                   รีเฟรช
                 </button>
               </div>
             </div>
 
+            {/* Employees table */}
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">
                   รายชื่อพนักงาน
-                  <span className="ml-2 text-gray-400 font-normal">
-                    ({employees.filter((e) => {
-                      const ms = empDeptFilter === "all" || e.department === empDeptFilter;
-                      const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
-                      return ms && mq;
-                    }).length} คน)
-                  </span>
+                  <span className="ml-2 text-gray-400 font-normal">({filteredEmployees.length} คน)</span>
                 </h2>
               </div>
               {empLoading ? (
@@ -683,67 +532,66 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {employees
-                        .filter((e) => {
-                          const ms = empDeptFilter === "all" || e.department === empDeptFilter;
-                          const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
-                          return ms && mq;
-                        })
-                        .map((emp) => {
-                          const ac        = avatarColor(emp.department);
-                          const pool      = emp.pool;
-                          const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
-                          const pct       = pool && pool.total_days > 0
-                            ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
-                          return (
-                            <tr key={emp.id} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-5 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${ac}`}>
-                                    {emp.full_name.slice(0, 2)}
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{emp.full_name}</p>
-                                    <p className="text-xs text-gray-400">{emp.department} · {emp.employee_code}</p>
+                      {filteredEmployees.map((emp) => {
+                        const ac = avatarColor(emp.department);
+                        const pool = emp.pool;
+                        const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
+                        const pct = pool && pool.total_days > 0 ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
+                        return (
+                          <tr key={emp.id} className="hover:bg-slate-50/50 cursor-pointer transition-colors" onClick={() => handleEmployeeClick(emp)}>
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${ac}`}>
+                                  {emp.full_name.slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{emp.full_name}</p>
+                                  <p className="text-xs text-gray-400">{emp.department} · {emp.employee_code}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <span className="text-sm font-semibold text-gray-700">{pool ? pool.total_days : "—"}</span>
+                              {pool && <p className="text-xs text-gray-400">วัน</p>}
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              {pool ? (
+                                <div className="space-y-1">
+                                  <span className="text-sm font-semibold text-gray-700">{pool.used_days}</span>
+                                  <div className="w-16 mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
+                                      style={{ width: `${pct}%` }} />
                                   </div>
                                 </div>
-                              </td>
-                              <td className="px-5 py-4 text-center">
-                                <span className="text-sm font-semibold text-gray-700">{pool ? pool.total_days : "—"}</span>
-                                {pool && <p className="text-xs text-gray-400">วัน</p>}
-                              </td>
-                              <td className="px-5 py-4 text-center">
-                                {pool ? (
-                                  <div className="space-y-1">
-                                    <span className="text-sm font-semibold text-gray-700">{pool.used_days}</span>
-                                    <div className="w-16 mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
-                                      <div className={`h-full rounded-full ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
-                                        style={{ width: `${pct}%` }} />
-                                    </div>
-                                  </div>
-                                ) : <span className="text-xs text-gray-300">—</span>}
-                              </td>
-                              <td className="px-5 py-4 text-center">
-                                <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                                  {pool ? `${remaining} วัน` : "—"}
-                                </span>
-                              </td>
-                              <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                              ) : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
+                                {pool ? `${remaining} วัน` : "—"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
                                   className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap"
                                 >
-                                  กำหนดวันลา
+                                  เพิ่มวันลา
                                 </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                                <svg className="text-gray-300 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M9 18l6-6-6-6" />
+                                </svg>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
             </div>
+            <p className="text-xs text-gray-400 text-right px-1">คลิกแถวพนักงานเพื่อดูประวัติการลา</p>
           </div>
         )}
 

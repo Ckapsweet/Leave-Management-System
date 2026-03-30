@@ -53,7 +53,7 @@ pipeline {
             steps {
                 sh '''
                 sudo rm -rf ${DEPLOY_DIR}/*
-                sudo cp -r ${BASE_DIR}/Leave-Management-System/dist/* ${DEPLOY_DIR}/
+                sudo cp -r ${BASE_DIR}/Leave-Management-System/* ${DEPLOY_DIR}/
                 echo "✅ Files deployed to ${DEPLOY_DIR}"
                 '''
             }
