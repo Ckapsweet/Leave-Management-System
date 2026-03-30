@@ -173,8 +173,8 @@ export default function SuperAdminDashboard() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-white">Super Admin</h1>
-            <p className="text-xs text-slate-500">Audit & Access Control</p>
+            <h1 className="text-sm font-semibold text-white">HR</h1>
+            <p className="text-xs text-slate-500">Human Resources</p>
           </div>
         </div>
 
