@@ -443,7 +443,7 @@ export default function SuperAdminDashboard() {
                               disabled={actionLoading}
                               className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500 ${ROLE_META[u.role]?.color ?? "bg-gray-100 text-gray-600"}`}
                             >
-                              {(["user", "hr", "admin", "super_admin"] as UserRole[]).map((r) => (
+                              {(["user", "manager", "hr"] as UserRole[]).map((r) => (
                                 <option key={r} value={r}>{ROLE_META[r].label}</option>
                               ))}
                             </select>

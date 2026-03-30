@@ -27,7 +27,6 @@ export default function AdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
-  const [deptFilter, setDeptFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"all" | "yearly" | "monthly">("all");
   const [selYear, setSelYear] = useState<number>(new Date().getFullYear());
@@ -168,11 +167,8 @@ export default function AdminDashboard() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const departments = ["all", ...Array.from(new Set(requests.map((r) => r.user?.department ?? "")))];
-
   const filtered = requests.filter((r) => {
     const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const matchDept = deptFilter === "all" || r.user?.department === deptFilter;
     const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
     const reqYear = new Date(r.start_date).getFullYear();
     const reqMonth = new Date(r.start_date).getMonth() + 1;
@@ -180,7 +176,7 @@ export default function AdminDashboard() {
       viewMode === "all" ? true :
         viewMode === "yearly" ? reqYear === selYear :
           reqYear === selYear && reqMonth === selMonth;
-    return matchStatus && matchDept && matchSearch && matchDate;
+    return matchStatus && matchSearch && matchDate;
   });
 
   const pending = requests.filter((r) => r.status === "pending").length;
@@ -341,11 +337,6 @@ export default function AdminDashboard() {
                   <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
                     placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
-                <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
-                  value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
-                  <option value="all">ทุกแผนก</option>
-                  {departments.filter((d) => d !== "all").map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
                 <div className="flex gap-2">
                   {(["all", "pending", "approved", "rejected"] as const).map((s) => (
                     <button key={s} onClick={() => setStatusFilter(s)}

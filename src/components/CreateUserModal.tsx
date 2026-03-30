@@ -73,7 +73,7 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
           <div className="text-[#000]">
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Role *</label>
             <select className={INPUT} value={form.role} onChange={(e) => set("role", e.target.value)}>
-              {(["user", "hr", "admin", "super_admin"] as UserRole[]).map((r) => (
+              {(["user", "manager", "hr"] as UserRole[]).map((r) => (
                 <option key={r} value={r}>{ROLE_META[r].label}</option>
               ))}
             </select>
