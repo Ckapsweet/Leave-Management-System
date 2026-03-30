@@ -390,8 +390,8 @@ export default function SuperAdminDashboard() {
                 className="border border-slate-700 bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
               >
                 <option value="">ทุก role</option>
-                {(["user", "hr", "admin", "super_admin"] as UserRole[]).map((r) => (
-                  <option key={r} value={r}>{ROLE_META[r].label}</option>
+                {(["user", "manager", "hr"] as UserRole[]).map((r) => (
+                  <option key={r} value={r}>{ROLE_META[r]?.label ?? r}</option>
                 ))}
               </select>
               <button
