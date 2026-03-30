@@ -21,9 +21,9 @@ export const STATUS_META: Record<
   LeaveStatus,
   { label: string; color: string; bg: string; dot: string; icon: string }
 > = {
-  pending:  { label: "รออนุมัติ",   color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",    dot: "bg-amber-400",   icon: "⏳" },
+  pending: { label: "รออนุมัติ", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", dot: "bg-amber-400", icon: "⏳" },
   approved: { label: "อนุมัติแล้ว", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-400", icon: "✓" },
-  rejected: { label: "ปฏิเสธ",     color: "text-red-700",     bg: "bg-red-50 border-red-200",        dot: "bg-red-400",     icon: "✗" },
+  rejected: { label: "ปฏิเสธ", color: "text-red-700", bg: "bg-red-50 border-red-200", dot: "bg-red-400", icon: "✗" },
 };
 
 export const TYPE_COLORS: Record<number, string> = {
@@ -35,10 +35,10 @@ export const TYPE_COLORS: Record<number, string> = {
 
 const DEPT_AVATAR: Record<string, string> = {
   "วิศวกรรมซอฟต์แวร์": "bg-violet-100 text-violet-700",
-  "การตลาด":            "bg-pink-100 text-pink-700",
-  "การเงิน":            "bg-amber-100 text-amber-700",
-  "ปฏิบัติการ":         "bg-teal-100 text-teal-700",
-  "ทรัพยากรบุคคล":     "bg-blue-100 text-blue-700",
+  "การตลาด": "bg-pink-100 text-pink-700",
+  "การเงิน": "bg-amber-100 text-amber-700",
+  "ปฏิบัติการ": "bg-teal-100 text-teal-700",
+  "ทรัพยากรบุคคล": "bg-blue-100 text-blue-700",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
