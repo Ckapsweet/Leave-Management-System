@@ -64,7 +64,21 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
           </div>
           <div className="text-[#000]">
             <label className="block text-xs font-medium text-gray-500 mb-1.5">แผนก</label>
-            <input className={INPUT} placeholder="วิศวกรรมซอฟต์แวร์" value={form.department} onChange={(e) => set("department", e.target.value)} />
+            <select
+              className={INPUT}
+              value={form.department}
+              onChange={(e) => set("department", e.target.value)}
+            >
+              {/* Option แรกทำหน้าที่เหมือน Placeholder */}
+              <option value="" disabled>เลือกแผนก...</option>
+
+              {/* รายชื่อแผนกต่างๆ ให้ผู้ใช้เลือก */}
+              <option value="วิศวกรรมซอฟต์แวร์">วิศวกรรมซอฟต์แวร์</option>
+              <option value="การตลาด">การตลาด</option>
+              <option value="ทรัพยากรบุคคล">ทรัพยากรบุคคล</option>
+              <option value="การเงิน">การเงิน</option>
+              <option value="ฝ่ายขาย">ฝ่ายขาย</option>
+            </select>
           </div>
           <div className="text-[#000]">
             <label className="block text-xs font-medium text-gray-500 mb-1.5">รหัสผ่าน *</label>
