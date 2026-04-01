@@ -61,7 +61,7 @@ export default function LoginPage() {
             value={password} onChange={(e) => setPassword(e.target.value)} required />
           <button type="submit" disabled={loading}
             className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors">
-            {loading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+            {loading ? "กำลังเข้าสู่ระบบ......" : "เข้าสู่ระบบ"}
           </button>
         </form>
       </div>
