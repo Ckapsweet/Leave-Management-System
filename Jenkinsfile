@@ -12,6 +12,19 @@ pipeline {
     }
 
     stages {
+        stage('Check Branch') {
+            steps {
+                script {
+                    def branch = env.GIT_BRANCH?.replaceAll('origin/', '')
+                    if (branch != 'main') {
+                        currentBuild.result = 'ABORTED'
+                        error("⛔ Branch '${branch}' is not main — skipping deploy")
+                    }
+                    echo "✅ Branch is main — proceeding with deploy"
+                }
+            }
+        }
+
         stage('Clone Repository') {
             steps {
                 withCredentials([
@@ -57,7 +70,7 @@ pipeline {
             steps {
                 sh '''
                 sudo rm -rf ${DEPLOY_DIR}/*
-                sudo cp -r ${BASE_DIR}/Leave-Management-System/* ${DEPLOY_DIR}/
+                sudo cp -r ${BASE_DIR}/Leave-Management-System/dist/* ${DEPLOY_DIR}/
                 echo "✅ Files deployed to ${DEPLOY_DIR}"
                 '''
             }
