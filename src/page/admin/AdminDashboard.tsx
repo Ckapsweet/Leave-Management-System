@@ -486,7 +486,7 @@ export default function AdminDashboard() {
                 </div>
                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
                   value={empDeptFilter} onChange={(e) => setEmpDeptFilter(e.target.value)}>
-                  <option value="all">ทุกแผนกกก</option>
+                  <option value="all">ทุกแผนก</option>
                   {Array.from(new Set(employees.map((e) => e.department))).map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
@@ -518,7 +518,7 @@ export default function AdminDashboard() {
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400">พนักงาน</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">คงเหลือ</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>
                       </tr>
                     </thead>
