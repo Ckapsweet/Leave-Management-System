@@ -27,7 +27,7 @@ export default function LoginPage() {
       // redirect ตาม role ให้ตรงกับ route ใน App.tsx
       const roleToPath: Record<string, string> = {
         manager: "/manager",
-        hr:      "/hr",
+        hr: "/hr",
       };
       navigate(roleToPath[user.role] ?? "/dashboard", { replace: true });
 
@@ -66,5 +66,7 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
+
+    // tedtetetetete
   );
 }
