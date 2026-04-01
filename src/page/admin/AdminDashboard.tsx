@@ -486,7 +486,7 @@ export default function AdminDashboard() {
                 </div>
                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
                   value={empDeptFilter} onChange={(e) => setEmpDeptFilter(e.target.value)}>
-                  <option value="all">ทุกแผนก</option>
+                  <option value="all">ทุกแผนกกก</option>
                   {Array.from(new Set(employees.map((e) => e.department))).map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
