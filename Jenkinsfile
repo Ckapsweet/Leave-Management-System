@@ -1,6 +1,10 @@
 pipeline {
     agent { label 'leave-frontend' }
 
+    triggers {
+        githubPush()
+    }
+
     environment {
         BASE_DIR   = '/home/adminis'
         DEPLOY_DIR = '/var/www/html'

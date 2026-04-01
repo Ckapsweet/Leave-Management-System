@@ -69,10 +69,8 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
               value={form.department}
               onChange={(e) => set("department", e.target.value)}
             >
-              {/* Option แรกทำหน้าที่เหมือน Placeholder */}
               <option value="" disabled>เลือกแผนก...</option>
 
-              {/* รายชื่อแผนกต่างๆ ให้ผู้ใช้เลือก */}
               <option value="วิศวกรรมซอฟต์แวร์">วิศวกรรมซอฟต์แวร์</option>
               <option value="การตลาด">การตลาด</option>
               <option value="ทรัพยากรบุคคล">ทรัพยากรบุคคล</option>
