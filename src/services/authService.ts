@@ -22,3 +22,13 @@ export async function getMe(): Promise<AuthUser> {
   const res = await api.get("/api/auth/me");
   return res.data;
 }
+
+export async function updateProfile(data: { full_name: string }): Promise<AuthUser> {
+  const res = await api.put("/api/auth/profile", data);
+  return res.data;
+}
+
+export async function changePassword(data: { old_password: string; new_password: string }): Promise<{ message: string }> {
+  const res = await api.post("/api/auth/change-password", data);
+  return res.data;
+}
