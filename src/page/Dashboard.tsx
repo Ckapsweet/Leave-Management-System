@@ -11,6 +11,8 @@ import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import { LeaveReport } from "../components/LeaveReport";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
 import { ToastContainer, toast } from "../components/Toast";
+import { EditProfileModal } from "../components/EditProfileModal";
+import type { AuthUser } from "../services/authService";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -22,9 +24,9 @@ const TYPE_COLORS: Record<number, string> = {
 };
 
 const STATUS_META: Record<LeaveStatus, { label: string; color: string; bg: string; dot: string; icon: string }> = {
-  pending:  { label: "รออนุมัติ",   color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",    dot: "bg-amber-400",   icon: "⏳" },
-  approved: { label: "อนุมัติแล้ว", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-400", icon: "✓"  },
-  rejected: { label: "ปฏิเสธ",      color: "text-red-700",     bg: "bg-red-50 border-red-200",         dot: "bg-red-400",     icon: "✗"  },
+  pending: { label: "รออนุมัติ", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", dot: "bg-amber-400", icon: "⏳" },
+  approved: { label: "อนุมัติแล้ว", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", dot: "bg-emerald-400", icon: "✓" },
+  rejected: { label: "ปฏิเสธ", color: "text-red-700", bg: "bg-red-50 border-red-200", dot: "bg-red-400", icon: "✗" },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
         </svg>
         {req.total_hours} ชม.
       </span>
@@ -55,9 +57,9 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
 // ── RequestRow ────────────────────────────────────────────────────────────────
 
 function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: () => void; onCancel: () => void }) {
-  const meta      = STATUS_META[req.status];
+  const meta = STATUS_META[req.status];
   const typeColor = TYPE_COLORS[req.leave_type_id] ?? "bg-gray-100 text-gray-600";
-  const isHourly  = req.leave_unit === "hour";
+  const isHourly = req.leave_unit === "hour";
   return (
     <tr className="hover:bg-slate-50/70 cursor-pointer transition-colors" onClick={onClick}>
       <td className="px-5 py-4">
@@ -88,7 +90,7 @@ function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: ()
             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg transition-colors whitespace-nowrap"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
             </svg>
             ยกเลิก
           </button>
@@ -131,7 +133,7 @@ function CancelConfirmDialog({
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
             </svg>
           </div>
           <div>
@@ -155,7 +157,7 @@ function CancelConfirmDialog({
             {loading ? (
               <>
                 <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
                 กำลังยกเลิก...
               </>
@@ -197,7 +199,7 @@ function DetailDrawer({
               <span className="text-gray-500">รูปแบบการลา</span>
               {isHourly ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
                   ลาเป็นชั่วโมง
                 </span>
               ) : (
@@ -270,14 +272,14 @@ function DetailDrawer({
               {cancelling ? (
                 <>
                   <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
                   กำลังยกเลิก...
                 </>
               ) : (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                   </svg>
                   ยกเลิกคำขอลา
                 </>
@@ -296,22 +298,23 @@ export default function UserLeaveDashboard() {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
 
-  const [user,      setUser]      = useState<{ full_name: string; employee_code: string; department: string } | null>(null);
+  const [user, setUser] = useState<{ full_name: string; employee_code: string; department: string } | null>(null);
   const [leavePool, setLeavePool] = useState<LeavePool | null>(null);
-  const [requests,  setRequests]  = useState<LeaveRequest[]>([]);
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showEditProfile, setShowEditProfile] = useState(false);
 
-  const [selected,         setSelected]         = useState<LeaveRequest | null>(null);
-  const [showModal,        setShowModal]         = useState(false);
-  const [submitting,       setSubmitting]        = useState(false);
-  const [cancelling,       setCancelling]        = useState(false);
-  const [confirmCancelId,  setConfirmCancelId]   = useState<number | null>(null);
-  const [statusFilter,     setStatusFilter]      = useState<"all" | LeaveStatus>("all");
-  const [viewMode,         setViewMode]          = useState<"all" | "monthly" | "yearly">("all");
-  const [selectedYear,     setSelectedYear]      = useState<number>(new Date().getFullYear());
-  const [selectedMonth,    setSelectedMonth]     = useState<number>(new Date().getMonth() + 1);
+  const [selected, setSelected] = useState<LeaveRequest | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
+  const [viewMode, setViewMode] = useState<"all" | "monthly" | "yearly">("all");
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -379,18 +382,18 @@ export default function UserLeaveDashboard() {
   // ── Derived ─────────────────────────────────────────────────
   const filtered = requests.filter((r) => {
     const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const reqYear  = new Date(r.start_date).getFullYear();
+    const reqYear = new Date(r.start_date).getFullYear();
     const reqMonth = new Date(r.start_date).getMonth() + 1;
     const matchDate =
       viewMode === "all" ? true :
-      viewMode === "yearly"  ? reqYear === selectedYear :
-      reqYear === selectedYear && reqMonth === selectedMonth;
+        viewMode === "yearly" ? reqYear === selectedYear :
+          reqYear === selectedYear && reqMonth === selectedMonth;
     return matchStatus && matchDate;
   });
 
-  const totalUsed      = leavePool?.used_days  ?? 0;
-  const totalRemaining = leavePool?.remaining  ?? 0;
-  const pendingCount   = requests.filter((r) => r.status === "pending").length;
+  const totalUsed = leavePool?.used_days ?? 0;
+  const totalRemaining = leavePool?.remaining ?? 0;
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) return (
@@ -446,12 +449,23 @@ export default function UserLeaveDashboard() {
         />
       )}
 
+      {showEditProfile && user && (
+        <EditProfileModal
+          user={user as unknown as AuthUser}
+          onClose={() => setShowEditProfile(false)}
+          onUpdateUser={(updated) => {
+            setUser(updated);
+            localStorage.setItem("user", JSON.stringify(updated));
+          }}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
             </svg>
           </div>
           <div>
@@ -461,7 +475,7 @@ export default function UserLeaveDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
             เพิ่มการลา
           </button>
           {pendingCount > 0 && (
@@ -470,11 +484,11 @@ export default function UserLeaveDashboard() {
               <span className="text-xs font-medium text-amber-700">{pendingCount} รออนุมัติ</span>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" onClick={() => setShowEditProfile(true)}>
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
               {user?.full_name?.slice(0, 2) ?? "??"}
             </div>
-            <div className="hidden sm:block text-right">
+            <div className="hidden sm:block text-right cursor-pointer hover:opacity-80 transition-opacity">
               <p className="text-xs font-semibold text-gray-800">{user?.full_name ?? ""}</p>
               <p className="text-xs text-gray-400">{user?.employee_code ?? ""}</p>
             </div>
@@ -521,7 +535,7 @@ export default function UserLeaveDashboard() {
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center flex-shrink-0">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                 </div>
                 <div className="flex-1">
@@ -535,10 +549,9 @@ export default function UserLeaveDashboard() {
                   <div className="mt-2 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                     {leavePool.total_days > 0 && (
                       <div
-                        className={`h-full rounded-full transition-all ${
-                          leavePool.remaining / leavePool.total_days < 0.2 ? "bg-red-400" :
-                          leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
-                        }`}
+                        className={`h-full rounded-full transition-all ${leavePool.remaining / leavePool.total_days < 0.2 ? "bg-red-400" :
+                            leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
+                          }`}
                         style={{ width: `${Math.min(100, (leavePool.remaining / leavePool.total_days) * 100)}%` }}
                       />
                     )}

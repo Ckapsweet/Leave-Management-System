@@ -13,6 +13,8 @@ import { ToastContainer, toast } from "../../components/Toast";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
+import { EditProfileModal } from "../../components/EditProfileModal";
+import type { AuthUser } from "../../services/authService";
 import {
   STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
   type Employee, type EmployeeWithBalance,
@@ -49,8 +51,15 @@ export default function AdminDashboard() {
     user: { id: number; full_name: string; employee_code: string; department: string };
     pool: LeavePool;
   } | null>(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
-  const adminName = localStorage.getItem("adminName") ?? "Admin";
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) setUser(JSON.parse(stored));
+  }, []);
+
+  const adminName = user?.full_name ?? "Admin";
   const year = new Date().getFullYear();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -259,6 +268,17 @@ export default function AdminDashboard() {
         />
       )}
 
+      {showEditProfile && user && (
+        <EditProfileModal
+          user={user}
+          onClose={() => setShowEditProfile(false)}
+          onUpdateUser={(updated) => {
+            setUser(updated);
+            localStorage.setItem("user", JSON.stringify(updated));
+          }}
+        />
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
@@ -291,20 +311,20 @@ export default function AdminDashboard() {
         </div>
 
         {/* User info */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-              {adminName.slice(0, 2)}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
+              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
+                {adminName.slice(0, 2)}
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-xs font-semibold text-gray-800">{adminName}</p>
+                <p className="text-xs text-gray-400">Admin</p>
+              </div>
             </div>
-            <div className="hidden sm:block">
-              <p className="text-xs font-semibold text-gray-800">{adminName}</p>
-              <p className="text-xs text-gray-400">Admin</p>
-            </div>
+            <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100">
+              ออกจากระบบ
+            </button>
           </div>
-          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100">
-            ออกจากระบบ
-          </button>
-        </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">

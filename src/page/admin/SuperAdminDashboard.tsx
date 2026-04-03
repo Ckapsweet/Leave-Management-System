@@ -10,6 +10,8 @@ import type { AuditLog, SuperAdminUser, UserRole } from "../../services/superAdm
 import { ToastContainer, toast } from "../../components/Toast";
 import { LogDrawer } from "../../components/LogDrawer";
 import { CreateUserModal } from "../../components/CreateUserModal";
+import { EditProfileModal } from "../../components/EditProfileModal";
+import type { AuthUser } from "../../services/authService";
 import { ROLE_META, fmtDatetime, getActionMeta } from "../../components/superAdminHelpers";
 
 export default function SuperAdminDashboard() {
@@ -37,8 +39,15 @@ export default function SuperAdminDashboard() {
   // filters — users
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
-  const adminName = localStorage.getItem("adminName") ?? "Super Admin";
+  useEffect(() => {
+    const stored = localStorage.getItem("user");
+    if (stored) setUser(JSON.parse(stored));
+  }, []);
+
+  const adminName = user?.full_name ?? "Super Admin";
 
   // ── Fetch logs ─────────────────────────────────────────────────────────────
   const fetchLogs = useCallback(async () => {
@@ -163,6 +172,16 @@ export default function SuperAdminDashboard() {
       {/* Overlays */}
       {selectedLog && <LogDrawer log={selectedLog} onClose={() => setSelectedLog(null)} />}
       {showCreate && <CreateUserModal onSubmit={handleCreateUser} onClose={() => setShowCreate(false)} loading={actionLoading} />}
+      {showEditProfile && user && (
+        <EditProfileModal
+          user={user}
+          onClose={() => setShowEditProfile(false)}
+          onUpdateUser={(updated) => {
+            setUser(updated);
+            localStorage.setItem("user", JSON.stringify(updated));
+          }}
+        />
+      )}
 
       {/* Header */}
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm">
@@ -192,20 +211,20 @@ export default function SuperAdminDashboard() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-rose-900 flex items-center justify-center text-xs font-bold text-rose-300">
-              {adminName.slice(0, 2)}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
+              <div className="w-8 h-8 rounded-full bg-rose-900 flex items-center justify-center text-xs font-bold text-rose-300">
+                {adminName.slice(0, 2)}
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-xs font-semibold text-slate-200">{adminName}</p>
+                <p className="text-xs text-rose-400">super_admin</p>
+              </div>
             </div>
-            <div className="hidden sm:block">
-              <p className="text-xs font-semibold text-slate-200">{adminName}</p>
-              <p className="text-xs text-rose-400">super_admin</p>
-            </div>
+            <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg hover:bg-slate-800">
+              ออกจากระบบ
+            </button>
           </div>
-          <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg hover:bg-slate-800">
-            ออกจากระบบ
-          </button>
-        </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
