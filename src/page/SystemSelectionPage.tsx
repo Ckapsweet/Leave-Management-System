@@ -1,16 +1,17 @@
 import { useNavigate } from "react-router-dom";
-import { 
-  Box, 
-  Container, 
-  Typography, 
-  Card, 
-  CardActionArea, 
-  CardContent, 
-  Grid, 
-  Avatar, 
+import { logout } from "../services/authService";
+import {
+  Box,
+  Container,
+  Typography,
+  Card,
+  CardActionArea,
+  CardContent,
+  Grid,
+  Avatar,
   AppBar,
   Toolbar,
-  IconButton
+  // IconButton
 } from "@mui/material";
 
 export default function SystemSelectionPage() {
@@ -29,21 +30,27 @@ export default function SystemSelectionPage() {
   };
 
   const handleSelectOT = () => {
-    // Placeholder for OT system
-    // navigate("/ot-dashboard");
     alert("ระบบจัดการ OT กำลังอยู่ในช่วงพัฒนา...");
+
+    // const roleToPath: Record<string, string> = {
+    //   manager: "/manager",
+    //   hr: "/hr",
+    // };
+    // navigate(roleToPath[role || ""] ?? "/dashboard");
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
+  const handleLogout = async () => {
+    await logout();
+    localStorage.removeItem("role");
+    localStorage.removeItem("user");
+    navigate("/", { replace: true });
   };
 
   return (
-    <Box 
-      sx={{ 
-        minHeight: "100vh", 
-        display: "flex", 
+    <Box
+      sx={{
+        minHeight: "100vh",
+        display: "flex",
         flexDirection: "column",
         background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
         fontFamily: "'Inter', sans-serif"
@@ -52,20 +59,18 @@ export default function SystemSelectionPage() {
       <AppBar position="static" elevation={0} sx={{ bgcolor: "transparent", color: "text.primary" }}>
         <Toolbar sx={{ justifyContent: "flex-end" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Box sx={{ textAlign: "right" }}>
-              <Typography variant="subtitle2" fontWeight="bold">
-                {user?.full_name || "Guest"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.department || "N/A"}
-              </Typography>
-            </Box>
-            <Avatar sx={{ bgcolor: "primary.main" }}>
-              👤
-            </Avatar>
-            <IconButton onClick={handleLogout} color="error" title="ออกจากระบบ">
-              🚪
-            </IconButton>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
+                {user?.full_name?.slice(0, 2) ?? "??"}
+              </div>
+              <div className="hidden sm:block text-right cursor-pointer hover:opacity-80 transition-opacity">
+                <p className="text-xs font-semibold text-gray-800">{user?.full_name ?? ""}</p>
+                <p className="text-xs text-gray-400">{user?.employee_code ?? ""}</p>
+              </div>
+            </div>
+            <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
+              ออกจากระบบ
+            </button>
           </Box>
         </Toolbar>
       </AppBar>
@@ -83,10 +88,10 @@ export default function SystemSelectionPage() {
         <Grid container spacing={4} justifyContent="center">
           {/* Leave Management System */}
           <Grid size={{ xs: 12, sm: 6 }}>
-            <Card 
-              sx={{ 
-                height: "100%", 
-                borderRadius: 4, 
+            <Card
+              sx={{
+                height: "100%",
+                borderRadius: 4,
                 boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
                 transition: "transform 0.3s ease, box-shadow 0.3s ease",
                 "&:hover": {
@@ -97,12 +102,12 @@ export default function SystemSelectionPage() {
             >
               <CardActionArea onClick={handleSelectLeave} sx={{ height: "100%", p: 2 }}>
                 <CardContent sx={{ textAlign: "center", py: 4 }}>
-                  <Avatar 
-                    sx={{ 
-                      width: 100, 
-                      height: 100, 
-                      bgcolor: "primary.light", 
-                      mb: 3, 
+                  <Avatar
+                    sx={{
+                      width: 100,
+                      height: 100,
+                      bgcolor: "primary.light",
+                      mb: 3,
                       mx: "auto",
                       boxShadow: "0 8px 16px rgba(25, 118, 210, 0.2)",
                       fontSize: 50
@@ -123,10 +128,10 @@ export default function SystemSelectionPage() {
 
           {/* OT Management System */}
           <Grid size={{ xs: 12, sm: 6 }}>
-            <Card 
-              sx={{ 
-                height: "100%", 
-                borderRadius: 4, 
+            <Card
+              sx={{
+                height: "100%",
+                borderRadius: 4,
                 boxShadow: "0 10px 40px rgba(0,0,0,0.1)",
                 transition: "transform 0.3s ease, box-shadow 0.3s ease",
                 "&:hover": {
@@ -137,12 +142,12 @@ export default function SystemSelectionPage() {
             >
               <CardActionArea onClick={handleSelectOT} sx={{ height: "100%", p: 2 }}>
                 <CardContent sx={{ textAlign: "center", py: 4 }}>
-                  <Avatar 
-                    sx={{ 
-                      width: 100, 
-                      height: 100, 
-                      bgcolor: "warning.light", 
-                      mb: 3, 
+                  <Avatar
+                    sx={{
+                      width: 100,
+                      height: 100,
+                      bgcolor: "warning.light",
+                      mb: 3,
                       mx: "auto",
                       boxShadow: "0 8px 16px rgba(237, 108, 2, 0.2)",
                       fontSize: 50
@@ -162,7 +167,7 @@ export default function SystemSelectionPage() {
           </Grid>
         </Grid>
       </Container>
-      
+
       <Box sx={{ py: 3, textAlign: "center" }}>
         <Typography variant="caption" color="text.secondary">
           © {new Date().getFullYear()} CKAP Management System. All rights reserved.
