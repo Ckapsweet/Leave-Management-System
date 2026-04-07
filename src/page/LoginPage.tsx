@@ -24,12 +24,8 @@ export default function LoginPage() {
         employee_code: user.employee_code,
         department: user.department,
       }));
-      // redirect ตาม role ให้ตรงกับ route ใน App.tsx
-      const roleToPath: Record<string, string> = {
-        manager: "/manager",
-        hr: "/hr",
-      };
-      navigate(roleToPath[user.role] ?? "/dashboard", { replace: true });
+      // redirect ไปหน้าเลือกระบบ
+      navigate("/select-system", { replace: true });
 
     } catch (err: any) {
       setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");

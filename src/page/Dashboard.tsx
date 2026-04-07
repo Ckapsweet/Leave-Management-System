@@ -493,7 +493,11 @@ export default function UserLeaveDashboard() {
               <p className="text-xs text-gray-400">{user?.employee_code ?? ""}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100">
+          <button onClick={() => navigate("/select-system")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+            สลับระบบ
+          </button>
+          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
             ออกจากระบบ
           </button>
         </div>

@@ -4,6 +4,7 @@ import LoginPage from "./page/LoginPage";
 import Dashboard from "./page/Dashboard";
 import AdminDashboard from "./page/admin/AdminDashboard";
 import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
+import SystemSelectionPage from "./page/SystemSelectionPage";
 import ProtectedRoute from "./ProtectedRoute";
 
 export default function App() {
@@ -12,6 +13,16 @@ export default function App() {
       <Routes>
         {/* Public */}
         <Route path="/" element={<LoginPage />} />
+
+        {/* Selection Page (หลังจาก login แล้ว) */}
+        <Route
+          path="/select-system"
+          element={
+            <ProtectedRoute requiredRole={["user", "manager", "hr"]}>
+              <SystemSelectionPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* User (hr/admin/super_admin เข้าได้ด้วย ถ้าต้องการ) */}
         <Route
