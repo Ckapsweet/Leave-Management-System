@@ -13,6 +13,7 @@ import type { LeaveRequestForm } from "../components/Leaverequestmodal";
 import { ToastContainer, toast } from "../components/Toast";
 import { EditProfileModal } from "../components/EditProfileModal";
 import type { AuthUser } from "../services/authService";
+import Footer from "../components/Footer";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -417,7 +418,7 @@ export default function UserLeaveDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
+    <div className="min-h-screen flex flex-col bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Confirm cancel dialog */}
@@ -503,7 +504,7 @@ export default function UserLeaveDashboard() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Profile + summary */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -690,6 +691,7 @@ export default function UserLeaveDashboard() {
           <p className="text-xs text-gray-400 text-right mt-2 px-1">คลิกแถวเพื่อดูรายละเอียด</p>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

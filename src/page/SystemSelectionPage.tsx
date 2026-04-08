@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { logout } from "../services/authService";
+import Footer from "../components/Footer";
 import {
   Box,
   Container,
@@ -170,11 +171,7 @@ export default function SystemSelectionPage() {
         </Grid>
       </Container>
 
-      <Box sx={{ py: 3, textAlign: "center" }}>
-        <Typography variant="caption" color="text.secondary">
-          © {new Date().getFullYear()} CKAP Management System. All rights reserved.
-        </Typography>
-      </Box>
+      <Footer />
     </Box>
   );
 }

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../services/authService";
+import Footer from "../components/Footer";
 
 export default function LoginPage() {
   const [employeeCode, setEmployeeCode] = useState("");
@@ -35,8 +36,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+    <div className="min-h-screen flex flex-col bg-gray-100">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
         <p className="text-xl font-bold text-center mb-2">ระบบลาออนไลน์</p>
         <p className="text-sm text-gray-500 text-center mb-6">เข้าสู่ระบบ</p>
 
@@ -61,8 +63,10 @@ export default function LoginPage() {
           </button>
         </form>
       </div>
+      </div>
+      <div className="w-full mt-auto">
+        <Footer />
+      </div>
     </div>
-
-    // tedtetetetete
   );
 }

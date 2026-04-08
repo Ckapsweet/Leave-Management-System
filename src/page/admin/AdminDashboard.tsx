@@ -19,6 +19,7 @@ import {
   STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
   type Employee, type EmployeeWithBalance,
 } from "../../components/adminHelpers";
+import Footer from "../../components/Footer";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -221,7 +222,7 @@ export default function AdminDashboard() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
+    <div className="min-h-screen flex flex-col bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <ToastContainer />
@@ -311,27 +312,27 @@ export default function AdminDashboard() {
         </div>
 
         {/* User info */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
-              <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-                {adminName.slice(0, 2)}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-gray-800">{adminName}</p>
-                <p className="text-xs text-gray-400">Admin</p>
-              </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
+            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
+              {adminName.slice(0, 2)}
             </div>
-            <button onClick={() => navigate("/select-system")} className="text-xs text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors font-medium flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
-              สลับระบบ
-            </button>
-            <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
-              ออกจากระบบ
-            </button>
+            <div className="hidden sm:block">
+              <p className="text-xs font-semibold text-gray-800">{adminName}</p>
+              <p className="text-xs text-gray-400">Admin</p>
+            </div>
           </div>
+          <button onClick={() => navigate("/select-system")} className="text-xs text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
+            สลับระบบ
+          </button>
+          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (
@@ -611,6 +612,7 @@ export default function AdminDashboard() {
         )}
 
       </main>
+      <Footer />
     </div>
   );
 }

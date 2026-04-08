@@ -13,6 +13,7 @@ import { CreateUserModal } from "../../components/CreateUserModal";
 import { EditProfileModal } from "../../components/EditProfileModal";
 import type { AuthUser } from "../../services/authService";
 import { ROLE_META, fmtDatetime, getActionMeta } from "../../components/superAdminHelpers";
+import Footer from "../../components/Footer";
 
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
@@ -164,7 +165,7 @@ export default function SuperAdminDashboard() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100" style={{ fontFamily: "'DM Mono', 'DM Sans', 'Noto Sans Thai', monospace" }}>
+    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100" style={{ fontFamily: "'DM Mono', 'DM Sans', 'Noto Sans Thai', monospace" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <ToastContainer />
@@ -231,7 +232,7 @@ export default function SuperAdminDashboard() {
           </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Audit Logs Tab ───────────────────────────────────────────────── */}
         {activeTab === "logs" && (
@@ -497,6 +498,7 @@ export default function SuperAdminDashboard() {
         )}
 
       </main>
+      <Footer />
     </div>
   );
 }
