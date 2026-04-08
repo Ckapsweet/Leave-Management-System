@@ -30,15 +30,15 @@ export default function SystemSelectionPage() {
   };
 
   const handleSelectOT = () => {
-    // alert("ระบบจัดการ OT กำลังอยู่ในช่วงพัฒนา...");
-
-    // const roleToPath: Record<string, string> = {
-    //   manager: "/manager",
-    //   hr: "/hr",
-    // };
-    // navigate(roleToPath[role || ""] ?? "/dashboard");
-    const otUrl = import.meta.env.VITE_OT_SYSTEM_URL;
-    window.location.href = otUrl;
+    const baseUrl = import.meta.env.VITE_OT_SYSTEM_URL || "http://localhost:5174";
+    // ตั้งค่า Path ใหม่ตามความต้องการของคุณ
+    const roleToPath: Record<string, string> = {
+      manager: "/ot-manager",
+      hr: "/ot-admin", // เปลี่ยนจาก /ot-hr เป็น /ot-admin
+    };
+    // ถ้าไม่ใช่ manager/hr จะไปที่ /ot (แทน /dashboard เดิม)
+    const targetPath = roleToPath[role || ""] ?? "/ot";
+    window.location.href = `${baseUrl}${targetPath}`;
   };
 
   const handleLogout = async () => {
