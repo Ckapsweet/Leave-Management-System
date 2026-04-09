@@ -31,7 +31,7 @@ export default function SystemSelectionPage() {
   };
 
   const handleSelectOT = () => {
-    const baseUrl = import.meta.env.VITE_OT_SYSTEM_URL || "http://localhost:5174";
+    const baseUrl = import.meta.env.VITE_OT_SYSTEM_URL;
     // ตั้งค่า Path ใหม่ตามความต้องการของคุณ
     const roleToPath: Record<string, string> = {
       manager: "/ot-manager",

@@ -22,14 +22,13 @@ function roleToPath(role: string): string {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: Props) {
-  const role = localStorage.getItem("role") as Role | null;
+  const role = localStorage.getItem("role");
 
-  // ไม่มี role = ยังไม่ได้ login
-  if (!role) return <Navigate to="/" replace />;
+  if (!role || role === "undefined") return <Navigate to="/" replace />;
 
   if (requiredRole) {
     const allowed = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    if (!allowed.includes(role)) {
+    if (!allowed.includes(role as Role)) {
       return <Navigate to={roleToPath(role)} replace />;
     }
   }
