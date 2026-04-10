@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { logout } from "../../services/authService";
 import {
   getAuditLogs, getAuditActions, getSuperAdminUsers,
-  changeUserRole, deleteUser, createUser,
+  changeUserRole, changeUserSupervisor, deleteUser, createUser,
 } from "../../services/superAdminService";
 import type { AuditLog, SuperAdminUser, UserRole } from "../../services/superAdminService";
 import { ToastContainer, toast } from "../../components/Toast";
@@ -15,10 +15,90 @@ import type { AuthUser } from "../../services/authService";
 import { ROLE_META, fmtDatetime, getActionMeta } from "../../components/superAdminHelpers";
 import Footer from "../../components/Footer";
 
+// ── Type badge helpers ─────────────────────────────────────────────────────
+
+const LEAVE_TYPE_META: Record<string, { cls: string; label: string }> = {
+  annual: { cls: "bg-blue-950/50 border border-blue-800 text-blue-300", label: "ลาพักร้อน" },
+  sick: { cls: "bg-purple-950/50 border border-purple-800 text-purple-300", label: "ลาป่วย" },
+  personal: { cls: "bg-teal-950/50 border border-teal-800 text-teal-300", label: "ลากิจ" },
+  maternity: { cls: "bg-pink-950/50 border border-pink-800 text-pink-300", label: "ลาคลอด" },
+};
+
+function TypeBadge({ log }: { log: AuditLog }) {
+  const after = log.after_data as any;
+  const before = log.before_data as any;
+
+  // กรณีเป็น action เกี่ยวกับ user
+  if (log.target_type === "user" || log.action?.includes("user")) {
+    return (
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-950/40 border border-blue-800 text-blue-300">
+        สร้าง user
+      </span>
+    );
+  }
+  // กรณีเป็น leave_request — ดึงประเภทจาก before_data / after_data ถ้ามี
+  const leaveType = after?.leave_type ?? before?.leave_type ?? "";
+  const meta = LEAVE_TYPE_META[leaveType];
+  if (meta) {
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${meta.cls}`}>
+        {meta.label}
+      </span>
+    );
+  }
+  // fallback — แสดง target_type เปล่า
+  return (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 border border-slate-700 text-slate-400">
+      {log.target_type ?? "—"}
+    </span>
+  );
+}
+
+// ── Target person cell ────────────────────────────────────────────────────
+
+function TargetCell({ log }: { log: AuditLog }) {
+  const after = log.after_data as any;
+  const before = log.before_data as any;
+
+  // ชื่อและรหัสของ "คนที่ถูกกระทำ" เช่น คนที่ขอลา หรือ user ที่ถูกสร้าง
+  const targetName: string =
+    after?.full_name ??
+    before?.full_name ??
+    after?.user?.full_name ??
+    before?.user?.full_name ??
+    after?.employee_code ??
+    before?.employee_code ??
+    after?.user?.employee_code ??
+    before?.user?.employee_code ??
+    log.target_type ?? "—";
+
+  const initials = targetName.slice(0, 2);
+  const subLabel = log.target_type
+    ? `${log.target_type} #${log.target_id}`
+    : "—";
+
+  if (!log.target_type) {
+    return <span className="text-slate-600 text-xs">—</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-7 h-7 rounded-full bg-emerald-950 flex items-center justify-center text-xs font-bold text-emerald-300 flex-shrink-0">
+        {initials}
+      </div>
+      <div>
+        <p className="text-xs font-medium text-slate-200 whitespace-nowrap">{targetName}</p>
+        <p className="text-xs text-slate-500 font-mono">{subLabel}</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────
+
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
 
-  // ── State ──────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<"logs" | "users">("logs");
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [users, setUsers] = useState<SuperAdminUser[]>([]);
@@ -29,7 +109,6 @@ export default function SuperAdminDashboard() {
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState("");
 
-  // filters — logs
   const [filterAction, setFilterAction] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -37,7 +116,6 @@ export default function SuperAdminDashboard() {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
 
-  // filters — users
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -50,7 +128,6 @@ export default function SuperAdminDashboard() {
 
   const adminName = user?.full_name ?? "Super Admin";
 
-  // ── Fetch logs ─────────────────────────────────────────────────────────────
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
@@ -73,12 +150,10 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
-  // ── Fetch actions dropdown ─────────────────────────────────────────────────
   useEffect(() => {
     getAuditActions().then(setActions).catch(() => { });
   }, []);
 
-  // ── Fetch users ────────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -98,7 +173,6 @@ export default function SuperAdminDashboard() {
     if (activeTab === "users") fetchUsers();
   }, [activeTab, fetchUsers]);
 
-  // ── Actions ────────────────────────────────────────────────────────────────
   const handleRoleChange = async (id: number, role: UserRole) => {
     try {
       setActionLoading(true);
@@ -107,6 +181,19 @@ export default function SuperAdminDashboard() {
       toast.success("เปลี่ยน role เรียบร้อย");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "เปลี่ยน role ไม่สำเร็จ");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSupervisorChange = async (id: number, supervisor_id: number | null) => {
+    try {
+      setActionLoading(true);
+      await changeUserSupervisor(id, supervisor_id);
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, supervisor_id } : u));
+      toast.success("เปลี่ยนหัวหน้าเรียบร้อย");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "เปลี่ยนหัวหน้าไม่สำเร็จ");
     } finally {
       setActionLoading(false);
     }
@@ -146,14 +233,12 @@ export default function SuperAdminDashboard() {
     navigate("/", { replace: true });
   };
 
-  // ── Derived ────────────────────────────────────────────────────────────────
   const userStats = {
     total: users.length,
     managers: users.filter((u) => u.role === "manager").length,
     hr: users.filter((u) => u.role === "hr").length,
   };
 
-  // ── Error state ────────────────────────────────────────────────────────────
   if (error) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950">
       <div className="text-center space-y-3">
@@ -163,14 +248,12 @@ export default function SuperAdminDashboard() {
     </div>
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100" style={{ fontFamily: "'DM Mono', 'DM Sans', 'Noto Sans Thai', monospace" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       <ToastContainer />
 
-      {/* Overlays */}
       {selectedLog && <LogDrawer log={selectedLog} onClose={() => setSelectedLog(null)} />}
       {showCreate && <CreateUserModal onSubmit={handleCreateUser} onClose={() => setShowCreate(false)} loading={actionLoading} />}
       {showEditProfile && user && (
@@ -198,7 +281,6 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        {/* Tab switcher */}
         <div className="flex items-center gap-1 bg-slate-900 rounded-xl p-1 border border-slate-800">
           {([
             { key: "logs", label: "Audit Logs", icon: "📋" },
@@ -212,24 +294,24 @@ export default function SuperAdminDashboard() {
           ))}
         </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
-              <div className="w-8 h-8 rounded-full bg-rose-900 flex items-center justify-center text-xs font-bold text-rose-300">
-                {adminName.slice(0, 2)}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-semibold text-slate-200">{adminName}</p>
-                <p className="text-xs text-rose-400">super_admin</p>
-              </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
+            <div className="w-8 h-8 rounded-full bg-rose-900 flex items-center justify-center text-xs font-bold text-rose-300">
+              {adminName.slice(0, 2)}
             </div>
-            <button onClick={() => navigate("/select-system")} className="text-xs text-slate-400 hover:text-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-800 transition-colors font-medium flex items-center gap-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
-              สลับระบบ
-            </button>
-            <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors">
-              ออกจากระบบ
-            </button>
+            <div className="hidden sm:block">
+              <p className="text-xs font-semibold text-slate-200">{adminName}</p>
+              <p className="text-xs text-rose-400">super_admin</p>
+            </div>
           </div>
+          <button onClick={() => navigate("/select-system")} className="text-xs text-slate-400 hover:text-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-800 hover:bg-slate-800 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
+            สลับระบบ
+          </button>
+          <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded-lg hover:bg-slate-800 transition-colors">
+            ออกจากระบบ
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -307,7 +389,15 @@ export default function SuperAdminDashboard() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-800 text-left">
-                        {["เวลา", "Action", "ผู้กระทำ", "เป้าหมาย", "หมายเหตุ", ""].map((h) => (
+                        {[
+                          "เวลา",
+                          "Action",
+                          "ผู้ที่ลา / เป้าหมาย",
+                          "ผู้รับทราบ (actor)",
+                          "ประเภท",
+                          "หมายเหตุ",
+                          "",
+                        ].map((h) => (
                           <th key={h} className="px-5 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -316,16 +406,30 @@ export default function SuperAdminDashboard() {
                       {logs.map((log) => {
                         const meta = getActionMeta(log.action);
                         return (
-                          <tr key={log.id} className="hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={() => setSelectedLog(log)}>
+                          <tr
+                            key={log.id}
+                            className="hover:bg-slate-800/50 cursor-pointer transition-colors"
+                            onClick={() => setSelectedLog(log)}
+                          >
+                            {/* เวลา */}
                             <td className="px-5 py-3 text-xs text-slate-400 font-mono whitespace-nowrap">
                               {fmtDatetime(log.created_at)}
                             </td>
+
+                            {/* Action badge */}
                             <td className="px-5 py-3">
                               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${meta.bg} ${meta.color}`}>
                                 <span>{meta.icon}</span>
                                 <span>{meta.label}</span>
                               </div>
                             </td>
+
+                            {/* ผู้ที่ลา / เป้าหมาย — NEW */}
+                            <td className="px-5 py-3">
+                              <TargetCell log={log} />
+                            </td>
+
+                            {/* ผู้รับทราบ (actor) — เดิมคือ "ผู้กระทำ" */}
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
@@ -337,19 +441,23 @@ export default function SuperAdminDashboard() {
                                 </div>
                               </div>
                             </td>
+
+                            {/* ประเภท — NEW */}
                             <td className="px-5 py-3">
-                              {log.target_type ? (
-                                <span className="text-xs font-mono text-slate-400">
-                                  {log.target_type} <span className="text-rose-400">#{log.target_id}</span>
-                                </span>
-                              ) : <span className="text-slate-600">—</span>}
+                              <TypeBadge log={log} />
                             </td>
+
+                            {/* หมายเหตุ */}
                             <td className="px-5 py-3 text-xs text-slate-400 max-w-[180px] truncate">
                               {log.note ?? <span className="text-slate-600">—</span>}
                             </td>
+
+                            {/* diff */}
                             <td className="px-5 py-3">
                               {(log.before_data || log.after_data) && (
-                                <span className="text-xs text-amber-500 border border-amber-800 bg-amber-950/50 px-2 py-0.5 rounded-full">diff</span>
+                                <span className="text-xs text-amber-500 border border-amber-800 bg-amber-950/50 px-2 py-0.5 rounded-full">
+                                  diff
+                                </span>
                               )}
                             </td>
                           </tr>
@@ -386,7 +494,6 @@ export default function SuperAdminDashboard() {
         {activeTab === "users" && (
           <div className="space-y-5">
 
-            {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
               {[
                 { label: "ผู้ใช้ทั้งหมด", value: userStats.total, color: "text-slate-200" },
@@ -400,7 +507,6 @@ export default function SuperAdminDashboard() {
               ))}
             </div>
 
-            {/* Filters + Create */}
             <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 flex flex-wrap gap-3 items-center">
               <input
                 placeholder="ค้นหาชื่อ / รหัสพนักงาน..."
@@ -414,7 +520,7 @@ export default function SuperAdminDashboard() {
                 className="border border-slate-700 bg-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
               >
                 <option value="">ทุก role</option>
-                {(["user", "manager", "hr"] as UserRole[]).map((r) => (
+                {(["user", "lead", "manager", "hr"] as UserRole[]).map((r) => (
                   <option key={r} value={r}>{ROLE_META[r]?.label ?? r}</option>
                 ))}
               </select>
@@ -427,7 +533,6 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            {/* Users table */}
             <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
               {loading ? (
                 <div className="py-16 flex justify-center">
@@ -438,7 +543,7 @@ export default function SuperAdminDashboard() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-slate-800 text-left">
-                        {["พนักงาน", "แผนก", "Role", "สร้างเมื่อ", ""].map((h) => (
+                        {["พนักงาน", "แผนก", "Role", "หัวหน้า", "สร้างเมื่อ", ""].map((h) => (
                           <th key={h} className="px-5 py-3 text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -467,9 +572,26 @@ export default function SuperAdminDashboard() {
                               disabled={actionLoading}
                               className={`px-2.5 py-1 rounded-full text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-rose-500 ${ROLE_META[u.role]?.color ?? "bg-gray-100 text-gray-600"}`}
                             >
-                              {(["user", "manager", "hr"] as UserRole[]).map((r) => (
+                              {(["user", "lead", "manager", "hr"] as UserRole[]).map((r) => (
                                 <option key={r} value={r}>{ROLE_META[r].label}</option>
                               ))}
+                            </select>
+                          </td>
+                          <td className="px-5 py-4">
+                            <select
+                              value={u.supervisor_id ?? ""}
+                              onChange={(e) => handleSupervisorChange(u.id, e.target.value ? Number(e.target.value) : null)}
+                              disabled={actionLoading}
+                              className="bg-slate-800 border-0 rounded-lg px-2 py-1 text-xs text-slate-300 focus:ring-2 focus:ring-rose-500"
+                            >
+                              <option value="">— ไม่มีหัวหน้า —</option>
+                              {users
+                                .filter((s) => s.id !== u.id && (s.role === "lead" || s.role === "manager"))
+                                .map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.full_name} ({ROLE_META[s.role]?.label})
+                                  </option>
+                                ))}
                             </select>
                           </td>
                           <td className="px-5 py-4 text-xs text-slate-500 font-mono whitespace-nowrap">

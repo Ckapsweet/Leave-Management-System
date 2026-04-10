@@ -186,6 +186,19 @@ export default function AdminDashboard() {
       viewMode === "all" ? true :
         viewMode === "yearly" ? reqYear === selYear :
           reqYear === selYear && reqMonth === selMonth;
+          
+    // Hierarchy filtering
+    const isLead = user?.role === "lead";
+    const isManager = user?.role === "manager";
+    
+    if (isLead) {
+      // Lead only sees their direct reports
+      if (r.user?.supervisor_id !== user.id) return false;
+    } else if (isManager) {
+      // Manager only sees Leads (per request)
+      if (r.user?.role !== "lead") return false;
+    }
+
     return matchStatus && matchSearch && matchDate;
   });
 

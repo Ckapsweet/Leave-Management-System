@@ -1,12 +1,15 @@
 // services/authService.ts
 import api from "./api";
 
+import type { UserRole } from "./superAdminService";
+
 export interface AuthUser {
   id: number;
   employee_code: string;
   full_name: string;
   department: string;
-  role: "user" | "manager" | "hr";
+  role: UserRole;
+  supervisor_id?: number | null;
 }
 
 export async function login(employee_code: string, password: string): Promise<{ user: AuthUser }> {

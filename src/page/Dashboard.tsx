@@ -495,7 +495,7 @@ export default function UserLeaveDashboard() {
             </div>
           </div>
           <button onClick={() => navigate("/select-system")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
             สลับระบบ
           </button>
           <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
@@ -534,7 +534,7 @@ export default function UserLeaveDashboard() {
 
         {/* Leave pool */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ ปี {year}</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ</h3>
           {leavePool ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
               <div className="flex items-center gap-4">
@@ -555,7 +555,7 @@ export default function UserLeaveDashboard() {
                     {leavePool.total_days > 0 && (
                       <div
                         className={`h-full rounded-full transition-all ${leavePool.remaining / leavePool.total_days < 0.2 ? "bg-red-400" :
-                            leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
+                          leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
                           }`}
                         style={{ width: `${Math.min(100, (leavePool.remaining / leavePool.total_days) * 100)}%` }}
                       />
@@ -614,13 +614,6 @@ export default function UserLeaveDashboard() {
             </div>
           )}
         </div>
-
-        {/* Report */}
-        <LeaveReport
-          fetchMonthly={getMyMonthlyReport}
-          fetchYearly={getMyYearlyReport}
-          currentYear={year}
-        />
 
         {/* Leave history */}
         <div>

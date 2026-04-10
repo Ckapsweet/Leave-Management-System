@@ -38,7 +38,7 @@ export interface AuditLogPagination {
   };
 }
 
-export type UserRole = "user" | "manager" | "hr";
+export type UserRole = "user" | "lead" | "manager" | "hr";
 
 export interface SuperAdminUser {
   id: number;
@@ -46,6 +46,7 @@ export interface SuperAdminUser {
   full_name: string;
   department: string | null;
   role: UserRole;
+  supervisor_id: number | null;
   created_at: string;
 }
 
@@ -91,10 +92,12 @@ export async function createUser(payload: {
 }): Promise<SuperAdminUser> {
   const res = await api.post("/api/super-admin/users", payload);
   return res.data;
+}export async function changeUserRole(id: number, role: UserRole): Promise<void> {
+  await api.patch(`/api/super-admin/users/${id}/role`, { role });
 }
 
-export async function changeUserRole(id: number, role: UserRole): Promise<void> {
-  await api.patch(`/api/super-admin/users/${id}/role`, { role });
+export async function changeUserSupervisor(id: number, supervisor_id: number | null): Promise<void> {
+  await api.patch(`/api/super-admin/users/${id}/supervisor`, { supervisor_id });
 }
 
 export async function deleteUser(id: number): Promise<void> {

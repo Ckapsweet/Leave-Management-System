@@ -1,6 +1,7 @@
 // services/leaveService.ts
 import api from "./api";
 import type { Dayjs } from "dayjs";
+import type { UserRole } from "./superAdminService";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -48,6 +49,8 @@ export interface LeaveRequest {
     full_name:     string;
     employee_code: string;
     department:    string;
+    role:          UserRole;
+    supervisor_id: number | null;
   };
 }
 

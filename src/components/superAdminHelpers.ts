@@ -19,7 +19,8 @@ export const ACTION_META: Record<string, { label: string; color: string; bg: str
 
 export const ROLE_META: Record<UserRole, { label: string; color: string }> = {
   hr: { label: "HR", color: "bg-violet-100 text-violet-700" },
-  manager: { label: "manager", color: "bg-blue-100 text-blue-700" },
+  manager: { label: "Manager", color: "bg-blue-100 text-blue-700" },
+  lead: { label: "Lead", color: "bg-emerald-100 text-emerald-700" },
   user: { label: "User", color: "bg-gray-100 text-gray-600" },
 };
 
