@@ -25,6 +25,7 @@ export default function SystemSelectionPage() {
     // Redirect based on role
     const roleToPath: Record<string, string> = {
       lead: "/lead",
+      "assistant manager": "/manager",
       manager: "/manager",
     };
     navigate(roleToPath[role || ""] ?? "/dashboard");
@@ -34,6 +35,7 @@ export default function SystemSelectionPage() {
     const baseUrl = import.meta.env.VITE_OT_SYSTEM_URL;
     const roleToPath: Record<string, string> = {
       lead: "/ot-lead",
+      "assistant manager": "/ot-manager",
       manager: "/ot-manager",
     };
     const targetPath = roleToPath[role || ""] ?? "/ot";

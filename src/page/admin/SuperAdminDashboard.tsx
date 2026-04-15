@@ -101,8 +101,8 @@ export default function AdminDashboard() {
       const usersRes = await api.get("/api/admin/users");
       let users: Employee[] = usersRes.data.filter((u: Employee) => u.role !== "admin");
 
-      // Lead/Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
-      if (user?.role === "lead" || user?.role === "manager") {
+      // Lead/Manager/Assistant Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
+      if (user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") {
         users = users.filter((u: any) => u.supervisor_id === user.id);
       }
       const withPool = await Promise.all(
@@ -151,9 +151,10 @@ export default function AdminDashboard() {
             : u
         )
       );
+      const isManagerLevel = user?.role === "manager" || user?.role === "assistant manager";
       const msg = assign
-        ? (user?.role === "manager" ? "กำหนด Lead เรียบร้อย" : "กำหนดทีมเรียบร้อย")
-        : (user?.role === "manager" ? "ยกเลิก Lead เรียบร้อย" : "ยกเลิกทีมเรียบร้อย");
+        ? (isManagerLevel ? "กำหนด Lead เรียบร้อย" : "กำหนดทีมเรียบร้อย")
+        : (isManagerLevel ? "ยกเลิก Lead เรียบร้อย" : "ยกเลิกทีมเรียบร้อย");
       toast.success(msg);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
@@ -245,7 +246,7 @@ export default function AdminDashboard() {
 
     // Hierarchy filtering
     const isLead = user?.role === "lead";
-    const isManager = user?.role === "manager";
+    const isManager = user?.role === "manager" || user?.role === "assistant manager";
 
     if (isLead) {
       // Lead only sees their direct reports
@@ -359,7 +360,7 @@ export default function AdminDashboard() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-gray-900">manager — ระบบการลา</h1>
+            <h1 className="text-sm font-semibold text-gray-900">{user?.role} — ระบบการลา</h1>
             <p className="text-xs text-gray-400">ปี {year}</p>
           </div>
         </div>
@@ -378,8 +379,8 @@ export default function AdminDashboard() {
               )}
             </button>
           ))}
-          {/* Lead / Manager: Manage Subordinates tab */}
-          {(user?.role === "lead" || user?.role === "manager") && (
+          {/* Lead / Manager / Assistant Manager: Manage Subordinates tab */}
+          {(user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") && (
             <button onClick={() => setActiveTab("subordinates")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "subordinates" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}>
@@ -387,7 +388,7 @@ export default function AdminDashboard() {
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              {user?.role === "manager" ? "จัดการทีม Lead" : "จัดการทีม"}
+              {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีม"}
               {allUsers.filter(u => u.supervisor_id === user.id).length > 0 && (
                 <span className="bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                   {allUsers.filter(u => u.supervisor_id === user.id).length}
@@ -700,7 +701,7 @@ export default function AdminDashboard() {
           </div>
         )}
         {/* ── Subordinates Tab (Lead & Manager) ───────────────────────────── */}
-        {activeTab === "subordinates" && (user?.role === "lead" || user?.role === "manager") && (
+        {activeTab === "subordinates" && (user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white">
               <div className="flex items-center gap-4">
@@ -712,10 +713,10 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-semibold">
-                    {user?.role === "manager" ? "จัดการทีม Lead" : "จัดการทีมลูกน้อง"}
+                    {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีมลูกน้อง"}
                   </h2>
                   <p className="text-indigo-200 text-xs mt-0.5">
-                    {user?.role === "manager"
+                    {user?.role === "manager" || user?.role === "assistant manager"
                       ? "เลือก Lead ที่คุณต้องการดูแลและอนุมัติคำขอลา"
                       : "เลือกพนักงานที่คุณต้องการดูแลและอนุมัติคำขอลา"}
                   </p>
@@ -723,7 +724,7 @@ export default function AdminDashboard() {
                 <div className="text-center">
                   <p className="text-3xl font-bold">{allUsers.filter(u => u.supervisor_id === user.id).length}</p>
                   <p className="text-indigo-200 text-xs">
-                    {user?.role === "manager" ? "Lead ปัจจุบัน" : "ลูกน้องปัจจุบัน"}
+                    {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ปัจจุบัน" : "ลูกน้องปัจจุบัน"}
                   </p>
                 </div>
               </div>
@@ -736,7 +737,7 @@ export default function AdminDashboard() {
                 </svg>
                 <input
                   className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder={user?.role === "manager" ? "ค้นหา Lead..." : "ค้นหาชื่อหรือรหัสพนักงาน..."}
+                  placeholder={user?.role === "manager" || user?.role === "assistant manager" ? "ค้นหา Lead..." : "ค้นหาชื่อหรือรหัสพนักงาน..."}
                   value={subSearch}
                   onChange={(e) => setSubSearch(e.target.value)}
                 />
@@ -750,7 +751,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-400" />
                     <h3 className="text-sm font-semibold text-gray-700">
-                      {user?.role === "manager" ? "Lead ในทีมของฉัน" : "ทีมของฉัน"}
+                      {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ในทีมของฉัน" : "ทีมของฉัน"}
                     </h3>
                   </div>
                   <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
@@ -774,7 +775,7 @@ export default function AdminDashboard() {
                             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                           </svg>
                         </div>
-                        {user?.role === "manager" ? "ยังไม่มี Lead ในทีม" : "ยังไม่มีทีมงาน"}<br />
+                        {user?.role === "manager" || user?.role === "assistant manager" ? "ยังไม่มี Lead ในทีม" : "ยังไม่มีทีมงาน"}<br />
                         <span className="text-xs text-gray-300">เพิ่มจากรายการทางขวา</span>
                       </div>
                     ) : (
@@ -813,7 +814,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-amber-400" />
                     <h3 className="text-sm font-semibold text-gray-700">
-                      {user?.role === "manager" ? "Lead ที่ยังไม่มีหัวหน้า" : "พนักงานที่ยังไม่มีหัวหน้า"}
+                      {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ที่ยังไม่มีหัวหน้า" : "พนักงานที่ยังไม่มีหัวหน้า"}
                     </h3>
                   </div>
                   <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
@@ -837,7 +838,7 @@ export default function AdminDashboard() {
                             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
                           </svg>
                         </div>
-                        {user?.role === "manager" ? "ไม่มี Lead ที่ยังไม่มีหัวหน้า" : "ไม่มีพนักงานที่ยังไม่มีหัวหน้า"}
+                        {user?.role === "manager" || user?.role === "assistant manager" ? "ไม่มี Lead ที่ยังไม่มีหัวหน้า" : "ไม่มีพนักงานที่ยังไม่มีหัวหน้า"}
                       </div>
                     ) : (
                       allUsers.filter(u => u.supervisor_id === null &&
@@ -871,7 +872,7 @@ export default function AdminDashboard() {
             </div>
 
             <p className="text-xs text-gray-400 text-center">
-              หมายเหตุ: {user?.role === "manager" ? "Lead" : "พนักงาน"}ที่มีหัวหน้าคนอื่นอยู่แล้วจะไม่ปรากฏในรายการ กรุณาติดต่อ Admin เพื่อเปลี่ยนแปลง
+              หมายเหตุ: {user?.role === "manager" || user?.role === "assistant manager" ? "Lead" : "พนักงาน"}ที่มีหัวหน้าคนอื่นอยู่แล้วจะไม่ปรากฏในรายการ กรุณาติดต่อ Admin เพื่อเปลี่ยนแปลง
             </p>
           </div>
         )}

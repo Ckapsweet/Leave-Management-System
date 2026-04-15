@@ -38,7 +38,7 @@ export interface AuditLogPagination {
   };
 }
 
-export type UserRole = "user" | "lead" | "manager" | "hr";
+export type UserRole = "user" | "lead" | "assistant manager" | "manager" | "hr";
 
 export interface SuperAdminUser {
   id: number;

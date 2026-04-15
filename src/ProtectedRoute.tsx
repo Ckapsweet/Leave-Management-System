@@ -2,7 +2,7 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
-type Role = "user" | "lead" | "manager";
+type Role = "user" | "lead" | "assistant manager" | "manager";
 
 type Props = {
   children: ReactNode;
@@ -17,6 +17,7 @@ type Props = {
 
 function roleToPath(role: string): string {
   if (role === "lead") return "/lead";
+  if (role === "assistant manager") return "/manager";
   if (role === "manager") return "/manager";
   return "/dashboard";            // user → /dashboard
 }

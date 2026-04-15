@@ -19,7 +19,7 @@ export default function App() {
         <Route
           path="/select-system"
           element={
-            <ProtectedRoute requiredRole={["user", "lead", "manager"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager"]}>
               <SystemSelectionPage />
             </ProtectedRoute>
           }
@@ -35,7 +35,6 @@ export default function App() {
           }
         />
 
-        {/* Lead — หัวหน้าทีม (ใช้ AdminDashboard เดียวกับ manager) */}
         <Route
           path="/lead"
           element={
@@ -45,11 +44,11 @@ export default function App() {
           }
         />
 
-        {/* Manager — ผู้จัดการ */}
+        {/* Manager & Assistant Manager */}
         <Route
           path="/manager"
           element={
-            <ProtectedRoute requiredRole={["manager"]}>
+            <ProtectedRoute requiredRole={["manager", "assistant manager"]}>
               <SuperAdminDashboard />
             </ProtectedRoute>
           }
