@@ -1,10 +1,9 @@
-// pages/UserLeaveDashboard.tsx
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../services/authService";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest,
-  getMyMonthlyReport, getMyYearlyReport,
+  getMyMonthlyReport, getMyYearlyReport
 } from "../services/leaveService";
 import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload } from "../services/leaveService";
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
@@ -14,6 +13,7 @@ import { ToastContainer, toast } from "../components/Toast";
 import { EditProfileModal } from "../components/EditProfileModal";
 import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
+import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -262,7 +262,6 @@ function DetailDrawer({
           <p className="text-xs text-gray-400 text-center">ส่งคำขอเมื่อ {fmtDatetime(req.created_at)}</p>
         </div>
 
-        {/* Cancel button — แสดงเฉพาะ status === "pending" */}
         {req.status === "pending" && (
           <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
             <button
@@ -531,6 +530,9 @@ export default function UserLeaveDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Today's Leaves Component ── */}
+        <TodayLeavesWidget />
 
         {/* Leave pool */}
         <div>

@@ -89,6 +89,11 @@ export async function getMyLeaveRequests(): Promise<LeaveRequest[]> {
 }
 
 // ✅ รับ LeaveRequestPayload ที่ start_date/end_date เป็น string แล้ว
+export async function getTodayLeaves(): Promise<LeaveRequest[]> {
+  const res = await api.get("/api/leave-requests/today");
+  return res.data;
+}
+
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
 

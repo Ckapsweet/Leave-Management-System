@@ -24,20 +24,18 @@ export default function SystemSelectionPage() {
   const handleSelectLeave = () => {
     // Redirect based on role
     const roleToPath: Record<string, string> = {
+      lead: "/lead",
       manager: "/manager",
-      hr: "/hr",
     };
     navigate(roleToPath[role || ""] ?? "/dashboard");
   };
 
   const handleSelectOT = () => {
     const baseUrl = import.meta.env.VITE_OT_SYSTEM_URL;
-    // ตั้งค่า Path ใหม่ตามความต้องการของคุณ
     const roleToPath: Record<string, string> = {
+      lead: "/ot-lead",
       manager: "/ot-manager",
-      hr: "/ot-admin", // เปลี่ยนจาก /ot-hr เป็น /ot-admin
     };
-    // ถ้าไม่ใช่ manager/hr จะไปที่ /ot (แทน /dashboard เดิม)
     const targetPath = roleToPath[role || ""] ?? "/ot";
     window.location.href = `${baseUrl}${targetPath}`;
   };

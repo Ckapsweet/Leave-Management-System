@@ -2,7 +2,7 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
-type Role = "user" | "manager" | "hr";
+type Role = "user" | "lead" | "manager";
 
 type Props = {
   children: ReactNode;
@@ -16,9 +16,9 @@ type Props = {
 // จะ return 401/403 เพราะ cookie ไม่มี / role ไม่ตรง
 
 function roleToPath(role: string): string {
-  if (role === "hr") return "/hr";
+  if (role === "lead") return "/lead";
   if (role === "manager") return "/manager";
-  return "/dashboard";
+  return "/dashboard";            // user → /dashboard
 }
 
 export default function ProtectedRoute({ children, requiredRole }: Props) {

@@ -20,9 +20,11 @@ export default function LoginPage() {
 
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify({
+        id: user.id,
         full_name: user.full_name,
         employee_code: user.employee_code,
         department: user.department,
+        role: user.role,
       }));
       navigate("/select-system", { replace: true });
 

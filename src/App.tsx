@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./page/LoginPage";
 import Dashboard from "./page/Dashboard";
 import AdminDashboard from "./page/admin/AdminDashboard";
-import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
 import SystemSelectionPage from "./page/SystemSelectionPage";
+import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
 import ProtectedRoute from "./ProtectedRoute";
+
 
 export default function App() {
   return (
@@ -14,41 +15,41 @@ export default function App() {
         {/* Public */}
         <Route path="/" element={<LoginPage />} />
 
-        {/* Selection Page (หลังจาก login แล้ว) */}
+        {/* Selection Page (ทุก role เข้าได้หลัง login) */}
         <Route
           path="/select-system"
           element={
-            <ProtectedRoute requiredRole={["user", "manager", "hr"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "manager"]}>
               <SystemSelectionPage />
             </ProtectedRoute>
           }
         />
 
-        {/* User (hr/admin/super_admin เข้าได้ด้วย ถ้าต้องการ) */}
+        {/* User — พนักงานทั่วไป */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requiredRole={["user", "manager", "hr"]}>
+            <ProtectedRoute requiredRole={["user"]}>
               <Dashboard />
             </ProtectedRoute>
           }
         />
 
-        {/* Admin */}
+        {/* Lead — หัวหน้าทีม (ใช้ AdminDashboard เดียวกับ manager) */}
         <Route
-          path="/manager"
+          path="/lead"
           element={
-            <ProtectedRoute requiredRole={["manager"]}>
+            <ProtectedRoute requiredRole={["lead"]}>
               <AdminDashboard />
             </ProtectedRoute>
           }
         />
 
-        {/* Super Admin */}
+        {/* Manager — ผู้จัดการ */}
         <Route
-          path="/hr"
+          path="/manager"
           element={
-            <ProtectedRoute requiredRole={["hr"]}>
+            <ProtectedRoute requiredRole={["manager"]}>
               <SuperAdminDashboard />
             </ProtectedRoute>
           }
