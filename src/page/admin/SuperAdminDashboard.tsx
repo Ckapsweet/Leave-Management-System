@@ -20,6 +20,7 @@ import {
 } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
+import { getSuperAdminUsers, changeUserRole, type SuperAdminUser, type UserRole } from "../../services/superAdminService";
 
 // ── Subordinate User type ────────────────────────────────────────────────────
 interface SubordinateUser {
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
   const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
 
   // ── Employees state ────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates" | "users">("requests");
   const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -62,6 +63,13 @@ export default function AdminDashboard() {
   const [subLoading, setSubLoading] = useState(false);
   const [subAssigning, setSubAssigning] = useState<number | null>(null);
   const [subSearch, setSubSearch] = useState("");
+
+  // ── Role Management state ───────────────────────────────────────────────────
+  const [saUsers, setSaUsers] = useState<SuperAdminUser[]>([]);
+  const [saUsersLoading, setSaUsersLoading] = useState(false);
+  const [saSearch, setSaSearch] = useState("");
+  const [saRoleFilter, setSaRoleFilter] = useState("all");
+  const [editingRole, setEditingRole] = useState<{ id: number; role: UserRole } | null>(null);
 
   // ── Balance modal state ────────────────────────────────────────────────────
   const [balanceModal, setBalanceModal] = useState<{
@@ -135,10 +143,24 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchSaUsers = useCallback(async () => {
+    try {
+      setSaUsersLoading(true);
+      const data = await getSuperAdminUsers();
+      setSaUsers(data);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("โหลดข้อมูลพนักงานไม่สำเร็จ");
+    } finally {
+      setSaUsersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab === "employees") fetchEmployees();
     if (activeTab === "subordinates") fetchAllUsersForLead();
-  }, [activeTab, fetchEmployees, fetchAllUsersForLead]);
+    if (activeTab === "users") fetchSaUsers();
+  }, [activeTab, fetchEmployees, fetchAllUsersForLead, fetchSaUsers]);
 
   const handleAssignSubordinate = async (userId: number, assign: boolean) => {
     try {
@@ -164,6 +186,17 @@ export default function AdminDashboard() {
   };
 
   // ── Actions ────────────────────────────────────────────────────────────────
+
+  const handleSaveRole = async (userId: number, newRole: UserRole) => {
+    try {
+      await changeUserRole(userId, newRole);
+      setSaUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success("อัปเดตสิทธิ์การใช้งานเรียบร้อย");
+      setEditingRole(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "อัปเดตสิทธิ์ไม่สำเร็จ");
+    }
+  };
 
   const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
     try {
@@ -396,6 +429,14 @@ export default function AdminDashboard() {
               )}
             </button>
           )}
+          {/* Manager & Assistant Manager: Manage Users tab */}
+          {(user?.role === "manager" || user?.role === "assistant manager") && (
+            <button onClick={() => setActiveTab("users")}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "users" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}>
+              กำหนดสิทธิ์
+            </button>
+          )}
         </div>
 
         {/* User info */}
@@ -409,6 +450,10 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-400">Admin</p>
             </div>
           </div>
+          <button onClick={() => navigate("/dashboard")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>
+            วันลาของฉัน
+          </button>
           <button onClick={() => navigate("/select-system")} className="text-xs text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors font-medium flex items-center gap-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
             สลับระบบ
@@ -713,7 +758,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-semibold">
-                    {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีมลูกน้อง"}
+                    {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีม"}
                   </h2>
                   <p className="text-indigo-200 text-xs mt-0.5">
                     {user?.role === "manager" || user?.role === "assistant manager"
@@ -724,7 +769,7 @@ export default function AdminDashboard() {
                 <div className="text-center">
                   <p className="text-3xl font-bold">{allUsers.filter(u => u.supervisor_id === user.id).length}</p>
                   <p className="text-indigo-200 text-xs">
-                    {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ปัจจุบัน" : "ลูกน้องปัจจุบัน"}
+                    {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ปัจจุบัน" : "ทีมปัจจุบัน"}
                   </p>
                 </div>
               </div>
@@ -874,6 +919,113 @@ export default function AdminDashboard() {
             <p className="text-xs text-gray-400 text-center">
               หมายเหตุ: {user?.role === "manager" || user?.role === "assistant manager" ? "Lead" : "พนักงาน"}ที่มีหัวหน้าคนอื่นอยู่แล้วจะไม่ปรากฏในรายการ กรุณาติดต่อ Admin เพื่อเปลี่ยนแปลง
             </p>
+          </div>
+        )}
+
+        {/* ── Users Tab (Manage Roles) ───────────────────────────── */}
+        {activeTab === "users" && (user?.role === "manager" || user?.role === "assistant manager") && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                    placeholder="ค้นหาพนักงาน..." value={saSearch}
+                    onChange={(e) => setSaSearch(e.target.value)} />
+                </div>
+                <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  value={saRoleFilter} onChange={(e) => setSaRoleFilter(e.target.value)}>
+                  <option value="all">ทุกระดับสิทธิ์</option>
+                  <option value="user">User</option>
+                  <option value="lead">Lead</option>
+                  <option value="assistant manager">Assistant Manager</option>
+                  <option value="manager">Manager</option>
+                  <option value="hr">HR</option>
+                </select>
+                <button onClick={fetchSaUsers} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
+                  รีเฟรช
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-700">จัดการสิทธิ์การใช้งาน</h2>
+              </div>
+              {saUsersLoading ? (
+                <div className="py-16 text-center text-gray-400 text-sm">
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  กำลังโหลด...
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-100 text-left">
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">พนักงาน</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">แผนก</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">สิทธิ์การใช้งาน (Role)</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {saUsers.filter(u =>
+                        (saRoleFilter === "all" || u.role === saRoleFilter) &&
+                        (!saSearch || u.full_name.includes(saSearch) || u.employee_code.includes(saSearch))
+                      ).length === 0 ? (
+                        <tr><td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">ไม่พบรายชื่อพนักงาน</td></tr>
+                      ) : saUsers.filter(u =>
+                        (saRoleFilter === "all" || u.role === saRoleFilter) &&
+                        (!saSearch || u.full_name.includes(saSearch) || u.employee_code.includes(saSearch))
+                      ).map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-5 py-4">
+                            <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{u.full_name}</p>
+                            <p className="text-xs text-gray-400">{u.employee_code}</p>
+                          </td>
+                          <td className="px-5 py-4 text-sm text-gray-600">{u.department || "-"}</td>
+                          <td className="px-5 py-4">
+                            {editingRole?.id === u.id ? (
+                              <select
+                                className="border border-indigo-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                value={editingRole.role}
+                                onChange={(e) => setEditingRole({ id: u.id, role: e.target.value as UserRole })}
+                              >
+                                {["user", "lead", "assistant manager", "manager", "hr"].map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${u.role === 'manager' ? 'bg-indigo-100 text-indigo-700' :
+                                u.role === 'assistant manager' ? 'bg-blue-100 text-blue-700' :
+                                  u.role === 'lead' ? 'bg-emerald-100 text-emerald-700' :
+                                    u.role === 'hr' ? 'bg-fuchsia-100 text-fuchsia-700' :
+                                      'bg-gray-100 text-gray-600'
+                                }`}>{u.role}</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            {user?.id !== u.id && (
+                              editingRole?.id === u.id ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  <button onClick={() => handleSaveRole(u.id, editingRole.role)} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">บันทึก</button>
+                                  <button onClick={() => setEditingRole(null)} className="px-3 py-1 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium">ยกเลิก</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setEditingRole({ id: u.id, role: u.role })} className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">แก้ไขสิทธิ์</button>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

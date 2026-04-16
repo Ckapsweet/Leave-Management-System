@@ -2,7 +2,7 @@
 import { Navigate } from "react-router-dom";
 import type { ReactNode } from "react";
 
-type Role = "user" | "lead" | "assistant manager" | "manager";
+type Role = "user" | "lead" | "assistant manager" | "manager" | "hr";
 
 type Props = {
   children: ReactNode;

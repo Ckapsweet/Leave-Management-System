@@ -25,11 +25,11 @@ export default function App() {
           }
         />
 
-        {/* User — พนักงานทั่วไป */}
+        {/* User — พนักงานทั่วไปและระดับจัดการ (สำหรับการลาของตัวเอง) */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requiredRole={["user"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "hr"]}>
               <Dashboard />
             </ProtectedRoute>
           }

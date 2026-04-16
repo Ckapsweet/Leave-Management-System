@@ -408,6 +408,10 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-400">Admin</p>
             </div>
           </div>
+          <button onClick={() => navigate("/dashboard")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>
+            วันลาของฉัน
+          </button>
           <button onClick={() => navigate("/select-system")} className="text-xs text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors font-medium flex items-center gap-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
             สลับระบบ
@@ -712,7 +716,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-semibold">
-                    {user?.role === "manager" ? "จัดการทีม Lead" : "จัดการทีมลูกน้อง"}
+                    {user?.role === "manager" ? "จัดการทีม Lead" : "จัดการทีม"}
                   </h2>
                   <p className="text-indigo-200 text-xs mt-0.5">
                     {user?.role === "manager"
@@ -723,7 +727,7 @@ export default function AdminDashboard() {
                 <div className="text-center">
                   <p className="text-3xl font-bold">{allUsers.filter(u => u.supervisor_id === user.id).length}</p>
                   <p className="text-indigo-200 text-xs">
-                    {user?.role === "manager" ? "Lead ปัจจุบัน" : "ลูกน้องปัจจุบัน"}
+                    {user?.role === "manager" ? "Lead ปัจจุบัน" : "ทีมปัจจุบัน"}
                   </p>
                 </div>
               </div>
