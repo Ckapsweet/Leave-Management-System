@@ -468,7 +468,7 @@ export default function UserLeaveDashboard() {
           </div>
           <div>
             <h1 className="text-sm font-semibold text-gray-900">ระบบการลา</h1>
-            <p className="text-xs text-gray-400">ปีงบประมาณ {year}</p>
+            <p className="text-xs text-gray-400">Ckapsweet</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

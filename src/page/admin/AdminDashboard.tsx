@@ -76,7 +76,6 @@ export default function AdminDashboard() {
     if (stored) setUser(JSON.parse(stored));
   }, []);
 
-  const adminName = user?.full_name ?? "Admin";
   const year = new Date().getFullYear();
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -243,17 +242,7 @@ export default function AdminDashboard() {
         viewMode === "yearly" ? reqYear === selYear :
           reqYear === selYear && reqMonth === selMonth;
 
-    // Hierarchy filtering
-    const isLead = user?.role === "lead";
-    const isManager = user?.role === "manager";
 
-    if (isLead) {
-      // Lead only sees their direct reports
-      if (r.user?.supervisor_id !== user.id) return false;
-    } else if (isManager) {
-      // Manager only sees Leads (per request)
-      if (r.user?.role !== "lead") return false;
-    }
 
     return matchStatus && matchSearch && matchDate;
   });
@@ -359,8 +348,8 @@ export default function AdminDashboard() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-gray-900">Admin — ระบบการลา</h1>
-            <p className="text-xs text-gray-400">ปี {year}</p>
+            <h1 className="text-sm font-semibold text-gray-900 capitalize">{user?.role} — ระบบการลา</h1>
+            <p className="text-xs text-gray-400">Ckapsweet</p>
           </div>
         </div>
 
@@ -401,11 +390,11 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-              {adminName.slice(0, 2)}
+              {user?.full_name?.slice(0, 2) || "??"}
             </div>
             <div className="hidden sm:block">
-              <p className="text-xs font-semibold text-gray-800">{adminName}</p>
-              <p className="text-xs text-gray-400">Admin</p>
+              <p className="text-xs font-semibold text-gray-800">{user?.full_name}</p>
+              <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
             </div>
           </div>
           <button onClick={() => navigate("/dashboard")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
