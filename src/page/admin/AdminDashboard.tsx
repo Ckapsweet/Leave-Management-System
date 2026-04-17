@@ -561,8 +561,6 @@ export default function AdminDashboard() {
                                       className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">อนุมัติ</button>
                                   </>
                                 )}
-                                <button onClick={() => r.user && openBalanceModal(r.user)}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">วันลา</button>
                               </div>
                             </td>
                           </tr>

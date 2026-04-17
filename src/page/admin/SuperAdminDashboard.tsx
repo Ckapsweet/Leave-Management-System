@@ -603,8 +603,6 @@ export default function AdminDashboard() {
                                       className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">อนุมัติ</button>
                                   </>
                                 )}
-                                <button onClick={() => r.user && openBalanceModal(r.user)}
-                                  className="px-3 py-1 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">วันลา</button>
                               </div>
                             </td>
                           </tr>
@@ -997,17 +995,17 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td className="px-5 py-4 text-center">
-                            {user?.id !== u.id && 
+                            {user?.id !== u.id &&
                               !(user?.role === "assistant manager" && ["manager", "assistant manager", "hr"].includes(u.role)) && (
-                              editingRole?.id === u.id ? (
-                                <div className="flex items-center justify-center gap-2">
-                                  <button onClick={() => handleSaveRole(u.id, editingRole.role)} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">บันทึก</button>
-                                  <button onClick={() => setEditingRole(null)} className="px-3 py-1 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium">ยกเลิก</button>
-                                </div>
-                              ) : (
-                                <button onClick={() => setEditingRole({ id: u.id, role: u.role })} className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">แก้ไขสิทธิ์</button>
-                              )
-                            )}
+                                editingRole?.id === u.id ? (
+                                  <div className="flex items-center justify-center gap-2">
+                                    <button onClick={() => handleSaveRole(u.id, editingRole.role)} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">บันทึก</button>
+                                    <button onClick={() => setEditingRole(null)} className="px-3 py-1 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium">ยกเลิก</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => setEditingRole({ id: u.id, role: u.role })} className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">แก้ไขสิทธิ์</button>
+                                )
+                              )}
                           </td>
                         </tr>
                       ))}
