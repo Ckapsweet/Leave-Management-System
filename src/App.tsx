@@ -6,6 +6,7 @@ import AdminDashboard from "./page/admin/AdminDashboard";
 import SystemSelectionPage from "./page/SystemSelectionPage";
 import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
 import ProtectedRoute from "./ProtectedRoute";
+import OverviewDashboard from "./page/admin/OverviewDashboard";
 
 
 export default function App() {
@@ -19,7 +20,7 @@ export default function App() {
         <Route
           path="/select-system"
           element={
-            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "admin"]}>
               <SystemSelectionPage />
             </ProtectedRoute>
           }
@@ -29,7 +30,7 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "hr"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "hr", "admin"]}>
               <Dashboard />
             </ProtectedRoute>
           }
@@ -54,6 +55,15 @@ export default function App() {
           }
         />
 
+        {/* Global Admin (Overview & Reports) */}
+        <Route
+          path="/admin-reports"
+          element={
+            <ProtectedRoute requiredRole={["admin"]}>
+              <OverviewDashboard />
+            </ProtectedRoute>
+          }
+        />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

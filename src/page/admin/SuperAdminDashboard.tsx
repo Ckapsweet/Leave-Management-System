@@ -21,6 +21,7 @@ import {
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { getSuperAdminUsers, changeUserRole, type SuperAdminUser, type UserRole } from "../../services/superAdminService";
+import { AdminReportWidget } from "../../components/AdminReportWidget";
 
 // ── Subordinate User type ────────────────────────────────────────────────────
 interface SubordinateUser {
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
   const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
 
   // ── Employees state ────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates" | "users">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates" | "users" | "reports">("requests");
   const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -81,7 +82,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setUser(parsed);
+      if (parsed.role === "admin") {
+        setActiveTab("reports");
+      }
+    }
   }, []);
 
   const year = new Date().getFullYear();
@@ -109,6 +116,7 @@ export default function AdminDashboard() {
       let users: Employee[] = usersRes.data.filter((u: Employee) => u.role !== "admin");
 
       // Lead/Manager/Assistant Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
+      // admin, hr: ไม่ filter (เห็นทุกคน)
       if (user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") {
         users = users.filter((u: any) => u.supervisor_id === user.id);
       }
@@ -156,7 +164,7 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "employees") fetchEmployees();
+    if (activeTab === "employees" || activeTab === "reports") fetchEmployees();
     if (activeTab === "subordinates") fetchAllUsersForLead();
     if (activeTab === "users") fetchSaUsers();
   }, [activeTab, fetchEmployees, fetchAllUsersForLead, fetchSaUsers]);
@@ -426,6 +434,17 @@ export default function AdminDashboard() {
               กำหนดสิทธิ์
             </button>
           )}
+          {/* Admin & Manager: Reports tab */}
+          {(user?.role === "admin" || user?.role === "manager") && (
+            <button onClick={() => setActiveTab("reports")}
+              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "reports" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                }`}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 20V10M12 20V4M6 20v-4" />
+              </svg>
+              ภาพรวม (Report)
+            </button>
+          )}
         </div>
 
         {/* User info */}
@@ -457,6 +476,11 @@ export default function AdminDashboard() {
 
         {/* ── Today's Leaves Component ── */}
         <TodayLeavesWidget />
+
+        {/* ── Reports Tab ────────────────────────────────────────────────────── */}
+        {activeTab === "reports" && (
+          <AdminReportWidget requests={requests} employees={employees} />
+        )}
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (

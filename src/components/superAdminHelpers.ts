@@ -23,6 +23,7 @@ export const ROLE_META: Record<UserRole, { label: string; color: string }> = {
   "assistant manager": { label: "Assistant Manager", color: "bg-indigo-100 text-indigo-700" },
   lead: { label: "Lead", color: "bg-emerald-100 text-emerald-700" },
   user: { label: "User", color: "bg-gray-100 text-gray-600" },
+  admin: { label: "Admin", color: "bg-red-100 text-red-700" },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

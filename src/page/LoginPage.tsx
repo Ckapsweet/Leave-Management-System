@@ -39,8 +39,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col bg-gray-100">
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-          <p className="text-xl font-bold text-center mb-2">ระบบลาออนไลน์</p>
-          <p className="text-sm text-gray-500 text-center mb-6">เข้าสู่ระบบ</p>
+          <p className="text-xl font-bold text-center mb-6">เข้าสู่ระบบ</p>
 
           {error && (
             <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
@@ -51,7 +50,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <input type="text"
               className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="รหัสพนักงาน (เช่น EMP-0001)"
+              placeholder="รหัส (เช่น MKT-9999)"
               value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} required />
             <input type="password"
               className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"

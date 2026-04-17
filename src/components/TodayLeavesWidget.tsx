@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getTodayLeaves } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
+import { DetailDrawer } from "./DetailDrawer"; // 1. นำเข้า DetailDrawer
 
 const TYPE_COLORS: Record<number, string> = {
     1: "bg-sky-100 text-sky-700",
@@ -13,6 +14,9 @@ export function TodayLeavesWidget() {
     const [todayLeaves, setTodayLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // 2. สร้าง State สำหรับเก็บข้อมูลรายการที่ถูกคลิก
+    const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+
     useEffect(() => {
         getTodayLeaves()
             .then(setTodayLeaves)
@@ -23,9 +27,6 @@ export function TodayLeavesWidget() {
     return (
         <div className="w-full">
             <h3 className="text-sm font-semibold uppercase tracking-wider mb-3 px-1 flex items-center gap-2 text-gray-500">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
                 ผู้ที่ลาในวันนี้
             </h3>
             <div className="rounded-2xl border overflow-hidden bg-white border-gray-100">
@@ -38,7 +39,11 @@ export function TodayLeavesWidget() {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
                         {todayLeaves.map((req) => (
-                            <div key={req.id} className="flex items-center gap-3 p-3 rounded-xl border transition-colors border-gray-100 bg-slate-50 hover:bg-slate-100">
+                            <div
+                                key={req.id}
+                                onClick={() => setSelectedRequest(req)} // 3. กำหนดค่าเมื่อถูกคลิก
+                                className="flex items-center gap-3 p-3 rounded-xl border transition-colors border-gray-100 bg-slate-50 hover:bg-slate-100 cursor-pointer" // เพิ่ม cursor-pointer
+                            >
                                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
                                     {req.user?.full_name?.slice(0, 2) ?? "??"}
                                 </div>
@@ -61,6 +66,18 @@ export function TodayLeavesWidget() {
                     </div>
                 )}
             </div>
+
+            {/* 4. แสดง DetailDrawer เมื่อมีการคลิกเลือกรายการ */}
+            {selectedRequest && (
+                <DetailDrawer
+                    request={selectedRequest}
+                    onClose={() => setSelectedRequest(null)}
+                    // ส่ง function ว่างๆ ไปให้ props onApprove และ onReject เพื่อไม่ให้ Type Error 
+                    // (เพราะส่วนใหญ่คนที่ลาวันนี้ สถานะจะเป็น Approved ไปแล้ว ปุ่มจึงไม่แสดงอยู่ดี)
+                    onApprove={() => { }}
+                    onReject={() => { }}
+                />
+            )}
         </div>
     );
 }
