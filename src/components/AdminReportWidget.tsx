@@ -1,4 +1,3 @@
-import React from "react";
 import type { LeaveRequest } from "../services/leaveService";
 import type { EmployeeWithBalance } from "./adminHelpers";
 
