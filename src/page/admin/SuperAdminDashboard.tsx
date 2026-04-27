@@ -409,7 +409,7 @@ export default function AdminDashboard() {
               )}
             </button>
           ))}
-          {/* Lead / Manager / Assistant Manager: Manage Subordinates tab */}
+          {/* Lead / Manager / Assistant Manager: view own team */}
           {(user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") && (
             <button onClick={() => setActiveTab("subordinates")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "subordinates" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
@@ -418,24 +418,16 @@ export default function AdminDashboard() {
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีม"}
-              {allUsers.filter(u => u.supervisor_id === user.id).length > 0 && (
+              ทีมของฉัน
+              {allUsers.filter(u => u.supervisor_id === user?.id).length > 0 && (
                 <span className="bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                  {allUsers.filter(u => u.supervisor_id === user.id).length}
+                  {allUsers.filter(u => u.supervisor_id === user?.id).length}
                 </span>
               )}
             </button>
           )}
-          {/* Manager & Assistant Manager: Manage Users tab */}
-          {(user?.role === "manager" || user?.role === "assistant manager") && (
-            <button onClick={() => setActiveTab("users")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "users" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                }`}>
-              กำหนดสิทธิ์
-            </button>
-          )}
-          {/* Admin & Manager: Reports tab */}
-          {(user?.role === "admin" || user?.role === "manager") && (
+          {/* Manager: Reports tab */}
+          {user?.role === "manager" && (
             <button onClick={() => setActiveTab("reports")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "reports" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}>
@@ -769,18 +761,16 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base font-semibold">
-                    {user?.role === "manager" || user?.role === "assistant manager" ? "จัดการทีม Lead" : "จัดการทีม"}
+                    ทีมของฉัน
                   </h2>
                   <p className="text-indigo-200 text-xs mt-0.5">
-                    {user?.role === "manager" || user?.role === "assistant manager"
-                      ? "เลือก Lead ที่คุณต้องการดูแลและอนุมัติคำขอลา"
-                      : "เลือกพนักงานที่คุณต้องการดูแลและอนุมัติคำขอลา"}
+                    รายชื่อสมาชิกทีมที่ถูกกำหนดโดย Admin
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold">{allUsers.filter(u => u.supervisor_id === user.id).length}</p>
+                  <p className="text-3xl font-bold">{allUsers.filter(u => u.supervisor_id === user?.id).length}</p>
                   <p className="text-indigo-200 text-xs">
-                    {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ปัจจุบัน" : "ทีมปัจจุบัน"}
+                    สมาชิกทีม
                   </p>
                 </div>
               </div>
@@ -793,148 +783,155 @@ export default function AdminDashboard() {
                 </svg>
                 <input
                   className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                  placeholder={user?.role === "manager" || user?.role === "assistant manager" ? "ค้นหา Lead..." : "ค้นหาชื่อหรือรหัสพนักงาน..."}
+                  placeholder="ค้นหาชื่อหรือรหัสพนักงาน..."
                   value={subSearch}
                   onChange={(e) => setSubSearch(e.target.value)}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* My Team */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ในทีมของฉัน" : "ทีมของฉัน"}
-                    </h3>
-                  </div>
-                  <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
-                    {allUsers.filter(u => u.supervisor_id === user.id &&
-                      (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                    ).length} คน
-                  </span>
-                </div>
-                {subLoading ? (
-                  <div className="py-12 flex justify-center">
-                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {allUsers.filter(u => u.supervisor_id === user.id &&
-                      (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                    ).length === 0 ? (
-                      <div className="py-14 text-center text-gray-400 text-sm">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-                          </svg>
-                        </div>
-                        {user?.role === "manager" || user?.role === "assistant manager" ? "ยังไม่มี Lead ในทีม" : "ยังไม่มีทีมงาน"}<br />
-                        <span className="text-xs text-gray-300">เพิ่มจากรายการทางขวา</span>
+            {/* Read-only team list */}
+                        </svg>
                       </div>
-                    ) : (
-                      allUsers.filter(u => u.supervisor_id === user.id &&
-                        (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                      ).map(emp => (
-                        <div key={emp.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(emp.department)}`}>
-                            {emp.full_name.slice(0, 2)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{emp.full_name}</p>
-                            <p className="text-xs text-gray-400 truncate">{emp.department} &middot; {emp.employee_code}</p>
-                          </div>
-                          <button
-                            onClick={() => handleAssignSubordinate(emp.id, false)}
-                            disabled={subAssigning === emp.id}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {subAssigning === emp.id
-                              ? <svg className="animate-spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-                              : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                            }
-                            ยกเลิก
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Available to assign */}
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-400" />
-                    <h3 className="text-sm font-semibold text-gray-700">
-                      {user?.role === "manager" || user?.role === "assistant manager" ? "Lead ที่ยังไม่มีหัวหน้า" : "พนักงานที่ยังไม่มีหัวหน้า"}
-                    </h3>
-                  </div>
-                  <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
-                    {allUsers.filter(u => u.supervisor_id === null &&
+                      ยังไม่มีสมาชิกในทีม<br />
+                      <span className="text-xs text-gray-300">ติดต่อ Admin เพื่อเพิ่มสมาชิก</span>
+                    </div>
+                  ) : (
+                    allUsers.filter(u => u.supervisor_id === user?.id &&
                       (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                    ).length} คน
-                  </span>
-                </div>
-                {subLoading ? (
-                  <div className="py-12 flex justify-center">
-                    <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {allUsers.filter(u => u.supervisor_id === null &&
-                      (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                    ).length === 0 ? (
-                      <div className="py-14 text-center text-gray-400 text-sm">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
-                          </svg>
+                    ).map(emp => (
+                      <div key={emp.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(emp.department)}`}>
+                          {emp.full_name.slice(0, 2)}
                         </div>
-                        {user?.role === "manager" || user?.role === "assistant manager" ? "ไม่มี Lead ที่ยังไม่มีหัวหน้า" : "ไม่มีพนักงานที่ยังไม่มีหัวหน้า"}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{emp.full_name}</p>
+                          <p className="text-xs text-gray-400 truncate">{emp.department} &middot; {emp.employee_code}</p>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          emp.role === 'lead' ? 'bg-emerald-100 text-emerald-700' :
+                          emp.role === 'assistant manager' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>{emp.role}</span>
                       </div>
-                    ) : (
-                      allUsers.filter(u => u.supervisor_id === null &&
-                        (!subSearch || u.full_name.includes(subSearch) || u.employee_code.includes(subSearch))
-                      ).map(emp => (
-                        <div key={emp.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(emp.department)}`}>
-                            {emp.full_name.slice(0, 2)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{emp.full_name}</p>
-                            <p className="text-xs text-gray-400 truncate">{emp.department} &middot; {emp.employee_code}</p>
-                          </div>
-                          <button
-                            onClick={() => handleAssignSubordinate(emp.id, true)}
-                            disabled={subAssigning === emp.id}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {subAssigning === emp.id
-                              ? <svg className="animate-spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-                              : <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
-                            }
-                            เพิ่ม
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-gray-400 text-center">
-              หมายเหตุ: {user?.role === "manager" || user?.role === "assistant manager" ? "Lead" : "พนักงาน"}ที่มีหัวหน้าคนอื่นอยู่แล้วจะไม่ปรากฏในรายการ กรุณาติดต่อ Admin เพื่อเปลี่ยนแปลง
+              หมายเหตุ: การเปลี่ยนแปลงสมาชิกทีมดำเนินการโดย Admin เท่านั้น
             </p>
           </div>
         )}
 
-        {/* ── Users Tab (Manage Roles) ───────────────────────────── */}
-        {activeTab === "users" && (user?.role === "manager" || user?.role === "assistant manager") && (
+        {/* ── Users Tab – admin only, hidden from manager/asst. manager ──── */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                    placeholder="ค้นหาพนักงาน..." value={saSearch}
+                    onChange={(e) => setSaSearch(e.target.value)} />
+                </div>
+                <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  value={saRoleFilter} onChange={(e) => setSaRoleFilter(e.target.value)}>
+                  <option value="all">ทุกระดับสิทธิ์</option>
+                  <option value="user">User</option>
+                  <option value="lead">Lead</option>
+                  <option value="assistant manager">Assistant Manager</option>
+                  <option value="manager">Manager</option>
+                  <option value="hr">HR</option>
+                </select>
+                <button onClick={fetchSaUsers} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
+                  รีเฟรช
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-700">จัดการสิทธิ์การใช้งาน</h2>
+              </div>
+              {saUsersLoading ? (
+                <div className="py-16 text-center text-gray-400 text-sm">
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  กำลังโหลด...
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-gray-100 text-left">
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">พนักงาน</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">แผนก</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400">สิทธิ์การใช้งาน (Role)</th>
+                        <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {saUsers.filter(u =>
+                        (saRoleFilter === "all" || u.role === saRoleFilter) &&
+                        (!saSearch || u.full_name.includes(saSearch) || u.employee_code.includes(saSearch))
+                      ).length === 0 ? (
+                        <tr><td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">ไม่พบรายชื่อพนักงาน</td></tr>
+                      ) : saUsers.filter(u =>
+                        (saRoleFilter === "all" || u.role === saRoleFilter) &&
+                        (!saSearch || u.full_name.includes(saSearch) || u.employee_code.includes(saSearch))
+                      ).map(u => (
+                        <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-5 py-4">
+                            <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{u.full_name}</p>
+                            <p className="text-xs text-gray-400">{u.employee_code}</p>
+                          </td>
+                          <td className="px-5 py-4 text-sm text-gray-600">{u.department || "-"}</td>
+                          <td className="px-5 py-4">
+                            {editingRole?.id === u.id ? (
+                              <select
+                                className="border border-indigo-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                value={editingRole.role}
+                                onChange={(e) => setEditingRole({ id: u.id, role: e.target.value as UserRole })}
+                              >
+                                {(["user", "lead", "assistant manager", "manager", "hr"] as UserRole[]).map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${u.role === 'manager' ? 'bg-indigo-100 text-indigo-700' :
+                                u.role === 'assistant manager' ? 'bg-blue-100 text-blue-700' :
+                                  u.role === 'lead' ? 'bg-emerald-100 text-emerald-700' :
+                                    u.role === 'hr' ? 'bg-fuchsia-100 text-fuchsia-700' :
+                                      'bg-gray-100 text-gray-600'
+                              }`}>{u.role}</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            {user?.id !== u.id && (
+                              editingRole?.id === u.id ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  <button onClick={() => handleSaveRole(u.id, editingRole.role)} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">บันทึก</button>
+                                  <button onClick={() => setEditingRole(null)} className="px-3 py-1 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 font-medium">ยกเลิก</button>
+                                </div>
+                              ) : (
+                                <button onClick={() => setEditingRole({ id: u.id, role: u.role })} className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">แก้ไขสิทธิ์</button>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {activeTab === "users" && user?.role === "admin" && (
           <div className="space-y-4">
             <div className="bg-white rounded-2xl border border-gray-100 p-4">
               <div className="flex flex-col sm:flex-row gap-3">
