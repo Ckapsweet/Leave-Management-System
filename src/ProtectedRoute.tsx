@@ -19,6 +19,7 @@ function roleToPath(role: string): string {
   if (role === "lead") return "/lead";
   if (role === "assistant manager") return "/manager";
   if (role === "manager") return "/manager";
+  if (role === "admin") return "/admin-reports";
   return "/dashboard";            // user → /dashboard
 }
 

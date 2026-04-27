@@ -25,6 +25,7 @@ export default function SystemSelectionPage() {
     const roleToPath: Record<string, string> = {
       manager: "/manager",
       hr: "/hr",
+      admin: "/admin-reports",
     };
     navigate(roleToPath[role || ""] ?? "/dashboard");
   };
