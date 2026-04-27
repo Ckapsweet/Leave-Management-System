@@ -33,11 +33,8 @@ export default function SystemSelectionPage() {
   const handleSelectOT = () => {
     alert("ระบบจัดการ OT กำลังอยู่ในช่วงพัฒนา...");
 
-    // const roleToPath: Record<string, string> = {
-    //   manager: "/manager",
-    //   hr: "/hr",
-    // };
-    // navigate(roleToPath[role || ""] ?? "/dashboard");
+    // const otUrl = import.meta.env.VITE_OT_SYSTEM_URL || "http://localhost:5174";
+    // window.location.href = otUrl;
   };
 
   const handleLogout = async () => {
