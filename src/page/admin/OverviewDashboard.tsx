@@ -41,9 +41,10 @@ export default function OverviewDashboard() {
     const navigate = useNavigate();
     const year = new Date().getFullYear();
 
-    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees">("requests");
+    // ---- Tab State (เพิ่ม "teams") ----
+    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams">("requests");
 
-    // Requests State
+    // ---- Requests State ----
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
     const [reqLoading, setReqLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
@@ -55,11 +56,11 @@ export default function OverviewDashboard() {
     const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Dashboard Stats
+    // ---- Dashboard Stats ----
     const [data, setData] = useState<DashboardData | null>(null);
     const [statsLoading, setStatsLoading] = useState(true);
 
-    // Employees List
+    // ---- Employees List ----
     const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
     const [empLoading, setEmpLoading] = useState(false);
     const [empSearch, setEmpSearch] = useState("");
@@ -74,15 +75,26 @@ export default function OverviewDashboard() {
         pool: LeavePool;
     } | null>(null);
 
+    // ---- Team Management State (NEW) ----
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [allUsersLoaded, setAllUsersLoaded] = useState(false);
+    const [selectedLeaderId, setSelectedLeaderId] = useState<number | "">("");
+    const [subSearch, setSubSearch] = useState("");
+    const [teamLoading, setTeamLoading] = useState(false);
+
+    // ---- Role Update State (NEW) ----
+    const [roleUpdatingId, setRoleUpdatingId] = useState<number | null>(null);
+
+    // ---- Auth ----
     const [user, setUser] = useState<AuthUser | null>(null);
     const [showEditProfile, setShowEditProfile] = useState(false);
 
     useEffect(() => {
         const stored = localStorage.getItem("user");
-        if (stored) {
-            setUser(JSON.parse(stored));
-        }
+        if (stored) setUser(JSON.parse(stored));
     }, []);
+
+    // ---- Fetch Functions ----
 
     const fetchDashboardData = useCallback(async () => {
         try {
@@ -120,10 +132,19 @@ export default function OverviewDashboard() {
         }
     }, [year]);
 
-    useEffect(() => {
-        if (activeTab === "reports") fetchDashboardData();
-        if (activeTab === "employees") fetchEmployees();
-    }, [activeTab, fetchDashboardData, fetchEmployees]);
+    // NEW: Fetch all users for team management
+    const fetchAllUsers = useCallback(async () => {
+        try {
+            setTeamLoading(true);
+            const res = await api.get("/api/admin/users");
+            setAllUsers(res.data);
+            setAllUsersLoaded(true);
+        } catch (err) {
+            toast.error("โหลดข้อมูลพนักงานไม่สำเร็จ");
+        } finally {
+            setTeamLoading(false);
+        }
+    }, []);
 
     const fetchRequests = useCallback(async () => {
         try {
@@ -139,7 +160,12 @@ export default function OverviewDashboard() {
 
     useEffect(() => {
         if (activeTab === "requests" || activeTab === "reports") fetchRequests();
-    }, [activeTab, fetchRequests]);
+        if (activeTab === "reports") fetchDashboardData();
+        if (activeTab === "employees") fetchEmployees();
+        if (activeTab === "teams" && !allUsersLoaded) fetchAllUsers();
+    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, allUsersLoaded]);
+
+    // ---- Handlers ----
 
     const handleLogout = async () => {
         await logout();
@@ -202,7 +228,6 @@ export default function OverviewDashboard() {
             setConfirm(null);
             setSelected(null);
             toast.success(type === "approve" ? "อนุมัติคำขอลาเรียบร้อย" : "ปฏิเสธคำขอลาเรียบร้อย");
-            // refresh stats and employees silently if needed
             if (activeTab === "reports") fetchDashboardData();
         } catch (err: any) {
             toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
@@ -210,6 +235,58 @@ export default function OverviewDashboard() {
             setActionLoading(false);
         }
     };
+
+    // NEW: Assign or remove subordinate
+    const handleAssignSubordinate = async (userId: number, assign: boolean) => {
+        if (assign && !selectedLeaderId) {
+            toast.error("กรุณาเลือกหัวหน้างานก่อน!");
+            return;
+        }
+        try {
+            await api.patch(`/api/admin/users/${userId}/assign-subordinate`, {
+                assign,
+                supervisor_id: assign ? Number(selectedLeaderId) : null,
+            });
+            setAllUsers((prev) =>
+                prev.map((u) =>
+                    u.id === userId
+                        ? { ...u, supervisor_id: assign ? Number(selectedLeaderId) : null }
+                        : u
+                )
+            );
+            toast.success(assign ? "เพิ่มเข้าทีมเรียบร้อย" : "นำออกจากทีมเรียบร้อย");
+        } catch {
+            toast.error("ดำเนินการไม่สำเร็จ");
+        }
+    };
+
+    // NEW: Update employee role
+    const ROLE_OPTIONS = ["user", "lead", "assistant manager", "manager"] as const;
+    type RoleOption = typeof ROLE_OPTIONS[number];
+
+    const ROLE_META: Record<RoleOption, { label: string; bg: string; color: string }> = {
+        user: { label: "User", bg: "bg-gray-100", color: "text-gray-600" },
+        lead: { label: "Lead", bg: "bg-blue-100", color: "text-blue-700" },
+        "assistant manager": { label: "Asst. Manager", bg: "bg-purple-100", color: "text-purple-700" },
+        manager: { label: "Manager", bg: "bg-amber-100", color: "text-amber-700" },
+    };
+
+    const handleUpdateRole = async (empId: number, newRole: RoleOption) => {
+        setRoleUpdatingId(empId);
+        try {
+            await api.patch(`/api/super-admin/users/${empId}/role`, { role: newRole });
+            setEmployees((prev) =>
+                prev.map((e) => e.id === empId ? { ...e, role: newRole } : e)
+            );
+            toast.success("อัปเดต Role เรียบร้อย");
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "อัปเดต Role ไม่สำเร็จ");
+        } finally {
+            setRoleUpdatingId(null);
+        }
+    };
+
+    // ---- Derived / Filtered Data ----
 
     const filteredEmployees = employees.filter((e) => {
         const ms = empDeptFilter === "all" || e.department === empDeptFilter;
@@ -232,6 +309,22 @@ export default function OverviewDashboard() {
     const pending = requests.filter((r) => r.status === "pending").length;
     const approved = requests.filter((r) => r.status === "approved").length;
     const rejected = requests.filter((r) => r.status === "rejected").length;
+
+    // NEW: derived lists for team management
+    const leaderOptions = allUsers.filter((u) =>
+        ["lead", "manager", "assistant manager"].includes(u.role?.toLowerCase() ?? "")
+    );
+    const currentSubordinates = allUsers.filter(
+        (u) => u.supervisor_id === Number(selectedLeaderId)
+    );
+    const freeEmployees = allUsers.filter(
+        (u) =>
+            !u.supervisor_id &&
+            u.role !== "admin" &&
+            u.full_name.includes(subSearch)
+    );
+
+    // ---- Render ----
 
     return (
         <div className="min-h-screen flex flex-col bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
@@ -290,7 +383,7 @@ export default function OverviewDashboard() {
                 />
             )}
 
-            {/* Header / Navbar */}
+            {/* ===== NAVBAR ===== */}
             <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
@@ -305,7 +398,7 @@ export default function OverviewDashboard() {
                     </div>
                 </div>
 
-                {/* Tab switcher */}
+                {/* Tab Switcher */}
                 <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
                     <button onClick={() => setActiveTab("requests")}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "requests" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
@@ -322,9 +415,14 @@ export default function OverviewDashboard() {
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "employees" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                         พนักงานทั้งหมด
                     </button>
+                    {/* NEW TAB */}
+                    <button onClick={() => setActiveTab("teams")}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "teams" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                        จัดการทีม
+                    </button>
                 </div>
 
-                {/* User info */}
+                {/* User Info */}
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
@@ -351,10 +449,10 @@ export default function OverviewDashboard() {
 
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-                {/* Today's Leaves Component */}
+                {/* Today's Leaves */}
                 <TodayLeavesWidget />
 
-                {/* TAB 0: REQUESTS */}
+                {/* ===== TAB: REQUESTS ===== */}
                 {activeTab === "requests" && (
                     <div className="space-y-6">
                         {/* Stats */}
@@ -421,7 +519,7 @@ export default function OverviewDashboard() {
                             </div>
                         </div>
 
-                        {/* Requests table */}
+                        {/* Requests Table */}
                         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                                 <h2 className="text-sm font-semibold text-gray-700">
@@ -493,6 +591,7 @@ export default function OverviewDashboard() {
                                                                 {meta.label}
                                                             </div>
                                                         </td>
+                                                        <td className="px-5 py-4" />
                                                     </tr>
                                                 );
                                             })}
@@ -505,7 +604,7 @@ export default function OverviewDashboard() {
                     </div>
                 )}
 
-                {/* TAB 1: REPORTS (Charts) */}
+                {/* ===== TAB: REPORTS ===== */}
                 {activeTab === "reports" && (
                     <div className="space-y-6">
                         {statsLoading ? (
@@ -527,7 +626,6 @@ export default function OverviewDashboard() {
                                             <p className="text-2xl font-bold text-gray-800">{data.summary.total_users} <span className="text-sm font-normal">คน</span></p>
                                         </div>
                                     </div>
-
                                     <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center border-l-4 border-green-500 hover:shadow-md transition">
                                         <div className="p-3 bg-green-100 rounded-full text-green-600 mr-4">
                                             <EventBusyIcon fontSize="large" />
@@ -537,7 +635,6 @@ export default function OverviewDashboard() {
                                             <p className="text-2xl font-bold text-gray-800">{data.summary.total_approved_leave_days} <span className="text-sm font-normal">วัน</span></p>
                                         </div>
                                     </div>
-
                                     <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center border-l-4 border-orange-500 hover:shadow-md transition">
                                         <div className="p-3 bg-orange-100 rounded-full text-orange-600 mr-4">
                                             <PendingActionsIcon fontSize="large" />
@@ -547,7 +644,6 @@ export default function OverviewDashboard() {
                                             <p className="text-2xl font-bold text-gray-800">{data.summary.pending_leaves} <span className="text-sm font-normal">รายการ</span></p>
                                         </div>
                                     </div>
-
                                     <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center border-l-4 border-purple-500 hover:shadow-md transition">
                                         <div className="p-3 bg-purple-100 rounded-full text-purple-600 mr-4">
                                             <AccessTimeIcon fontSize="large" />
@@ -569,10 +665,7 @@ export default function OverviewDashboard() {
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                     <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 12 }} axisLine={false} tickLine={false} />
                                                     <YAxis tick={{ fill: '#6B7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-                                                    <Tooltip
-                                                        cursor={{ fill: '#F3F4F6' }}
-                                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                                    />
+                                                    <Tooltip cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
                                                     <Bar dataKey="จำนวนครั้งที่ลา" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={40} />
                                                 </BarChart>
                                             </ResponsiveContainer>
@@ -585,21 +678,13 @@ export default function OverviewDashboard() {
                                             {data.deptStats.length > 0 ? (
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
-                                                        <Pie
-                                                            data={data.deptStats}
-                                                            cx="50%"
-                                                            cy="50%"
-                                                            innerRadius={70}
-                                                            outerRadius={100}
-                                                            paddingAngle={5}
-                                                            dataKey="value"
-                                                            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-                                                        >
+                                                        <Pie data={data.deptStats} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value"
+                                                            label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                                                             {data.deptStats.map((_, index) => (
                                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                             ))}
                                                         </Pie>
-                                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} />
+                                                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} />
                                                         <Legend verticalAlign="bottom" height={36} iconType="circle" />
                                                     </PieChart>
                                                 </ResponsiveContainer>
@@ -610,7 +695,7 @@ export default function OverviewDashboard() {
                                     </div>
                                 </div>
 
-                                {/* Table */}
+                                {/* Leave Type Stats Table */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="p-5 border-b border-gray-100">
                                         <h2 className="text-sm font-semibold text-gray-700">📑 รายละเอียดวันลาแยกตามแผนกและประเภทการลา</h2>
@@ -630,10 +715,7 @@ export default function OverviewDashboard() {
                                                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                                             <td className="px-5 py-4 text-sm font-medium text-gray-800">{row.department || 'ไม่ระบุแผนก'}</td>
                                                             <td className="px-5 py-4">
-                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${row.leave_type.includes('ป่วย') ? 'bg-red-100 text-red-700' :
-                                                                    row.leave_type.includes('พักผ่อน') ? 'bg-green-100 text-green-700' :
-                                                                        'bg-gray-100 text-gray-700'
-                                                                    }`}>
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${row.leave_type.includes('ป่วย') ? 'bg-red-100 text-red-700' : row.leave_type.includes('พักผ่อน') ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
                                                                     {row.leave_type}
                                                                 </span>
                                                             </td>
@@ -642,9 +724,7 @@ export default function OverviewDashboard() {
                                                     ))
                                                 ) : (
                                                     <tr>
-                                                        <td colSpan={3} className="px-5 py-12 text-center text-sm text-gray-400">
-                                                            ไม่มีประวัติการอนุมัติวันลาในปีนี้
-                                                        </td>
+                                                        <td colSpan={3} className="px-5 py-12 text-center text-sm text-gray-400">ไม่มีประวัติการอนุมัติวันลาในปีนี้</td>
                                                     </tr>
                                                 )}
                                             </tbody>
@@ -656,7 +736,7 @@ export default function OverviewDashboard() {
                     </div>
                 )}
 
-                {/* TAB 2: EMPLOYEES */}
+                {/* ===== TAB: EMPLOYEES ===== */}
                 {activeTab === "employees" && (
                     <div className="space-y-4">
                         <div className="bg-white rounded-2xl border border-gray-100 p-4">
@@ -666,8 +746,7 @@ export default function OverviewDashboard() {
                                         <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                                     </svg>
                                     <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                                        placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={empSearch}
-                                        onChange={(e) => setEmpSearch(e.target.value)} />
+                                        placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={empSearch} onChange={(e) => setEmpSearch(e.target.value)} />
                                 </div>
                                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
                                     value={empDeptFilter} onChange={(e) => setEmpDeptFilter(e.target.value)}>
@@ -686,8 +765,7 @@ export default function OverviewDashboard() {
                         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                             <div className="px-5 py-4 border-b border-gray-100">
                                 <h2 className="text-sm font-semibold text-gray-700">
-                                    รายชื่อพนักงาน
-                                    <span className="ml-2 text-gray-400 font-normal">({filteredEmployees.length} คน)</span>
+                                    รายชื่อพนักงาน <span className="ml-2 text-gray-400 font-normal">({filteredEmployees.length} คน)</span>
                                 </h2>
                             </div>
                             {empLoading ? (
@@ -700,6 +778,7 @@ export default function OverviewDashboard() {
                                         <thead>
                                             <tr className="bg-slate-50 border-b border-gray-100 text-left">
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400">พนักงาน</th>
+                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400">Role</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
@@ -725,6 +804,22 @@ export default function OverviewDashboard() {
                                                                 </div>
                                                             </div>
                                                         </td>
+                                                        {/* Role column */}
+                                                        <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                                                            {roleUpdatingId === emp.id ? (
+                                                                <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                                            ) : (
+                                                                <select
+                                                                    value={(emp as any).role ?? "user"}
+                                                                    onChange={(e) => handleUpdateRole(emp.id, e.target.value as RoleOption)}
+                                                                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300 ${ROLE_META[(emp as any).role as RoleOption]?.bg ?? "bg-gray-100"} ${ROLE_META[(emp as any).role as RoleOption]?.color ?? "text-gray-600"}`}
+                                                                >
+                                                                    {ROLE_OPTIONS.map((r) => (
+                                                                        <option key={r} value={r}>{ROLE_META[r].label}</option>
+                                                                    ))}
+                                                                </select>
+                                                            )}
+                                                        </td>
                                                         <td className="px-5 py-4 text-center">
                                                             <span className="text-sm font-semibold text-gray-700">{pool ? pool.total_days : "—"}</span>
                                                             {pool && <p className="text-xs text-gray-400">วัน</p>}
@@ -749,8 +844,7 @@ export default function OverviewDashboard() {
                                                             <div className="flex items-center gap-2">
                                                                 <button
                                                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
-                                                                    className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap"
-                                                                >
+                                                                    className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">
                                                                     เพิ่มวันลา
                                                                 </button>
                                                                 <svg className="text-gray-300 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -769,6 +863,139 @@ export default function OverviewDashboard() {
                         <p className="text-xs text-gray-400 text-right px-1">คลิกแถวพนักงานเพื่อดูประวัติการลา</p>
                     </div>
                 )}
+
+                {/* ===== TAB: TEAMS (NEW) ===== */}
+                {activeTab === "teams" && (
+                    <div className="space-y-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-gray-700">👥 จัดการทีมงาน — กำหนดหัวหน้าให้พนักงาน</h2>
+                                <button onClick={fetchAllUsers} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
+                                    รีเฟรช
+                                </button>
+                            </div>
+
+                            <div className="p-5 space-y-5">
+                                {/* Leader Selector */}
+                                <div className="max-w-md">
+                                    <label className="text-xs font-semibold text-gray-600 block mb-2">
+                                        เลือกหัวหน้างาน (Manager / Lead)
+                                    </label>
+                                    {teamLoading ? (
+                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                            <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                            กำลังโหลด...
+                                        </div>
+                                    ) : (
+                                        <select
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-slate-300 text-gray-700"
+                                            value={selectedLeaderId}
+                                            onChange={(e) => setSelectedLeaderId(e.target.value === "" ? "" : Number(e.target.value))}
+                                        >
+                                            <option value="">-- กรุณาเลือกหัวหน้างาน --</option>
+                                            {leaderOptions.map((leader) => (
+                                                <option key={leader.id} value={leader.id}>
+                                                    [{leader.role}] {leader.full_name} ({leader.department})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+
+                                {/* Team Grid */}
+                                {selectedLeaderId ? (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                                        {/* Left: Current Subordinates */}
+                                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                            <div className="bg-blue-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                                                <span className="text-sm font-semibold text-blue-800">ลูกทีมปัจจุบัน</span>
+                                                <span className="text-sm font-bold text-blue-600">
+                                                    {currentSubordinates.length} คน
+                                                </span>
+                                            </div>
+                                            <div className="divide-y divide-gray-100 h-80 overflow-y-auto">
+                                                {currentSubordinates.length === 0 ? (
+                                                    <div className="p-8 text-center text-sm text-gray-400">ยังไม่มีลูกทีม</div>
+                                                ) : (
+                                                    currentSubordinates.map((emp) => (
+                                                        <div key={emp.id} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(emp.department)}`}>
+                                                                    {emp.full_name?.slice(0, 2)}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-800">{emp.full_name}</p>
+                                                                    <p className="text-xs text-gray-500">{emp.department}</p>
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleAssignSubordinate(emp.id, false)}
+                                                                className="px-3 py-1.5 text-xs text-red-600 font-medium border border-red-200 bg-red-50 rounded-lg hover:bg-red-100 transition-colors whitespace-nowrap"
+                                                            >
+                                                                นำออก
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Right: Free Employees */}
+                                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
+                                                <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">พนักงานที่ว่าง</span>
+                                                <div className="relative flex-1 max-w-[160px] ml-auto">
+                                                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                                                    </svg>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="ค้นหาชื่อ..."
+                                                        className="w-full pl-7 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                                                        value={subSearch}
+                                                        onChange={(e) => setSubSearch(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="divide-y divide-gray-100 h-80 overflow-y-auto">
+                                                {freeEmployees.length === 0 ? (
+                                                    <div className="p-8 text-center text-sm text-gray-400">ไม่มีพนักงานที่ว่าง</div>
+                                                ) : (
+                                                    freeEmployees.map((emp) => (
+                                                        <div key={emp.id} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor(emp.department)}`}>
+                                                                    {emp.full_name?.slice(0, 2)}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-800">{emp.full_name}</p>
+                                                                    <p className="text-xs text-gray-500">{emp.department}</p>
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleAssignSubordinate(emp.id, true)}
+                                                                className="px-3 py-1.5 text-xs text-emerald-700 font-medium border border-emerald-200 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                                                            >
+                                                                เพิ่มเข้าทีม
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="py-12 text-center text-sm text-gray-400">
+                                        กรุณาเลือกหัวหน้างานเพื่อจัดการทีม
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
             </main>
             <Footer />
         </div>
