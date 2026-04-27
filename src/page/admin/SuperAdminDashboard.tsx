@@ -20,18 +20,9 @@ import {
 } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
-import { getSuperAdminUsers, changeUserRole, type SuperAdminUser, type UserRole } from "../../services/superAdminService";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
 
-// ── Subordinate User type ────────────────────────────────────────────────────
-interface SubordinateUser {
-  id: number;
-  employee_code: string;
-  full_name: string;
-  department: string;
-  role: string;
-  supervisor_id: number | null;
-}
+
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -50,7 +41,7 @@ export default function AdminDashboard() {
   const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
 
   // ── Employees state ────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates" | "users" | "reports">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "reports">("requests");
   const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -58,19 +49,6 @@ export default function AdminDashboard() {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithBalance | null>(null);
   const [empLeaveRequests, setEmpLeaveRequests] = useState<LeaveRequest[]>([]);
   const [empLeaveLoading, setEmpLeaveLoading] = useState(false);
-
-  // ── Subordinate management state (lead & manager) ──────────────────────────
-  const [allUsers, setAllUsers] = useState<SubordinateUser[]>([]);
-  const [subLoading, setSubLoading] = useState(false);
-  const [subAssigning, setSubAssigning] = useState<number | null>(null);
-  const [subSearch, setSubSearch] = useState("");
-
-  // ── Role Management state ───────────────────────────────────────────────────
-  const [saUsers, setSaUsers] = useState<SuperAdminUser[]>([]);
-  const [saUsersLoading, setSaUsersLoading] = useState(false);
-  const [saSearch, setSaSearch] = useState("");
-  const [saRoleFilter, setSaRoleFilter] = useState("all");
-  const [editingRole, setEditingRole] = useState<{ id: number; role: UserRole } | null>(null);
 
   // ── Balance modal state ────────────────────────────────────────────────────
   const [balanceModal, setBalanceModal] = useState<{
@@ -118,7 +96,7 @@ export default function AdminDashboard() {
       // Lead/Manager/Assistant Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
       // admin, hr: ไม่ filter (เห็นทุกคน)
       if (user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") {
-        users = users.filter((u: any) => u.supervisor_id === user.id);
+        users = users.filter((u: Employee) => u.supervisor_id === user.id);
       }
       const withPool = await Promise.all(
         users.map(async (u) => {
@@ -138,72 +116,11 @@ export default function AdminDashboard() {
     }
   }, [year, user]);
 
-  const fetchAllUsersForLead = useCallback(async () => {
-    try {
-      setSubLoading(true);
-      const res = await api.get("/api/admin/users");
-      setAllUsers(res.data);
-    } catch (err: any) {
-      console.error("fetch users for subordinate management failed", err);
-    } finally {
-      setSubLoading(false);
-    }
-  }, []);
-
-  const fetchSaUsers = useCallback(async () => {
-    try {
-      setSaUsersLoading(true);
-      const data = await getSuperAdminUsers();
-      setSaUsers(data);
-    } catch (err: any) {
-      console.error(err);
-      toast.error("โหลดข้อมูลพนักงานไม่สำเร็จ");
-    } finally {
-      setSaUsersLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (activeTab === "employees" || activeTab === "reports") fetchEmployees();
-    if (activeTab === "subordinates") fetchAllUsersForLead();
-    if (activeTab === "users") fetchSaUsers();
-  }, [activeTab, fetchEmployees, fetchAllUsersForLead, fetchSaUsers]);
-
-  const handleAssignSubordinate = async (userId: number, assign: boolean) => {
-    try {
-      setSubAssigning(userId);
-      await api.patch(`/api/admin/users/${userId}/assign-subordinate`, { assign });
-      setAllUsers(prev =>
-        prev.map(u =>
-          u.id === userId
-            ? { ...u, supervisor_id: assign ? (user?.id ?? null) : null }
-            : u
-        )
-      );
-      const isManagerLevel = user?.role === "manager" || user?.role === "assistant manager";
-      const msg = assign
-        ? (isManagerLevel ? "กำหนด Lead เรียบร้อย" : "กำหนดทีมเรียบร้อย")
-        : (isManagerLevel ? "ยกเลิก Lead เรียบร้อย" : "ยกเลิกทีมเรียบร้อย");
-      toast.success(msg);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
-    } finally {
-      setSubAssigning(null);
-    }
-  };
+  }, [activeTab, fetchEmployees]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
-
-  const handleSaveRole = async (userId: number, newRole: UserRole) => {
-    try {
-      await changeUserRole(userId, newRole);
-      setSaUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      toast.success("อัปเดตสิทธิ์การใช้งานเรียบร้อย");
-      setEditingRole(null);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "อัปเดตสิทธิ์ไม่สำเร็จ");
-    }
-  };
 
   const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
     try {
