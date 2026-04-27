@@ -657,10 +657,10 @@ export default function OverviewDashboard() {
 
                                 {/* Charts */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-w-0">
                                         <h2 className="text-lg font-bold text-gray-700 mb-6 border-b pb-2">📈 แนวโน้มคำขอลาแยกตามเดือน</h2>
-                                        <div className="h-72">
-                                            <ResponsiveContainer width="100%" height="100%">
+                                        <div className="h-72 w-full">
+                                            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                                 <BarChart data={data.monthlyStats} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                                     <XAxis dataKey="name" tick={{ fill: '#6B7280', fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -672,11 +672,11 @@ export default function OverviewDashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 min-w-0">
                                         <h2 className="text-lg font-bold text-gray-700 mb-6 border-b pb-2">📊 สัดส่วนจำนวนครั้งการลาแยกตามแผนก</h2>
-                                        <div className="h-72 flex justify-center items-center">
+                                        <div className="h-72 w-full">
                                             {data.deptStats.length > 0 ? (
-                                                <ResponsiveContainer width="100%" height="100%">
+                                                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                                     <PieChart>
                                                         <Pie data={data.deptStats} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={5} dataKey="value"
                                                             label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}>
@@ -689,7 +689,9 @@ export default function OverviewDashboard() {
                                                     </PieChart>
                                                 </ResponsiveContainer>
                                             ) : (
-                                                <p className="text-gray-400">ยังไม่มีข้อมูล</p>
+                                                <div className="h-full w-full flex justify-center items-center">
+                                                    <p className="text-gray-400">ยังไม่มีข้อมูล</p>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
