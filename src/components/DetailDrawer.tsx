@@ -7,9 +7,10 @@ interface DetailDrawerProps {
   onClose: () => void;
   onApprove: () => void;
   onReject: () => void;
+  canApprove?: boolean; // NEW: Controls whether to show action buttons
 }
 
-export function DetailDrawer({ request: req, onClose, onApprove, onReject }: DetailDrawerProps) {
+export function DetailDrawer({ request: req, onClose, onApprove, onReject, canApprove = true }: DetailDrawerProps) {
   const typeColor = TYPE_COLORS[req.leave_type_id] ?? "bg-gray-100 text-gray-600";
   const meta = STATUS_META[req.status];
   const isHourly = req.leave_unit === "hour";
@@ -120,7 +121,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject }: Det
         </div>
 
         {/* Action buttons */}
-        {req.status === "pending" && (
+        {req.status === "pending" && canApprove && (
           <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
             <button
               onClick={onReject}

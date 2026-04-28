@@ -40,6 +40,7 @@ export interface LeaveRequest {
   status:         LeaveStatus;
   approved_by?:   number;
   approved_at?:   string;
+  current_assignee_id?: number | null;
   created_at:     string;
   leave_type:     LeaveType;
   approver_name?: string;
@@ -141,12 +142,14 @@ export async function getAdminLeaveRequests(params?: {
   return res.data;
 }
 
-export async function approveLeaveRequest(id: number, comment?: string): Promise<void> {
-  await api.patch(`/api/admin/leave-requests/${id}/approve`, { comment });
+export async function approveLeaveRequest(id: number, comment?: string): Promise<{ status: LeaveStatus, current_assignee_id: number | null }> {
+  const res = await api.patch(`/api/admin/leave-requests/${id}/approve`, { comment });
+  return res.data;
 }
 
-export async function rejectLeaveRequest(id: number, comment: string): Promise<void> {
-  await api.patch(`/api/admin/leave-requests/${id}/reject`, { comment });
+export async function rejectLeaveRequest(id: number, comment: string): Promise<{ status: LeaveStatus, current_assignee_id: number | null }> {
+  const res = await api.patch(`/api/admin/leave-requests/${id}/reject`, { comment });
+  return res.data;
 }
 
 // ── Admin Leave Pool ──────────────────────────────────────────

@@ -239,12 +239,24 @@ export default function OverviewDashboard() {
     const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
         try {
             setActionLoading(true);
-            if (type === "approve") await approveLeaveRequest(id, comment);
-            else await rejectLeaveRequest(id, comment);
+            
+            let response;
+            if (type === "approve") {
+                response = await approveLeaveRequest(id, comment);
+            } else {
+                response = await rejectLeaveRequest(id, comment);
+            }
+
             setRequests((prev) =>
                 prev.map((r) =>
                     r.id === id
-                        ? { ...r, status: type === "approve" ? "approved" : "rejected", approved_at: new Date().toISOString(), comment: comment || undefined }
+                        ? { 
+                            ...r, 
+                            status: response.status, 
+                            current_assignee_id: response.current_assignee_id,
+                            approved_at: new Date().toISOString(), 
+                            comment: comment || undefined 
+                          }
                         : r
                 )
             );
