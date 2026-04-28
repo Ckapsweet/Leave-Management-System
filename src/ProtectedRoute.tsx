@@ -9,12 +9,6 @@ type Props = {
   requiredRole?: Role | Role[];   // รับได้ทั้ง string เดียวและ array
 };
 
-// ── หมายเหตุ ──────────────────────────────────────────────────
-// role ใน localStorage ใช้เพื่อ redirect เท่านั้น
-// ความปลอดภัยจริงอยู่ที่ httpOnly cookie + backend middleware
-// ถ้าใครแก้ role ใน localStorage ก็จะเข้าหน้าได้ แต่ทุก API call
-// จะ return 401/403 เพราะ cookie ไม่มี / role ไม่ตรง
-
 function roleToPath(role: string): string {
   if (role === "lead") return "/lead";
   if (role === "assistant manager") return "/manager";
