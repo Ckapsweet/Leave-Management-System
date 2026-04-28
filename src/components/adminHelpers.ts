@@ -34,13 +34,16 @@ export const TYPE_COLORS: Record<number, string> = {
   4: "bg-orange-100 text-orange-700",
 };
 
-const DEPT_AVATAR: Record<string, string> = {
-  "วิศวกรรมซอฟต์แวร์": "bg-violet-100 text-violet-700",
-  "การตลาด": "bg-pink-100 text-pink-700",
-  "การเงิน": "bg-amber-100 text-amber-700",
-  "ปฏิบัติการ": "bg-teal-100 text-teal-700",
-  "ทรัพยากรบุคคล": "bg-blue-100 text-blue-700",
-};
+const COLORS_PALETTE = [
+  "bg-violet-100 text-violet-700",
+  "bg-pink-100 text-pink-700",
+  "bg-amber-100 text-amber-700",
+  "bg-teal-100 text-teal-700",
+  "bg-blue-100 text-blue-700",
+  "bg-rose-100 text-rose-700",
+  "bg-indigo-100 text-indigo-700",
+  "bg-emerald-100 text-emerald-700",
+];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -57,5 +60,10 @@ export function fmtDatetime(d: string) {
 }
 
 export function avatarColor(dept = "") {
-  return DEPT_AVATAR[dept] ?? "bg-gray-100 text-gray-600";
+  if (!dept) return "bg-gray-100 text-gray-600";
+  let hash = 0;
+  for (let i = 0; i < dept.length; i++) {
+    hash = dept.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COLORS_PALETTE[Math.abs(hash) % COLORS_PALETTE.length];
 }

@@ -20,6 +20,7 @@ import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
+import { CreateUserModal } from "../../components/CreateUserModal";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 
@@ -41,8 +42,8 @@ export default function OverviewDashboard() {
     const navigate = useNavigate();
     const year = new Date().getFullYear();
 
-    // ---- Tab State (เพิ่ม "teams") ----
-    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams">("requests");
+    // ---- Tab State (เพิ่ม "teams" และ "departments") ----
+    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams" | "departments">("requests");
 
     // ---- Requests State ----
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -75,6 +76,9 @@ export default function OverviewDashboard() {
         pool: LeavePool;
     } | null>(null);
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createLoading, setCreateLoading] = useState(false);
+
     // ---- Team Management State (NEW) ----
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [allUsersLoaded, setAllUsersLoaded] = useState(false);
@@ -84,6 +88,12 @@ export default function OverviewDashboard() {
 
     // ---- Role Update State (NEW) ----
     const [roleUpdatingId, setRoleUpdatingId] = useState<number | null>(null);
+
+    // ---- Departments State (NEW) ----
+    const [departments, setDepartments] = useState<{id: number, name: string}[]>([]);
+    const [deptLoading, setDeptLoading] = useState(false);
+    const [showDeptModal, setShowDeptModal] = useState(false);
+    const [deptForm, setDeptForm] = useState<{id: number | null, name: string}>({ id: null, name: "" });
 
     // ---- Auth ----
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -158,12 +168,25 @@ export default function OverviewDashboard() {
         }
     }, []);
 
+    const fetchDepartments = useCallback(async () => {
+        try {
+            setDeptLoading(true);
+            const res = await api.get("/api/admin/departments");
+            setDepartments(res.data);
+        } catch (err) {
+            toast.error("โหลดข้อมูลแผนกไม่สำเร็จ");
+        } finally {
+            setDeptLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (activeTab === "requests" || activeTab === "reports") fetchRequests();
         if (activeTab === "reports") fetchDashboardData();
         if (activeTab === "employees") fetchEmployees();
         if (activeTab === "teams" && !allUsersLoaded) fetchAllUsers();
-    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, allUsersLoaded]);
+        if (activeTab === "departments") fetchDepartments();
+    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded]);
 
     // ---- Handlers ----
 
@@ -286,6 +309,68 @@ export default function OverviewDashboard() {
         }
     };
 
+    // NEW: Create User
+    const handleCreateUser = async (data: any) => {
+        try {
+            setCreateLoading(true);
+            await api.post("/api/super-admin/users", data);
+            toast.success("สร้างพนักงานเรียบร้อย");
+            setShowCreateModal(false);
+            fetchEmployees();
+            if (activeTab === "teams") fetchAllUsers();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "สร้างพนักงานไม่สำเร็จ");
+        } finally {
+            setCreateLoading(false);
+        }
+    };
+
+    // NEW: Delete User
+    const handleDeleteUser = async (id: number) => {
+        if (!window.confirm("คุณต้องการลบพนักงานคนนี้ใช่หรือไม่?")) return;
+        try {
+            await api.delete(`/api/super-admin/users/${id}`);
+            toast.success("ลบพนักงานเรียบร้อย");
+            setEmployees((prev) => prev.filter((e) => e.id !== id));
+            if (activeTab === "teams") fetchAllUsers();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "ลบพนักงานไม่สำเร็จ");
+        }
+    };
+
+    // NEW: Save Department
+    const handleSaveDepartment = async () => {
+        if (!deptForm.name) return toast.error("กรุณาระบุชื่อแผนก");
+        try {
+            setActionLoading(true);
+            if (deptForm.id) {
+                await api.put(`/api/admin/departments/${deptForm.id}`, { name: deptForm.name });
+                toast.success("แก้ไขแผนกเรียบร้อย");
+            } else {
+                await api.post("/api/admin/departments", { name: deptForm.name });
+                toast.success("เพิ่มแผนกเรียบร้อย");
+            }
+            setShowDeptModal(false);
+            fetchDepartments();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "บันทึกไม่สำเร็จ");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    // NEW: Delete Department
+    const handleDeleteDepartment = async (id: number) => {
+        if (!window.confirm("คุณต้องการลบแผนกนี้ใช่หรือไม่? (ต้องไม่มีพนักงานในแผนกนี้)")) return;
+        try {
+            await api.delete(`/api/admin/departments/${id}`);
+            toast.success("ลบแผนกเรียบร้อย");
+            fetchDepartments();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "ลบไม่สำเร็จ");
+        }
+    };
+
     // ---- Derived / Filtered Data ----
 
     const filteredEmployees = employees.filter((e) => {
@@ -382,6 +467,47 @@ export default function OverviewDashboard() {
                     }}
                 />
             )}
+            {showCreateModal && (
+                <CreateUserModal
+                    onSubmit={handleCreateUser}
+                    onClose={() => setShowCreateModal(false)}
+                    loading={createLoading}
+                />
+            )}
+            {showDeptModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setShowDeptModal(false)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">{deptForm.id ? "แก้ไขแผนก" : "เพิ่มแผนก"}</h3>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">ชื่อแผนก *</label>
+                                <input className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white text-gray-800"
+                                    placeholder="เช่น วิศวกรรมซอฟต์แวร์" value={deptForm.name} onChange={(e) => setDeptForm(f => ({ ...f, name: e.target.value }))} />
+                            </div>
+                        </div>
+                        <div className="px-6 pb-6 flex gap-3 justify-end">
+                            <button onClick={() => setShowDeptModal(false)} disabled={actionLoading}
+                                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">
+                                ยกเลิก
+                            </button>
+                            <button onClick={handleSaveDepartment} disabled={actionLoading || !deptForm.name}
+                                className="px-5 py-2.5 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium flex items-center gap-2 disabled:opacity-50">
+                                {actionLoading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "บันทึก"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ===== NAVBAR ===== */}
             <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
@@ -419,6 +545,10 @@ export default function OverviewDashboard() {
                     <button onClick={() => setActiveTab("teams")}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "teams" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                         จัดการทีม
+                    </button>
+                    <button onClick={() => setActiveTab("departments")}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "departments" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                        จัดการแผนก
                     </button>
                 </div>
 
@@ -761,6 +891,10 @@ export default function OverviewDashboard() {
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
                                     รีเฟรช
                                 </button>
+                                <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm hover:bg-indigo-700 font-medium whitespace-nowrap">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>
+                                    เพิ่มพนักงาน
+                                </button>
                             </div>
                         </div>
 
@@ -848,6 +982,13 @@ export default function OverviewDashboard() {
                                                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
                                                                     className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">
                                                                     เพิ่มวันลา
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteUser(emp.id)}
+                                                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="ลบพนักงาน"
+                                                                >
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
                                                                 </button>
                                                                 <svg className="text-gray-300 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                     <path d="M9 18l6-6-6-6" />
@@ -994,6 +1135,74 @@ export default function OverviewDashboard() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== TAB: DEPARTMENTS (NEW) ===== */}
+                {activeTab === "departments" && (
+                    <div className="space-y-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-gray-700">🏢 จัดการแผนกทั้งหมด</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={fetchDepartments} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 px-3 py-1.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                                        รีเฟรช
+                                    </button>
+                                    <button onClick={() => { setDeptForm({ id: null, name: "" }); setShowDeptModal(true); }} className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-xs hover:bg-indigo-700 font-medium whitespace-nowrap transition-colors">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                                        เพิ่มแผนก
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {deptLoading ? (
+                                <div className="py-16 flex justify-center">
+                                    <div className="w-6 h-6 border-2 border-slate-800 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-gray-100 text-left">
+                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400 w-16">ID</th>
+                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400">ชื่อแผนก</th>
+                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-right">จัดการ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {departments.map((dept) => (
+                                                <tr key={dept.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-5 py-4 text-sm text-gray-500">{dept.id}</td>
+                                                    <td className="px-5 py-4 text-sm font-medium text-gray-800">{dept.name}</td>
+                                                    <td className="px-5 py-4 text-right">
+                                                        <div className="flex justify-end items-center gap-2">
+                                                            <button
+                                                                onClick={() => { setDeptForm({ id: dept.id, name: dept.name }); setShowDeptModal(true); }}
+                                                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="แก้ไขแผนก"
+                                                            >
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteDepartment(dept.id)}
+                                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="ลบแผนก"
+                                                            >
+                                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {departments.length === 0 && (
+                                                <tr><td colSpan={3} className="py-8 text-center text-sm text-gray-400">ยังไม่มีแผนก</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

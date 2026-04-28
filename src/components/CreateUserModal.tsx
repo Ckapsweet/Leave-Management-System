@@ -1,7 +1,7 @@
-// components/CreateUserModal.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { UserRole } from "../services/superAdminService";
 import { ROLE_META } from "./superAdminHelpers";
+import api from "../services/api";
 
 interface CreateUserModalProps {
   onSubmit: (data: {
@@ -23,6 +23,12 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
     password: "",
     role: "user" as UserRole,
   });
+  
+  const [departments, setDepartments] = useState<{id: number, name: string}[]>([]);
+
+  useEffect(() => {
+    api.get("/api/admin/departments").then(res => setDepartments(res.data)).catch(() => {});
+  }, []);
 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -70,12 +76,9 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
               onChange={(e) => set("department", e.target.value)}
             >
               <option value="" disabled>เลือกแผนก...</option>
-
-              <option value="วิศวกรรมซอฟต์แวร์">วิศวกรรมซอฟต์แวร์</option>
-              <option value="การตลาด">การตลาด</option>
-              <option value="ทรัพยากรบุคคล">ทรัพยากรบุคคล</option>
-              <option value="การเงิน">การเงิน</option>
-              <option value="ฝ่ายขาย">ฝ่ายขาย</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
             </select>
           </div>
           <div className="text-[#000]">
