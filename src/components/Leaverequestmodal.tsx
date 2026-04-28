@@ -110,23 +110,22 @@ function UnitToggle({ value, onChange }: { value: LeaveUnit; onChange: (v: Leave
           key={u}
           type="button"
           onClick={() => onChange(u)}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-all ${
-            value === u
-              ? "bg-indigo-600 text-white border-indigo-600"
-              : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-          }`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-all ${value === u
+            ? "bg-indigo-600 text-white border-indigo-600"
+            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+            }`}
         >
           {u === "day" ? (
             <>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
               ลาเป็นวัน
             </>
           ) : (
             <>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
               </svg>
               ลาเป็นชั่วโมง
             </>
@@ -219,7 +218,7 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14M5 12h14"/>
+                <path d="M12 5v14M5 12h14" />
               </svg>
             </div>
             <div>
@@ -253,15 +252,14 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
                   key={t.id}
                   type="button"
                   onClick={() => set("leave_type_id", t.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all ${
-                    form.leave_type_id === t.id
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  }`}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all ${form.leave_type_id === t.id
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    }`}
                 >
                   {t.name}
-                  <span className={`ml-1.5 text-xs ${form.leave_type_id === t.id ? "text-indigo-200" : "text-gray-400"}`}>
-                    ({t.max_days} วัน/ปี)
+                  <span className={`text-xs ${form.leave_type_id === t.id ? "text-indigo-200" : "text-gray-400"}`}>
+                    {/* ({t.max_days} วัน/ปี) */}
                   </span>
                 </button>
               ))}
@@ -399,14 +397,14 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
             {isLoading ? (
               <>
                 <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
                 กำลังส่ง...
               </>
             ) : (
               <>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M5 12l5 5L20 7"/>
+                  <path d="M5 12l5 5L20 7" />
                 </svg>
                 ส่งคำขอลา
               </>

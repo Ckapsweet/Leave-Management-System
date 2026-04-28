@@ -1,18 +1,17 @@
-// pages/UserLeaveDashboard.tsx
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { logout } from "../services/authService";
 import {
-  getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest,
-  getMyMonthlyReport, getMyYearlyReport,
+  getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
 import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload } from "../services/leaveService";
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
-import { LeaveReport } from "../components/LeaveReport";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
 import { ToastContainer, toast } from "../components/Toast";
 import { EditProfileModal } from "../components/EditProfileModal";
 import type { AuthUser } from "../services/authService";
+import Footer from "../components/Footer";
+import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -261,7 +260,6 @@ function DetailDrawer({
           <p className="text-xs text-gray-400 text-center">ส่งคำขอเมื่อ {fmtDatetime(req.created_at)}</p>
         </div>
 
-        {/* Cancel button — แสดงเฉพาะ status === "pending" */}
         {req.status === "pending" && (
           <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
             <button
@@ -417,7 +415,7 @@ export default function UserLeaveDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
+    <div className="min-h-screen flex flex-col bg-slate-50" style={{ fontFamily: "'DM Sans', 'Noto Sans Thai', sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Confirm cancel dialog */}
@@ -470,7 +468,7 @@ export default function UserLeaveDashboard() {
           </div>
           <div>
             <h1 className="text-sm font-semibold text-gray-900">ระบบการลา</h1>
-            <p className="text-xs text-gray-400">ปีงบประมาณ {year}</p>
+            <p className="text-xs text-gray-400">Ckapsweet</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -493,13 +491,24 @@ export default function UserLeaveDashboard() {
               <p className="text-xs text-gray-400">{user?.employee_code ?? ""}</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100">
+          {/* Link to Admin View for Leads/Managers */}
+          {user && ["lead", "assistant manager", "manager"].includes((user as any).role) && (
+            <button onClick={() => navigate((user as any).role === "lead" ? "/lead" : "/manager")} className="text-xs text-emerald-600 hover:text-emerald-800 px-2.5 py-1.5 rounded-xl border border-emerald-100 hover:bg-emerald-50 transition-colors font-medium flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              จัดการทีม
+            </button>
+          )}
+          <button onClick={() => navigate("/select-system")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-100 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
+            สลับระบบ
+          </button>
+          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
             ออกจากระบบ
           </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
         {/* Profile + summary */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -527,9 +536,12 @@ export default function UserLeaveDashboard() {
           </div>
         </div>
 
+        {/* ── Today's Leaves Component ── */}
+        <TodayLeavesWidget />
+
         {/* Leave pool */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ ปี {year}</h3>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ</h3>
           {leavePool ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
               <div className="flex items-center gap-4">
@@ -550,7 +562,7 @@ export default function UserLeaveDashboard() {
                     {leavePool.total_days > 0 && (
                       <div
                         className={`h-full rounded-full transition-all ${leavePool.remaining / leavePool.total_days < 0.2 ? "bg-red-400" :
-                            leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
+                          leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
                           }`}
                         style={{ width: `${Math.min(100, (leavePool.remaining / leavePool.total_days) * 100)}%` }}
                       />
@@ -609,13 +621,6 @@ export default function UserLeaveDashboard() {
             </div>
           )}
         </div>
-
-        {/* Report */}
-        <LeaveReport
-          fetchMonthly={getMyMonthlyReport}
-          fetchYearly={getMyYearlyReport}
-          currentYear={year}
-        />
 
         {/* Leave history */}
         <div>
@@ -686,6 +691,7 @@ export default function UserLeaveDashboard() {
           <p className="text-xs text-gray-400 text-right mt-2 px-1">คลิกแถวเพื่อดูรายละเอียด</p>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login } from "../services/authService";
+import Footer from "../components/Footer";
 
 export default function LoginPage() {
   const [employeeCode, setEmployeeCode] = useState("");
@@ -17,19 +18,15 @@ export default function LoginPage() {
       setLoading(true);
       const { user } = await login(employeeCode, password);
 
-      // เก็บ role + user info ใน localStorage
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify({
+        id: user.id,
         full_name: user.full_name,
         employee_code: user.employee_code,
         department: user.department,
+        role: user.role,
       }));
-      // redirect ตาม role ให้ตรงกับ route ใน App.tsx
-      const roleToPath: Record<string, string> = {
-        manager: "/manager",
-        hr: "/hr",
-      };
-      navigate(roleToPath[user.role] ?? "/dashboard", { replace: true });
+      navigate("/select-system", { replace: true });
 
     } catch (err: any) {
       setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
@@ -39,34 +36,36 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-        <p className="text-xl font-bold text-center mb-2">ระบบลาออนไลน์</p>
-        <p className="text-sm text-gray-500 text-center mb-6">เข้าสู่ระบบ</p>
+    <div className="min-h-screen flex flex-col bg-gray-100">
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+          <p className="text-xl font-bold text-center mb-6">เข้าสู่ระบบ</p>
 
-        {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input type="text"
-            className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="รหัสพนักงาน (เช่น EMP-0001)"
-            value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} required />
-          <input type="password"
-            className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="รหัสผ่าน"
-            value={password} onChange={(e) => setPassword(e.target.value)} required />
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors">
-            {loading ? "กำลังเข้าสู่ระบบ......" : "เข้าสู่ระบบ"}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <input type="text"
+              className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="รหัส (เช่น MKT-9999)"
+              value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} required />
+            <input type="password"
+              className="w-full border rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="รหัสผ่าน"
+              value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <button type="submit" disabled={loading}
+              className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium transition-colors">
+              {loading ? "กำลังเข้าสู่ระบบ......" : "เข้าสู่ระบบ"}
+            </button>
+          </form>
+        </div>
+      </div>
+      <div className="w-full mt-auto">
+        <Footer />
       </div>
     </div>
-
-    // tedtetetetete
   );
 }

@@ -9,6 +9,7 @@ export interface Employee {
   full_name: string;
   department: string;
   role: string;
+  supervisor_id?: number | null;
 }
 
 export interface EmployeeWithBalance extends Employee {
