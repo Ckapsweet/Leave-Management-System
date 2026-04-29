@@ -22,7 +22,6 @@ export function EmployeeLeaveDrawer({
   const ac = avatarColor(emp.department);
   const pool = emp.pool;
   const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
-  const pct = pool && pool.total_days > 0 ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
 
   const [leaveFilter, setLeaveFilter] = useState<"all" | LeaveStatus>("all");
   const filtered = leaveRequests.filter((r) => leaveFilter === "all" || r.status === leaveFilter);

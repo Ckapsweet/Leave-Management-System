@@ -7,7 +7,7 @@ interface DetailDrawerProps {
   onClose: () => void;
   onApprove: () => void;
   onReject: () => void;
-  canApprove?: boolean; // NEW: Controls whether to show action buttons
+  canApprove?: boolean; 
 }
 
 export function DetailDrawer({ request: req, onClose, onApprove, onReject, canApprove = true }: DetailDrawerProps) {

@@ -1,25 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { logout } from "../../services/authService";
 import api from "../../services/api";
-import {
-  getAdminLeaveRequests, approveLeaveRequest, rejectLeaveRequest,
-  getAdminUserPool, updateLeavePool,
-} from "../../services/leaveService";
-import type { LeaveRequest, LeaveStatus, LeavePool } from "../../services/leaveService";
+import type { LeaveStatus } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
 import { ToastContainer, toast } from "../../components/Toast";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { EditProfileModal } from "../../components/EditProfileModal";
-import type { AuthUser } from "../../services/authService";
 import {
   STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
-  type Employee, type EmployeeWithBalance,
 } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
+import {
+  getErrorMessage,
+  useAdminAuthUser,
+  useAdminEmployees,
+  useAdminLeaveRequests,
+} from "./adminDashboardHooks";
 
 // ── Subordinate User type ────────────────────────────────────────────────────
 interface SubordinateUser {
@@ -32,102 +30,80 @@ interface SubordinateUser {
 }
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
-
-  // ── Leave requests state ───────────────────────────────────────────────────
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
-  const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"all" | "yearly" | "monthly">("all");
-  const [selYear, setSelYear] = useState<number>(new Date().getFullYear());
-  const [selMonth, setSelMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selected, setSelected] = useState<LeaveRequest | null>(null);
-  const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
-
-  // ── Employees state ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates">("requests");
-  const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
-  const [empLoading, setEmpLoading] = useState(false);
-  const [empSearch, setEmpSearch] = useState("");
-  const [empDeptFilter, setEmpDeptFilter] = useState("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithBalance | null>(null);
-  const [empLeaveRequests, setEmpLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [empLeaveLoading, setEmpLeaveLoading] = useState(false);
-
-  // ── Subordinate management state (lead & manager) ──────────────────────────
   const [allUsers, setAllUsers] = useState<SubordinateUser[]>([]);
   const [subLoading, setSubLoading] = useState(false);
   const [subAssigning, setSubAssigning] = useState<number | null>(null);
   const [subSearch, setSubSearch] = useState("");
-
-  // ── Balance modal state ────────────────────────────────────────────────────
-  const [balanceModal, setBalanceModal] = useState<{
-    user: { id: number; full_name: string; employee_code: string; department: string };
-    pool: LeavePool;
-  } | null>(null);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
-  }, []);
-
   const year = new Date().getFullYear();
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  const {
+    user,
+    showEditProfile,
+    setShowEditProfile,
+    updateUser,
+    handleLogout,
+    navigate,
+  } = useAdminAuthUser();
 
-  const fetchRequests = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getAdminLeaveRequests();
-      setRequests(data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "โหลดข้อมูลไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    requests,
+    loading,
+    actionLoading,
+    error,
+    statusFilter,
+    setStatusFilter,
+    search,
+    setSearch,
+    viewMode,
+    setViewMode,
+    selYear,
+    setSelYear,
+    selMonth,
+    setSelMonth,
+    selected,
+    setSelected,
+    confirm,
+    setConfirm,
+    fetchRequests,
+    handleAction,
+    filtered,
+    pending,
+    approved,
+    rejected,
+  } = useAdminLeaveRequests();
 
-  useEffect(() => { fetchRequests(); }, [fetchRequests]);
-
-  const fetchEmployees = useCallback(async () => {
-    try {
-      setEmpLoading(true);
-      const usersRes = await api.get("/api/admin/users");
-      let users: Employee[] = usersRes.data.filter((u: Employee) => u.role !== "admin");
-
-      // Lead/Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
-      if (user?.role === "lead" || user?.role === "manager") {
-        users = users.filter((u: any) => u.supervisor_id === user.id);
-      }
-      const withPool = await Promise.all(
-        users.map(async (u) => {
-          try {
-            const res = await api.get(`/api/admin/leave-pool/${u.id}`, { params: { year } });
-            return { ...u, pool: res.data };
-          } catch {
-            return { ...u, pool: null };
-          }
-        })
-      );
-      setEmployees(withPool);
-    } catch (err: any) {
-      console.error("fetch employees failed", err);
-    } finally {
-      setEmpLoading(false);
-    }
-  }, [year, user]);
-
+  const {
+    employees,
+    empLoading,
+    empSearch,
+    setEmpSearch,
+    empDeptFilter,
+    setEmpDeptFilter,
+    selectedEmployee,
+    setSelectedEmployee,
+    empLeaveRequests,
+    setEmpLeaveRequests,
+    empLeaveLoading,
+    balanceModal,
+    setBalanceModal,
+    fetchEmployees,
+    openBalanceModal,
+    handleUpdateBalance,
+    handleEmployeeClick,
+    filteredEmployees,
+  } = useAdminEmployees({
+    year,
+    user,
+    requests,
+    filterToSupervisor: user?.role === "lead" || user?.role === "manager",
+  });
   const fetchAllUsersForLead = useCallback(async () => {
     try {
       setSubLoading(true);
-      const res = await api.get("/api/admin/users");
+      const res = await api.get<SubordinateUser[]>("/api/admin/users");
       setAllUsers(res.data);
-    } catch (err: any) {
+    } catch (err) {
       console.error("fetch users for subordinate management failed", err);
     } finally {
       setSubLoading(false);
@@ -154,110 +130,14 @@ export default function AdminDashboard() {
         ? (user?.role === "manager" ? "กำหนด Lead เรียบร้อย" : "กำหนดทีมเรียบร้อย")
         : (user?.role === "manager" ? "ยกเลิก Lead เรียบร้อย" : "ยกเลิกทีมเรียบร้อย");
       toast.success(msg);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "ดำเนินการไม่สำเร็จ"));
     } finally {
       setSubAssigning(null);
     }
   };
 
   // ── Actions ────────────────────────────────────────────────────────────────
-
-  const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
-    try {
-      setActionLoading(true);
-      if (type === "approve") await approveLeaveRequest(id, comment);
-      else await rejectLeaveRequest(id, comment);
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? { ...r, status: type === "approve" ? "approved" : "rejected", approved_at: new Date().toISOString(), comment: comment || undefined }
-            : r
-        )
-      );
-      setConfirm(null);
-      setSelected(null);
-      toast.success(type === "approve" ? "อนุมัติคำขอลาเรียบร้อย" : "ปฏิเสธคำขอลาเรียบร้อย");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const openBalanceModal = async (user: { id: number; full_name: string; employee_code: string; department: string }) => {
-    try {
-      const pool = await getAdminUserPool(user.id, year);
-      setBalanceModal({ user, pool });
-    } catch {
-      toast.error("โหลดข้อมูลวันลาไม่สำเร็จ");
-    }
-  };
-
-  const handleUpdateBalance = async (remaining_days: number) => {
-    if (!balanceModal) return;
-    try {
-      const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
-      setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
-      if (activeTab === "employees") {
-        setEmployees((prev) => prev.map((e) =>
-          e.id === balanceModal.user.id ? { ...e, pool: updated } : e
-        ));
-      }
-      toast.success("อัปเดตวันลาเรียบร้อย");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "อัปเดตวันลาไม่สำเร็จ");
-    }
-  };
-
-  const handleEmployeeClick = async (emp: EmployeeWithBalance) => {
-    setSelectedEmployee(emp);
-    setEmpLeaveRequests([]);
-    setEmpLeaveLoading(true);
-    try {
-      const data = await getAdminLeaveRequests({ user_id: emp.id });
-      setEmpLeaveRequests(data);
-    } catch {
-      setEmpLeaveRequests(requests.filter((r) => r.user_id === emp.id));
-    } finally {
-      setEmpLeaveLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    localStorage.removeItem("role");
-    navigate("/", { replace: true });
-  };
-
-  // ── Derived data ───────────────────────────────────────────────────────────
-
-  const filtered = requests.filter((r) => {
-    const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
-    const reqYear = new Date(r.start_date).getFullYear();
-    const reqMonth = new Date(r.start_date).getMonth() + 1;
-    const matchDate =
-      viewMode === "all" ? true :
-        viewMode === "yearly" ? reqYear === selYear :
-          reqYear === selYear && reqMonth === selMonth;
-
-
-
-    return matchStatus && matchSearch && matchDate;
-  });
-
-  const pending = requests.filter((r) => r.status === "pending").length;
-  const approved = requests.filter((r) => r.status === "approved").length;
-  const rejected = requests.filter((r) => r.status === "rejected").length;
-
-  const filteredEmployees = employees.filter((e) => {
-    const ms = empDeptFilter === "all" || e.department === empDeptFilter;
-    const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
-    return ms && mq;
-  });
-
-  // ── Loading / Error states ─────────────────────────────────────────────────
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -331,10 +211,7 @@ export default function AdminDashboard() {
         <EditProfileModal
           user={user}
           onClose={() => setShowEditProfile(false)}
-          onUpdateUser={(updated) => {
-            setUser(updated);
-            localStorage.setItem("user", JSON.stringify(updated));
-          }}
+          onUpdateUser={updateUser}
         />
       )}
 
