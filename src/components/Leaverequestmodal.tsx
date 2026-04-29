@@ -9,6 +9,8 @@ import { toast } from "./Toast";
 
 type LeaveUnit = "day" | "hour";
 
+import type { LeavePool } from "../services/leaveService";
+
 interface LeaveType {
   id: number;
   name: string;
@@ -28,6 +30,7 @@ export interface LeaveRequestForm {
 
 export interface LeaveRequestModalProps {
   leaveTypes: LeaveType[];
+  pool: LeavePool | null;
   onSubmit: (form: LeaveRequestForm) => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
@@ -159,7 +162,7 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = false }: LeaveRequestModalProps) {
+export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoading = false }: LeaveRequestModalProps) {
   const [form, setForm] = useState<LeaveRequestForm>({
     leave_type_id: 0,
     leave_unit: "day",
@@ -246,23 +249,29 @@ export function LeaveRequestModal({ leaveTypes, onSubmit, onClose, isLoading = f
           {/* ประเภทการลา */}
           <div>
             <label className={LABEL_CLASS}>ประเภทการลา <span className="text-red-400">*</span></label>
-            <div className="flex flex-wrap gap-2">
-              {leaveTypes.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => set("leave_type_id", t.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-all ${form.leave_type_id === t.id
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                    }`}
-                >
-                  {t.name}
-                  <span className={`text-xs ${form.leave_type_id === t.id ? "text-indigo-200" : "text-gray-400"}`}>
-                    {/* ({t.max_days} วัน/ปี) */}
-                  </span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-2">
+              {leaveTypes.map((t) => {
+                const bal = pool?.balances?.find(b => b.leave_type_id === t.id);
+                const remaining = bal ? bal.remaining : 0;
+                const isSelected = form.leave_type_id === t.id;
+                
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => set("leave_type_id", t.id)}
+                    className={`flex flex-col items-start px-4 py-3 rounded-2xl text-xs font-medium border transition-all ${isSelected
+                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
+                      : "bg-white text-gray-600 border-gray-100 hover:border-indigo-200 hover:bg-slate-50"
+                      }`}
+                  >
+                    <span className="text-sm mb-1">{t.name}</span>
+                    <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
+                      คงเหลือ: <strong className={isSelected ? "text-white" : "text-gray-600"}>{remaining} วัน</strong>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {errors.leave_type_id && <p className={ERROR_CLASS}>{errors.leave_type_id}</p>}
           </div>

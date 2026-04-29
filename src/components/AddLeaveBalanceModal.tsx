@@ -1,28 +1,26 @@
 // components/AddLeaveBalanceModal.tsx
 import { useState, useEffect } from "react";
-import type { LeavePool } from "../services/leaveService";
+import type { LeavePool, LeaveBalance } from "../services/leaveService";
 
 export interface AddLeavePoolModalProps {
   user: { id: number; full_name: string; employee_code: string; department: string };
   pool: LeavePool;
   year: number;
-  onSubmit: (remaining_days: number) => Promise<void>;
+  onSubmit: (balances: { leave_type_id: number; total_days: number }[]) => Promise<void>;
   onClose: () => void;
 }
 
 export function AddLeaveBalanceModal({
   user, pool, year, onSubmit, onClose,
 }: AddLeavePoolModalProps) {
-  const [remainingDays, setRemainingDays] = useState<number>(pool.remaining ?? 0);
+  const [balances, setBalances] = useState<LeaveBalance[]>(pool.balances || []);
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setRemainingDays(pool.remaining ?? 0);
+    setBalances(pool.balances || []);
     setError("");
   }, [pool]);
-
-  const diff = remainingDays - (pool.remaining ?? 0);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -30,13 +28,22 @@ export function AddLeaveBalanceModal({
     return () => window.removeEventListener("keydown", fn);
   }, [onClose]);
 
+  const handleUpdateTotal = (typeId: number, newVal: number) => {
+    setBalances(prev => prev.map(b => 
+      b.leave_type_id === typeId ? { ...b, total_days: Math.max(0, newVal) } : b
+    ));
+    setError("");
+  };
+
   const handleSubmit = async () => {
-    if (remainingDays < 0) return setError("วันลาคงเหลือต้องไม่ติดลบ");
-    if (diff === 0) return onClose();
     try {
       setLoading(true);
       setError("");
-      await onSubmit(remainingDays);
+      const payload = balances.map(b => ({
+        leave_type_id: b.leave_type_id,
+        total_days: b.total_days
+      }));
+      await onSubmit(payload);
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.message || "บันทึกไม่สำเร็จ");
@@ -45,12 +52,12 @@ export function AddLeaveBalanceModal({
     }
   };
 
-  const INPUT_CLS = "w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white";
+  const INPUT_CLS = "w-20 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-center font-bold text-gray-900";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
@@ -61,7 +68,7 @@ export function AddLeaveBalanceModal({
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">กำหนดวันลา</h2>
+              <h2 className="text-base font-semibold text-gray-900">กำหนดวันลาแยกประเภท</h2>
               <p className="text-xs text-gray-400">ปี {year}</p>
             </div>
           </div>
@@ -69,7 +76,7 @@ export function AddLeaveBalanceModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
 
           {/* User */}
           <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
@@ -82,66 +89,36 @@ export function AddLeaveBalanceModal({
             </div>
           </div>
 
-          {/* Current pool summary */}
-          <div className="bg-slate-50 rounded-xl p-4 flex gap-4 text-sm">
-            <div className="text-center flex-1">
-              <p className="text-xs text-slate-500 mb-0.5">สิทธิ์รวม</p>
-              <p className="font-bold text-slate-700">{pool.total_days} วัน</p>
-            </div>
-            <div className="w-px bg-slate-200" />
-            <div className="text-center flex-1">
-              <p className="text-xs text-slate-500 mb-0.5">ใช้ไปแล้ว</p>
-              <p className="font-bold text-slate-700">{pool.used_days} วัน</p>
-            </div>
-            <div className="w-px bg-slate-200" />
-            <div className="text-center flex-1">
-              <p className="text-xs text-slate-500 mb-0.5">คงเหลือ</p>
-              <p className={`font-bold ${(pool.remaining ?? 0) <= 3 ? "text-red-600" : "text-emerald-600"}`}>
-                {pool.remaining} วัน
-              </p>
-            </div>
-          </div>
-
-          {/* Input วันคงเหลือ */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-2">
-              ตั้งวันลาคงเหลือ
-            </label>
-            <div className="flex items-center gap-3">
-              <button type="button"
-                onClick={() => { setRemainingDays((v) => Math.max(0, v - 1)); setError(""); }}
-                className="w-10 h-10 flex-shrink-0 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-xl font-medium transition-colors">
-                −
-              </button>
-              <div className="relative flex-1">
-                <input
-                  type="number" min={0}
-                  value={remainingDays}
-                  onChange={(e) => { setRemainingDays(Math.max(0, Number(e.target.value))); setError(""); }}
-                  className={`${INPUT_CLS} text-center text-2xl font-bold text-gray-900 pr-10`}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">วัน</span>
-              </div>
-              <button type="button"
-                onClick={() => { setRemainingDays((v) => v + 1); setError(""); }}
-                className="w-10 h-10 flex-shrink-0 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center text-xl font-medium transition-colors">
-                +
-              </button>
-            </div>
-
-            {/* diff + new total */}
-            <div className="mt-2.5 flex items-center justify-between text-xs">
-              <span>
-                {diff > 0 && <span className="text-emerald-600 font-medium">+{diff} วัน</span>}
-                {diff < 0 && <span className="text-amber-600 font-medium">{diff} วัน</span>}
-                {diff === 0 && <span className="text-gray-400">ไม่มีการเปลี่ยนแปลง</span>}
-              </span>
-              {diff !== 0 && (
-                <span className="text-gray-400">
-                  สิทธิ์รวมใหม่ <strong className="text-gray-600">{remainingDays + pool.used_days} วัน</strong>
-                </span>
-              )}
-            </div>
+          <div className="space-y-4">
+            {balances.map((b) => {
+              const remaining = Math.max(0, b.total_days - b.used_days);
+              return (
+                <div key={b.leave_type_id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-slate-50/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-700">{b.name}</p>
+                    <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {b.used_days} วัน · คงเหลือ {remaining} วัน</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button"
+                      onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days - 1)}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                      −
+                    </button>
+                    <input
+                      type="number" min={0}
+                      value={b.total_days}
+                      onChange={(e) => handleUpdateTotal(b.leave_type_id, Number(e.target.value))}
+                      className={INPUT_CLS}
+                    />
+                    <button type="button"
+                      onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days + 1)}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Error */}
@@ -156,17 +133,17 @@ export function AddLeaveBalanceModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6 flex gap-3 justify-end">
+        <div className="px-6 pb-6 flex gap-3 justify-end border-t border-gray-50 pt-4">
           <button onClick={onClose} disabled={loading}
             className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">
             ยกเลิก
           </button>
-          <button onClick={handleSubmit} disabled={loading || diff === 0}
+          <button onClick={handleSubmit} disabled={loading}
             className="px-5 py-2.5 text-sm bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
             {loading ? (
               <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />กำลังบันทึก...</>
             ) : (
-              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12l5 5L20 7"/></svg>บันทึก</>
+              <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12l5 5L20 7"/></svg>บันทึกทั้งหมด</>
             )}
           </button>
         </div>

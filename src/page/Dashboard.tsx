@@ -441,6 +441,7 @@ export default function UserLeaveDashboard() {
       {showModal && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
+          pool={leavePool}
           onSubmit={handleAddLeave}
           onClose={() => setShowModal(false)}
           isLoading={submitting}

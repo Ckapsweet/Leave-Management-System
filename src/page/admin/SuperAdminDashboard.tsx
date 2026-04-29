@@ -153,10 +153,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateBalance = async (remaining_days: number) => {
+  const handleUpdateBalance = async (balances: { leave_type_id: number; total_days: number }[]) => {
     if (!balanceModal) return;
     try {
-      const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
+      const updated = await updateLeavePool(balanceModal.user.id, balances, year);
       setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
       if (activeTab === "employees") {
         setEmployees((prev) => prev.map((e) =>

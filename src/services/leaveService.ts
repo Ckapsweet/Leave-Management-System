@@ -16,6 +16,14 @@ export interface LeaveType {
 }
 
 // Pool รวมของ user (ไม่แยกประเภท)
+export interface LeaveBalance {
+  leave_type_id: number;
+  name:          string;
+  total_days:    number;
+  used_days:     number;
+  remaining:     number;
+}
+
 export interface LeavePool {
   id?:        number | null;
   user_id:    number;
@@ -23,6 +31,7 @@ export interface LeavePool {
   used_days:  number;
   remaining:  number;
   year:       number;
+  balances?:  LeaveBalance[];
 }
 
 export interface LeaveRequest {
@@ -163,11 +172,11 @@ export async function getAdminUserPool(userId: number, year?: number): Promise<L
 
 export async function updateLeavePool(
   userId: number,
-  remaining_days: number,
+  balances: { leave_type_id: number; total_days: number }[],
   year?: number
 ): Promise<LeavePool> {
   const res = await api.patch(`/api/admin/leave-pool/${userId}`, {
-    remaining_days,
+    balances,
     year: year ?? new Date().getFullYear(),
   });
   return res.data;
