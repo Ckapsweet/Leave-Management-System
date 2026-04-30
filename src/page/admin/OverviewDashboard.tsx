@@ -222,7 +222,7 @@ export default function OverviewDashboard() {
         }
     };
 
-    const handleEmployeeClick = async (emp: EmployeeWithBalance) => {
+    const handleEmployeeClick = async (emp: EmployeeWithBalance) =>  {
         setSelectedEmployee(emp);
         setEmpLeaveRequests([]);
         setEmpLeaveLoading(true);

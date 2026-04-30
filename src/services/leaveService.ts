@@ -104,6 +104,11 @@ export async function getTodayLeaves(): Promise<LeaveRequest[]> {
   return res.data;
 }
 
+export async function getThisWeekLeaves(): Promise<LeaveRequest[]> {
+  const res = await api.get("/api/leave-requests/week");
+  return res.data;
+}
+
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
 
