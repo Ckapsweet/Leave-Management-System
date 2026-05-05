@@ -9,7 +9,8 @@ interface EmployeeLeaveDrawerProps {
   leaveRequests: LeaveRequest[];
   loading: boolean;
   onClose: () => void;
-  onOpenBalance: () => void;
+  onOpenBalance?: () => void;
+  canEditBalance?: boolean;
 }
 
 export function EmployeeLeaveDrawer({
@@ -18,6 +19,7 @@ export function EmployeeLeaveDrawer({
   loading,
   onClose,
   onOpenBalance,
+  canEditBalance = true,
 }: EmployeeLeaveDrawerProps) {
   const ac = avatarColor(emp.department);
   const pool = emp.pool;
@@ -92,6 +94,7 @@ export function EmployeeLeaveDrawer({
 
           <button
             onClick={onOpenBalance}
+            hidden={!canEditBalance || !onOpenBalance}
             className="w-full py-2.5 text-xs bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium transition-colors flex items-center justify-center gap-2"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>

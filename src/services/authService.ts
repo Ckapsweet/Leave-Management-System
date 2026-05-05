@@ -10,6 +10,9 @@ export interface AuthUser {
   department: string;
   role: UserRole;
   supervisor_id?: number | null;
+  email?: string | null;
+  email_2?: string | null;
+  phone?: string | null;
 }
 
 export async function login(employee_code: string, password: string): Promise<{ user: AuthUser }> {
@@ -26,7 +29,12 @@ export async function getMe(): Promise<AuthUser> {
   return res.data;
 }
 
-export async function updateProfile(data: { full_name: string }): Promise<AuthUser> {
+export async function updateProfile(data: {
+  full_name: string;
+  email?: string | null;
+  email_2?: string | null;
+  phone?: string | null;
+}): Promise<AuthUser> {
   const res = await api.put("/api/auth/profile", data);
   return res.data;
 }

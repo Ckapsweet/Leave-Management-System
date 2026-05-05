@@ -1,5 +1,5 @@
 import type { LeaveRequest } from "../services/leaveService";
-import type { EmployeeWithBalance } from "./adminHelpers";
+import type { Employee, EmployeeWithBalance } from "./adminHelpers";
 
 function toNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -48,9 +48,15 @@ function employeeName(request: LeaveRequest) {
 export function AdminReportWidget({
   requests,
   employees,
+  teamEmployees,
+  currentUser,
+  teamLoading = false,
 }: {
   requests: LeaveRequest[];
   employees: EmployeeWithBalance[];
+  teamEmployees?: Employee[];
+  currentUser?: Employee | null;
+  teamLoading?: boolean;
 }) {
   const currentYear = new Date().getFullYear();
   const today = toDateOnly(new Date());
@@ -88,26 +94,45 @@ export function AdminReportWidget({
     deptStats[department] = (deptStats[department] ?? 0) + 1;
   });
 
-  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
-  const teamStats = requests.reduce<
-    Record<number, { leadName: string; memberIds: Set<number>; pendingCount: number; totalRequests: number }>
-  >((acc, request) => {
-      const supervisorId = request.user?.supervisor_id;
-      if (!supervisorId) return acc;
-      const lead = employeeById.get(supervisorId);
-      if (!acc[supervisorId]) {
-        acc[supervisorId] = {
-          leadName: lead?.full_name ?? `Supervisor #${supervisorId}`,
-          memberIds: new Set<number>(),
-          pendingCount: 0,
-          totalRequests: 0,
-        };
-      }
-      acc[supervisorId].memberIds.add(request.user_id);
-      acc[supervisorId].totalRequests += 1;
-      if (request.status === "pending") acc[supervisorId].pendingCount += 1;
+  const teamSource = [
+    ...(teamEmployees ?? []),
+    ...employees,
+    ...requests.flatMap((request) => (request.user ? [request.user] : [])),
+    ...(currentUser ? [currentUser] : []),
+  ].reduce<Employee[]>((acc, employee) => {
+    if (!acc.some((item) => item.id === employee.id)) acc.push(employee);
+    return acc;
+  }, []);
+  const employeeById = new Map(teamSource.map((employee) => [employee.id, employee]));
+  const requestStatsByUserId = requests.reduce<Record<number, { pendingCount: number; totalRequests: number }>>(
+    (acc, request) => {
+      acc[request.user_id] = acc[request.user_id] ?? { pendingCount: 0, totalRequests: 0 };
+      acc[request.user_id].totalRequests += 1;
+      if (request.status === "pending") acc[request.user_id].pendingCount += 1;
       return acc;
-    }, {});
+    },
+    {}
+  );
+  const teamStats = teamSource.reduce<
+    Record<number, { leadName: string; members: Employee[]; pendingCount: number; totalRequests: number }>
+  >((acc, employee) => {
+    const supervisorId = employee.supervisor_id;
+    if (!supervisorId) return acc;
+    const lead = employeeById.get(supervisorId);
+    const requestStat = requestStatsByUserId[employee.id] ?? { pendingCount: 0, totalRequests: 0 };
+    if (!acc[supervisorId]) {
+      acc[supervisorId] = {
+        leadName: lead?.full_name ?? `หัวหน้า #${supervisorId}`,
+        members: [],
+        pendingCount: 0,
+        totalRequests: 0,
+      };
+    }
+    acc[supervisorId].members.push(employee);
+    acc[supervisorId].pendingCount += requestStat.pendingCount;
+    acc[supervisorId].totalRequests += requestStat.totalRequests;
+    return acc;
+  }, {});
 
   const lowBalanceEmployees = employees
     .flatMap((employee) =>
@@ -131,7 +156,7 @@ export function AdminReportWidget({
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-red-600 to-rose-600 rounded-2xl p-6 text-white shadow-lg">
         <h2 className="text-2xl font-bold mb-2">ภาพรวมทีม - ปี {currentYear}</h2>
-        <p className="text-red-100 text-sm">สรุปงานอนุมัติและภาพรวมการลาของทีม</p>
+        <p className="text-red-100 text-sm">สรุปอนุมัติและภาพรวมการลาของทีม</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -191,7 +216,7 @@ export function AdminReportWidget({
             </div>
             <div className="rounded-xl bg-emerald-50 p-3 text-center">
               <p className="text-2xl font-bold text-emerald-600">{weekLeaves.length}</p>
-              <p className="text-xs text-emerald-700">7 วัน</p>
+              <p className="text-xs text-emerald-700">สัปดาห์นี้</p>
             </div>
           </div>
           {weekLeaves.length > 0 ? (
@@ -212,15 +237,30 @@ export function AdminReportWidget({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-700 border-b border-gray-100 pb-3 mb-4">สรุปทีมตามหัวหน้า</h3>
-          {Object.keys(teamStats).length > 0 ? (
+          {teamLoading ? (
+            <div className="py-8 flex justify-center">
+              <div className="w-6 h-6 border-2 border-slate-800 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : Object.keys(teamStats).length > 0 ? (
             <ul className="space-y-3">
               {Object.entries(teamStats).map(([leaderId, stat]) => (
-                <li key={leaderId} className="flex justify-between items-center text-sm">
-                  <div>
+                <li key={leaderId} className="text-sm border border-gray-100 rounded-xl p-3">
+                  <div className="flex justify-between items-start gap-3">
+                    <div>
                     <p className="font-medium text-gray-800">{stat.leadName}</p>
-                    <p className="text-xs text-gray-400">{stat.memberIds.size} คนที่มีรายการ • {stat.totalRequests} รายการทั้งหมด</p>
+                    <p className="text-xs text-gray-400">{stat.members.length} คนในทีม • {stat.totalRequests} รายการทั้งหมด</p>
+                    </div>
+                    <span className="font-semibold text-amber-700 bg-amber-50 px-3 py-1 rounded-full whitespace-nowrap">{stat.pendingCount} รออนุมัติ</span>
                   </div>
-                  <span className="font-semibold text-amber-700 bg-amber-50 px-3 py-1 rounded-full">{stat.pendingCount} รออนุมัติ</span>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {stat.members
+                      .sort((a, b) => a.full_name.localeCompare(b.full_name, "th"))
+                      .map((member) => (
+                        <span key={member.id} className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-full px-2.5 py-1">
+                          {member.full_name}
+                        </span>
+                      ))}
+                  </div>
                 </li>
               ))}
             </ul>

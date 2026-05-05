@@ -14,6 +14,7 @@ import {
 import type { LeavePool, LeaveRequest, LeaveStatus } from "../../services/leaveService";
 import { toast } from "../../components/Toast";
 import type { Employee, EmployeeWithBalance } from "../../components/adminHelpers";
+import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
 
 export type RequestViewMode = "all" | "yearly" | "monthly";
 export type ConfirmLeaveAction = { type: "approve" | "reject"; req: LeaveRequest };
@@ -192,15 +193,34 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
   };
 }
 
-async function fetchEmployeesWithPools(year: number, shouldInclude: (user: Employee) => boolean) {
+function normalizeDepartment(value?: string | null) {
+  return (value ?? "").trim();
+}
+
+function mergeUsers(primary: Employee[], secondary: Employee[]) {
+  return [...primary, ...secondary].reduce<Employee[]>((acc, employee) => {
+    if (!acc.some((item) => item.id === employee.id)) {
+      acc.push({ ...employee, department: normalizeDepartment(employee.department) });
+    }
+    return acc;
+  }, []);
+}
+
+async function fetchEmployeesWithPools(
+  year: number,
+  shouldInclude: (user: Employee, users: Employee[]) => boolean,
+  seedUsers: Employee[] = [],
+  requests: LeaveRequest[] = []
+) {
   const usersRes = await api.get<Employee[]>("/api/admin/users");
-  const users = usersRes.data.filter((user) => user.role !== "admin").filter(shouldInclude);
+  const nonAdminUsers = mergeUsers(usersRes.data, seedUsers).filter((user) => user.role !== "admin");
+  const users = nonAdminUsers.filter((employee) => shouldInclude(employee, nonAdminUsers));
 
   return Promise.all(
     users.map(async (user) => {
       try {
         const res = await getAdminUserPool(user.id, year);
-        return { ...user, pool: res };
+        return { ...user, pool: deriveLeavePoolFromRequests(res, requests.filter((request) => request.user_id === user.id), year) };
       } catch {
         return { ...user, pool: null };
       }
@@ -213,8 +233,9 @@ export function useAdminEmployees(options: {
   user: AuthUser | null;
   requests: LeaveRequest[];
   filterToSupervisor?: boolean;
+  departmentScope?: string | null;
 }) {
-  const { year, user, requests, filterToSupervisor = false } = options;
+  const { year, user, requests, filterToSupervisor = false, departmentScope = null } = options;
   const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
   const [empSearch, setEmpSearch] = useState("");
@@ -227,17 +248,23 @@ export function useAdminEmployees(options: {
   const fetchEmployees = useCallback(async () => {
     try {
       setEmpLoading(true);
-      const withPool = await fetchEmployeesWithPools(year, (employee) => {
+      const requestUsers = requests.flatMap((request) => (request.user ? [request.user] : []));
+      const withPool = await fetchEmployeesWithPools(year, (employee, users) => {
+        if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
+          return false;
+        }
         if (!filterToSupervisor) return true;
-        return employee.supervisor_id === user?.id;
-      });
+        if (employee.supervisor_id === user?.id) return true;
+        const supervisor = users.find((item) => item.id === employee.supervisor_id);
+        return supervisor?.supervisor_id === user?.id;
+      }, requestUsers, requests);
       setEmployees(withPool);
     } catch (err) {
       console.error("fetch employees failed", err);
     } finally {
       setEmpLoading(false);
     }
-  }, [filterToSupervisor, user?.id, year]);
+  }, [departmentScope, filterToSupervisor, requests, user?.id, year]);
 
   const openBalanceModal = useCallback(
     async (targetUser: { id: number; full_name: string; employee_code: string; department: string }) => {
@@ -290,7 +317,7 @@ export function useAdminEmployees(options: {
   const filteredEmployees = useMemo(
     () =>
       employees.filter((employee) => {
-        const matchDepartment = empDeptFilter === "all" || employee.department === empDeptFilter;
+        const matchDepartment = empDeptFilter === "all" || normalizeDepartment(employee.department) === normalizeDepartment(empDeptFilter);
         const query = empSearch.trim();
         const matchSearch =
           !query || employee.full_name.includes(query) || employee.employee_code.includes(query);

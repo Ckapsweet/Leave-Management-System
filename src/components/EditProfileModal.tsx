@@ -11,6 +11,9 @@ interface EditProfileModalProps {
 
 export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileModalProps) {
   const [fullName, setFullName] = useState(user.full_name);
+  const [email, setEmail] = useState(user.email ?? "");
+  const [email2, setEmail2] = useState(user.email_2 ?? "");
+  const [phone, setPhone] = useState(user.phone ?? "");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -20,9 +23,16 @@ export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileMod
   const handleUpdateInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim()) return toast.error("กรุณาระบุชื่อ-นามสกุล");
+    const isEmail = (value: string) => !value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+    if (!isEmail(email) || !isEmail(email2)) return toast.error("กรุณากรอกอีเมลให้ถูกต้อง");
     setLoading(true);
     try {
-      const updated = await updateProfile({ full_name: fullName });
+      const updated = await updateProfile({
+        full_name: fullName.trim(),
+        email: email.trim() || null,
+        email_2: email2.trim() || null,
+        phone: phone.trim() || null,
+      });
       onUpdateUser(updated);
       toast.success("อัปเดตข้อมูลส่วนตัวเรียบร้อย");
       onClose();
@@ -96,6 +106,36 @@ export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileMod
                   />
                 </div>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 ml-1">Email 1</label>
+                <input
+                  type="email"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 ml-1">Email 2</label>
+                <input
+                  type="email"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                  value={email2}
+                  onChange={(e) => setEmail2(e.target.value)}
+                  placeholder="alternate@company.com"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 ml-1">เบอร์โทร</label>
+                <input
+                  type="tel"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="เช่น 0812345678"
+                />
+              </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -106,7 +146,16 @@ export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileMod
                 </button>
                 <button
                   type="submit"
-                  disabled={loading || !fullName.trim() || fullName === user.full_name}
+                  disabled={
+                    loading ||
+                    !fullName.trim() ||
+                    (
+                      fullName.trim() === user.full_name &&
+                      email.trim() === (user.email ?? "") &&
+                      email2.trim() === (user.email_2 ?? "") &&
+                      phone.trim() === (user.phone ?? "")
+                    )
+                  }
                   className="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-200 transition-all"
                 >
                   {loading ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}

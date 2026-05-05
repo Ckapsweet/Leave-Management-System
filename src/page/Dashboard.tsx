@@ -4,6 +4,7 @@ import { logout } from "../services/authService";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
+import { deriveLeavePoolFromRequests } from "../services/leavePoolHelpers";
 import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload, LeaveBalance } from "../services/leaveService";
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
@@ -296,7 +297,7 @@ export default function UserLeaveDashboard() {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
 
-  const [user, setUser] = useState<{ full_name: string; employee_code: string; department: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [leavePool, setLeavePool] = useState<LeavePool | null>(null);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -389,8 +390,9 @@ export default function UserLeaveDashboard() {
     return matchStatus && matchDate;
   });
 
-  const totalUsed = leavePool?.used_days ?? 0;
-  const totalRemaining = leavePool?.remaining ?? 0;
+  const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
+  const totalUsed = displayLeavePool?.used_days ?? 0;
+  const totalRemaining = displayLeavePool?.remaining ?? 0;
   const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   // ── Loading / Error ──────────────────────────────────────────
@@ -441,7 +443,7 @@ export default function UserLeaveDashboard() {
       {showModal && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
-          pool={leavePool}
+          pool={displayLeavePool}
           onSubmit={handleAddLeave}
           onClose={() => setShowModal(false)}
           isLoading={submitting}
@@ -543,10 +545,10 @@ export default function UserLeaveDashboard() {
         {/* Leave balances by type */}
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือแต่ละประเภท</h3>
-          {leavePool ? (
-            leavePool.balances && leavePool.balances.length > 0 ? (
+          {displayLeavePool ? (
+            displayLeavePool.balances && displayLeavePool.balances.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {leavePool.balances.map((balance) => (
+                {displayLeavePool.balances.map((balance) => (
                   <LeaveBalanceCard key={balance.leave_type_id} balance={balance} />
                 ))}
               </div>

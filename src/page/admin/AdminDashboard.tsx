@@ -244,8 +244,8 @@ export default function AdminDashboard() {
               )}
             </button>
           ))}
-          {/* Lead / Manager: Manage Subordinates tab */}
-          {(user?.role === "lead" || user?.role === "manager") && (
+          {/* Manager: Manage Subordinates tab */}
+          {user?.role === "manager" && (
             <button onClick={() => setActiveTab("subordinates")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "subordinates" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}>
@@ -567,8 +567,8 @@ export default function AdminDashboard() {
             <p className="text-xs text-gray-400 text-right px-1">คลิกแถวพนักงานเพื่อดูประวัติการลา</p>
           </div>
         )}
-        {/* ── Subordinates Tab (Lead & Manager) ───────────────────────────── */}
-        {activeTab === "subordinates" && (user?.role === "lead" || user?.role === "manager") && (
+        {/* ── Subordinates Tab (Manager) ───────────────────────────── */}
+        {activeTab === "subordinates" && user?.role === "manager" && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white">
               <div className="flex items-center gap-4">

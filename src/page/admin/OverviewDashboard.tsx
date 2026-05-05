@@ -26,6 +26,10 @@ import Footer from "../../components/Footer";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
 
+function normalizeDepartment(value?: string | null) {
+    return (value ?? "").trim();
+}
+
 interface DashboardData {
     summary: {
         total_users: number;
@@ -82,6 +86,7 @@ export default function OverviewDashboard() {
     // ---- Team Management State (NEW) ----
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [allUsersLoaded, setAllUsersLoaded] = useState(false);
+    const [selectedTeamDepartment, setSelectedTeamDepartment] = useState("");
     const [selectedLeaderId, setSelectedLeaderId] = useState<number | "">("");
     const [subSearch, setSubSearch] = useState("");
     const [teamLoading, setTeamLoading] = useState(false);
@@ -185,8 +190,8 @@ export default function OverviewDashboard() {
         if (activeTab === "reports") fetchDashboardData();
         if (activeTab === "employees") fetchEmployees();
         if (activeTab === "teams" && !allUsersLoaded) fetchAllUsers();
-        if (activeTab === "departments") fetchDepartments();
-    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded]);
+        if ((activeTab === "teams" || activeTab === "departments") && departments.length === 0) fetchDepartments();
+    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded, departments.length]);
 
     // ---- Handlers ----
 
@@ -406,19 +411,40 @@ export default function OverviewDashboard() {
     const pending = requests.filter((r) => r.status === "pending").length;
     const approved = requests.filter((r) => r.status === "approved").length;
     const rejected = requests.filter((r) => r.status === "rejected").length;
+    const leaveUsageByDepartment = Object.entries(
+        (data?.leaveTypeStats ?? []).reduce<Record<string, { total: number; leaveTypes: { name: string; days: number }[] }>>((acc, row) => {
+            const department = normalizeDepartment(row.department) || "ไม่ระบุแผนก";
+            const days = Number(row.total_leave_days) || 0;
+            if (!acc[department]) acc[department] = { total: 0, leaveTypes: [] };
+            acc[department].total += days;
+            acc[department].leaveTypes.push({ name: row.leave_type, days });
+            return acc;
+        }, {})
+    ).sort(([, a], [, b]) => b.total - a.total);
 
     // NEW: derived lists for team management
+    const departmentOptions = Array.from(new Set([
+        ...departments.map((department) => normalizeDepartment(department.name)),
+        ...allUsers.map((u) => normalizeDepartment(u.department)),
+        ...employees.map((employee) => normalizeDepartment(employee.department)),
+        ...requests.map((request) => normalizeDepartment(request.user?.department)),
+    ].filter(Boolean))).sort();
+    const selectedDepartment = normalizeDepartment(selectedTeamDepartment);
     const leaderOptions = allUsers.filter((u) =>
+        selectedDepartment &&
+        normalizeDepartment(u.department) === selectedDepartment &&
         ["lead", "manager", "assistant manager"].includes(u.role?.toLowerCase() ?? "")
     );
     const currentSubordinates = allUsers.filter(
-        (u) => u.supervisor_id === Number(selectedLeaderId)
+        (u) => u.supervisor_id === Number(selectedLeaderId) && normalizeDepartment(u.department) === selectedDepartment
     );
     const freeEmployees = allUsers.filter(
         (u) =>
+            selectedDepartment &&
+            normalizeDepartment(u.department) === selectedDepartment &&
             !u.supervisor_id &&
             u.role !== "admin" &&
-            u.full_name.includes(subSearch)
+            (!subSearch || u.full_name.includes(subSearch) || u.employee_code?.includes(subSearch))
     );
 
     // ---- Render ----
@@ -842,6 +868,40 @@ export default function OverviewDashboard() {
                                 {/* Leave Type Stats Table */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="p-5 border-b border-gray-100">
+                                        <h2 className="text-sm font-semibold text-gray-700">ภาพรวมการใช้วันลารายแผนก</h2>
+                                    </div>
+                                    <div className="p-5">
+                                        {leaveUsageByDepartment.length > 0 ? (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {leaveUsageByDepartment.map(([department, stat]) => (
+                                                    <div key={department} className="border border-gray-100 rounded-xl p-4 bg-slate-50/40">
+                                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                                            <div>
+                                                                <h3 className="text-sm font-semibold text-gray-800">{department}</h3>
+                                                                <p className="text-xs text-gray-400">{stat.leaveTypes.length} ประเภทการลา</p>
+                                                            </div>
+                                                            <span className="text-sm font-bold text-slate-800 bg-white border border-gray-100 rounded-full px-3 py-1">
+                                                                {stat.total.toFixed(2)} วัน
+                                                            </span>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            {stat.leaveTypes.map((leaveType) => (
+                                                                <div key={`${department}-${leaveType.name}`} className="flex items-center justify-between text-xs">
+                                                                    <span className="text-gray-600">{leaveType.name}</span>
+                                                                    <span className="font-semibold text-gray-800">{leaveType.days.toFixed(2)} วัน</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="py-8 text-center text-sm text-gray-400">ไม่มีประวัติการอนุมัติวันลาในปีนี้</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="hidden">
+                                    <div className="p-5 border-b border-gray-100">
                                         <h2 className="text-sm font-semibold text-gray-700">📑 รายละเอียดวันลาแยกตามแผนกและประเภทการลา</h2>
                                     </div>
                                     <div className="overflow-x-auto">
@@ -1032,8 +1092,28 @@ export default function OverviewDashboard() {
                             </div>
 
                             <div className="p-5 space-y-5">
-                                {/* Leader Selector */}
-                                <div className="max-w-md">
+                                {/* Department and Leader Selector */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-600 block mb-2">
+                                            เลือกแผนก
+                                        </label>
+                                        <select
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-slate-300 text-gray-700"
+                                            value={selectedTeamDepartment}
+                                            onChange={(e) => {
+                                                setSelectedTeamDepartment(e.target.value);
+                                                setSelectedLeaderId("");
+                                                setSubSearch("");
+                                            }}
+                                        >
+                                            <option value="">-- กรุณาเลือกแผนกก่อน --</option>
+                                            {departmentOptions.map((department) => (
+                                                <option key={department} value={department}>{department}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
                                     <label className="text-xs font-semibold text-gray-600 block mb-2">
                                         เลือกหัวหน้างาน (Manager / Lead)
                                     </label>
@@ -1046,6 +1126,7 @@ export default function OverviewDashboard() {
                                         <select
                                             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-slate-300 text-gray-700"
                                             value={selectedLeaderId}
+                                            disabled={!selectedTeamDepartment}
                                             onChange={(e) => setSelectedLeaderId(e.target.value === "" ? "" : Number(e.target.value))}
                                         >
                                             <option value="">-- กรุณาเลือกหัวหน้างาน --</option>
@@ -1058,8 +1139,14 @@ export default function OverviewDashboard() {
                                     )}
                                 </div>
 
+                                </div>
+
                                 {/* Team Grid */}
-                                {selectedLeaderId ? (
+                                {!selectedTeamDepartment ? (
+                                    <div className="py-12 text-center text-sm text-gray-400">
+                                        กรุณาเลือกแผนกก่อนเพื่อจัดการทีม
+                                    </div>
+                                ) : selectedLeaderId ? (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                                         {/* Left: Current Subordinates */}

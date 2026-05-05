@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import api from "../../services/api";
 import type { LeaveStatus } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
 import { ToastContainer } from "../../components/Toast";
@@ -9,6 +10,7 @@ import { EditProfileModal } from "../../components/EditProfileModal";
 import {
   STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
 } from "../../components/adminHelpers";
+import type { Employee } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
@@ -17,6 +19,10 @@ import {
   useAdminEmployees,
   useAdminLeaveRequests,
 } from "./adminDashboardHooks";
+
+function normalizeDepartment(value?: string | null) {
+  return (value ?? "").trim();
+}
 
 
 
@@ -30,6 +36,8 @@ export default function AdminDashboard() {
       return "requests";
     }
   });
+  const [reportTeamUsers, setReportTeamUsers] = useState<Employee[]>([]);
+  const [reportTeamLoading, setReportTeamLoading] = useState(false);
   const year = new Date().getFullYear();
 
   const {
@@ -93,13 +101,44 @@ export default function AdminDashboard() {
     requests,
     filterToSupervisor:
       user?.role === "lead" ||
-      user?.role === "manager" ||
       user?.role === "assistant manager",
+    departmentScope: user?.role === "manager" ? user.department : null,
   });
+  const canEditEmployeeBalance = user?.role === "admin";
+
+  const fetchReportTeamUsers = useCallback(async () => {
+    try {
+      setReportTeamLoading(true);
+      const res = await api.get<Employee[]>("/api/admin/users");
+      const users = res.data.filter((employee) => employee.role !== "admin");
+      if (user?.role !== "manager") {
+        setReportTeamUsers(users);
+        return;
+      }
+
+      const directSubordinateIds = new Set(
+        users.filter((employee) => employee.supervisor_id === user.id).map((employee) => employee.id)
+      );
+      setReportTeamUsers(
+        users.filter(
+          (employee) =>
+            employee.id === user.id ||
+            employee.supervisor_id === user.id ||
+            (employee.supervisor_id != null && directSubordinateIds.has(employee.supervisor_id))
+        )
+      );
+    } catch (err) {
+      console.error("fetch report team users failed", err);
+      setReportTeamUsers([]);
+    } finally {
+      setReportTeamLoading(false);
+    }
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (activeTab === "employees" || activeTab === "reports") fetchEmployees();
-  }, [activeTab, fetchEmployees]);
+    if (activeTab === "reports") fetchReportTeamUsers();
+  }, [activeTab, fetchEmployees, fetchReportTeamUsers]);
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="text-center space-y-3">
@@ -137,7 +176,7 @@ export default function AdminDashboard() {
         />
       )}
 
-      {balanceModal && (
+      {canEditEmployeeBalance && balanceModal && (
         <AddLeaveBalanceModal
           user={balanceModal.user}
           pool={balanceModal.pool}
@@ -160,6 +199,7 @@ export default function AdminDashboard() {
           leaveRequests={empLeaveRequests}
           loading={empLeaveLoading}
           onClose={() => { setSelectedEmployee(null); setEmpLeaveRequests([]); }}
+          canEditBalance={canEditEmployeeBalance}
           onOpenBalance={() => openBalanceModal({
             id: selectedEmployee.id,
             full_name: selectedEmployee.full_name,
@@ -251,7 +291,13 @@ export default function AdminDashboard() {
 
         {/* ── Reports Tab ────────────────────────────────────────────────────── */}
         {activeTab === "reports" && (
-          <AdminReportWidget requests={requests} employees={employees} />
+          <AdminReportWidget
+            requests={requests}
+            employees={employees}
+            teamEmployees={reportTeamUsers.length > 0 ? reportTeamUsers : employees}
+            currentUser={user}
+            teamLoading={reportTeamLoading || empLoading}
+          />
         )}
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
@@ -430,7 +476,10 @@ export default function AdminDashboard() {
                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
                   value={empDeptFilter} onChange={(e) => setEmpDeptFilter(e.target.value)}>
                   <option value="all">ทุกแผนก</option>
-                  {Array.from(new Set(employees.map((e) => e.department))).map((d) => (
+                  {Array.from(new Set([
+                    ...employees.map((e) => normalizeDepartment(e.department)),
+                    ...requests.map((request) => normalizeDepartment(request.user?.department)),
+                  ].filter(Boolean))).sort().map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -462,7 +511,7 @@ export default function AdminDashboard() {
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>
+                        {canEditEmployeeBalance && <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -504,7 +553,7 @@ export default function AdminDashboard() {
                                 {pool ? `${remaining} วัน` : "—"}
                               </span>
                             </td>
-                            <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                            {canEditEmployeeBalance && <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
@@ -516,7 +565,7 @@ export default function AdminDashboard() {
                                   <path d="M9 18l6-6-6-6" />
                                 </svg>
                               </div>
-                            </td>
+                            </td>}
                           </tr>
                         );
                       })}
