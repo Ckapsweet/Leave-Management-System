@@ -61,6 +61,9 @@ export interface LeaveRequest {
     department:    string;
     role:          UserRole;
     supervisor_id: number | null;
+    email?:        string | null;
+    email_2?:      string | null;
+    phone?:        string | null;
   };
 }
 

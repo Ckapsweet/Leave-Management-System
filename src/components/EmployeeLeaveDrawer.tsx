@@ -52,6 +52,13 @@ export function EmployeeLeaveDrawer({
 
         {/* Leave balance summary */}
         <div className="px-6 py-4 border-b border-gray-100 space-y-4">
+          {(emp.email || emp.email_2 || emp.phone) && (
+            <div className="rounded-xl bg-slate-50 border border-gray-100 p-3 space-y-1.5 text-xs text-gray-600">
+              {emp.email && <p className="truncate">Email 1: <span className="font-medium text-gray-800">{emp.email}</span></p>}
+              {emp.email_2 && <p className="truncate">Email 2: <span className="font-medium text-gray-800">{emp.email_2}</span></p>}
+              {emp.phone && <p className="truncate">เบอร์โทร: <span className="font-medium text-gray-800">{emp.phone}</span></p>}
+            </div>
+          )}
           <div>
             <p className="text-xs font-medium text-gray-400 mb-3">สรุปวันลาประจำปี</p>
             {pool ? (

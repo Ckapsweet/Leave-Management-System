@@ -10,6 +10,9 @@ export interface Employee {
   department: string;
   role: string;
   supervisor_id?: number | null;
+  email?: string | null;
+  email_2?: string | null;
+  phone?: string | null;
 }
 
 export interface EmployeeWithBalance extends Employee {

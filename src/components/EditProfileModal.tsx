@@ -113,7 +113,7 @@ export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileMod
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
+                  placeholder="name@ckapsweet.com"
                 />
               </div>
               <div className="space-y-1.5">
@@ -123,7 +123,7 @@ export function EditProfileModal({ user, onClose, onUpdateUser }: EditProfileMod
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
                   value={email2}
                   onChange={(e) => setEmail2(e.target.value)}
-                  placeholder="alternate@company.com"
+                  placeholder="name@outlook.com"
                 />
               </div>
               <div className="space-y-1.5">

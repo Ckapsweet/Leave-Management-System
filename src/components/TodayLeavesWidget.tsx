@@ -40,9 +40,12 @@ export function TodayLeavesWidget() {
                         <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
                             {req.user?.full_name?.slice(0, 2) ?? "??"}
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 space-y-0.5">
                             <p className="text-sm font-semibold truncate text-gray-900">{req.user?.full_name}</p>
                             <p className="text-xs truncate text-gray-500">{req.user?.department}</p>
+                            {req.user?.email && <p className="text-xs truncate text-gray-500">{req.user.email}</p>}
+                            {req.user?.email_2 && <p className="text-xs truncate text-gray-500">{req.user.email_2}</p>}
+                            {req.user?.phone && <p className="text-xs truncate text-gray-500">{req.user.phone}</p>}
                         </div>
                     </div>
                 ))}
