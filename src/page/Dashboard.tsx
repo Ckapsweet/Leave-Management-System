@@ -37,13 +37,17 @@ function fmtDate(d: string) {
 function fmtDatetime(d: string) {
   return new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+function isLateRequest(req: LeaveRequest) {
+  return req.request_type === "late";
+}
 
 // ── DurationBadge ─────────────────────────────────────────────────────────────
 
 function DurationBadge({ req }: { req: LeaveRequest }) {
   if (req.leave_unit === "hour") {
+    const late = isLateRequest(req);
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${late ? "bg-amber-50 text-amber-700" : "bg-indigo-50 text-indigo-700"}`}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
         </svg>
@@ -344,7 +348,8 @@ export default function UserLeaveDashboard() {
     setSubmitting(true);
     try {
       const newReq = await createLeaveRequest(form as LeaveRequestPayload);
-      setRequests((prev) => [newReq, ...prev]);
+      const requestWithType = { ...newReq, request_type: newReq.request_type ?? form.request_type };
+      setRequests((prev) => [requestWithType, ...prev]);
       setShowModal(false);
     } catch (err) {
       throw err;

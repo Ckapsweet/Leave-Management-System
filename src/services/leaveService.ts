@@ -7,6 +7,7 @@ import type { UserRole } from "./superAdminService";
 
 export type LeaveStatus = "pending" | "approved" | "rejected";
 export type LeaveUnit   = "day" | "hour";
+export type RequestKind = "leave" | "late";
 
 export interface LeaveType {
   id:          number;
@@ -43,6 +44,7 @@ export interface LeaveRequest {
   start_time?:    string;
   end_time?:      string;
   leave_unit:     LeaveUnit;
+  request_type?:   RequestKind;
   total_days:     number;
   total_hours?:   number | null;
   reason:         string;
@@ -54,6 +56,8 @@ export interface LeaveRequest {
   leave_type:     LeaveType;
   approver_name?: string;
   comment?:       string;
+  attachments?:   LeaveAttachment[];
+  attachment_urls?: string[];
   user?: {
     id:            number;
     full_name:     string;
@@ -67,15 +71,31 @@ export interface LeaveRequest {
   };
 }
 
+export interface LeaveAttachment {
+  id?: number | string;
+  name?: string;
+  file_name?: string;
+  original_name?: string;
+  filename?: string;
+  url?: string;
+  file_url?: string;
+  download_url?: string;
+  path?: string;
+  mime_type?: string;
+  size?: number | string | null;
+}
+
 // ✅ LeaveRequestPayload ใช้ string แทน Dayjs เพื่อให้ตรงกับ LeaveRequestForm จาก Modal
 export interface LeaveRequestPayload {
   leave_type_id: number;
   leave_unit:    LeaveUnit;
+  request_type?:  RequestKind;
   start_date:    string;
   end_date:      string;
   start_time?:   Dayjs | null;
   end_time?:     Dayjs | null;
   reason:        string;
+  attachments?:   File[];
 }
 
 // ── Leave Types ───────────────────────────────────────────────
@@ -114,6 +134,8 @@ export async function getThisWeekLeaves(): Promise<LeaveRequest[]> {
 
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
+  const request_type = payload.request_type ?? "leave";
+  const hasAttachments = (payload.attachments?.length ?? 0) > 0;
 
   // คำนวณ total_hours จาก Dayjs start_time/end_time
   const total_hours = isHour && payload.start_time && payload.end_time
@@ -135,12 +157,25 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
     end_date:      isHour ? payload.start_date : payload.end_date,
     reason:        payload.reason,
     total_days,
+    request_type,
     start_time:    isHour && payload.start_time?.isValid() ? payload.start_time.format("HH:mm") : null,
     end_time:      isHour && payload.end_time?.isValid()   ? payload.end_time.format("HH:mm")   : null,
     total_hours:   isHour ? total_hours : null,
   };
 
-  const res = await api.post("/api/leave-requests", body);
+  const requestBody = hasAttachments
+    ? (() => {
+        const formData = new FormData();
+        Object.entries(body).forEach(([key, value]) => {
+          if (value === null || value === undefined) return;
+          formData.append(key, String(value));
+        });
+        payload.attachments?.forEach((file) => formData.append("attachments", file));
+        return formData;
+      })()
+    : body;
+
+  const res = await api.post("/api/leave-requests", requestBody);
   return res.data;
 }
 

@@ -1,6 +1,51 @@
 // components/DetailDrawer.tsx
-import type { LeaveRequest } from "../services/leaveService";
+import type { LeaveAttachment, LeaveRequest } from "../services/leaveService";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
+
+function formatAttachmentSize(size: number | string | null | undefined) {
+  const value = Number(size ?? 0);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+  return `${Math.round((value / (1024 * 1024)) * 10) / 10} MB`;
+}
+
+function resolveAttachmentUrl(url: string) {
+  if (/^https?:\/\//i.test(url) || url.startsWith("/")) return url;
+  const base = import.meta.env.VITE_API_URL ?? "";
+  return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+}
+
+function decodeMojibakeName(name: string) {
+  if (!/[à-ÿ]/.test(name)) return name;
+  try {
+    const bytes = Uint8Array.from(Array.from(name, (char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return decoded.includes("\uFFFD") ? name : decoded;
+  } catch {
+    return name;
+  }
+}
+
+function getAttachments(req: LeaveRequest) {
+  const files = req.attachments ?? [];
+  const urlFiles: LeaveAttachment[] = (req.attachment_urls ?? []).map((url, index) => ({
+    id: `url-${index}`,
+    name: `ไฟล์แนบ ${index + 1}`,
+    url,
+  }));
+
+  return [...files, ...urlFiles]
+    .map((file, index) => {
+      const url = file.url ?? file.file_url ?? file.download_url ?? file.path ?? "";
+      return {
+        id: file.id ?? `${url}-${index}`,
+        name: decodeMojibakeName(file.original_name ?? file.file_name ?? file.filename ?? file.name ?? `ไฟล์แนบ ${index + 1}`),
+        url: url ? resolveAttachmentUrl(url) : "",
+        size: formatAttachmentSize(file.size),
+      };
+    })
+    .filter((file) => file.url);
+}
 
 interface DetailDrawerProps {
   request: LeaveRequest;
@@ -15,6 +60,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
   const meta = STATUS_META[req.status];
   const isHourly = req.leave_unit === "hour";
   const ac = avatarColor(req.user?.department);
+  const attachments = getAttachments(req);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -103,6 +149,31 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             <p className="text-xs font-medium text-gray-400 mb-2">เหตุผล</p>
             <p className="text-sm text-gray-700 bg-gray-50 rounded-xl p-4 leading-relaxed">{req.reason}</p>
           </div>
+
+          {attachments.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-400 mb-2">ไฟล์แนบ</p>
+              <div className="space-y-2">
+                {attachments.map((file) => (
+                  <a
+                    key={file.id}
+                    href={file.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm hover:bg-slate-100 transition-colors"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <svg className="flex-shrink-0 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                      </svg>
+                      <span className="truncate font-medium text-gray-700">{file.name}</span>
+                    </span>
+                    <span className="flex-shrink-0 text-xs text-gray-400">{file.size || "เปิดดู"}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Comment */}
           {req.comment && (

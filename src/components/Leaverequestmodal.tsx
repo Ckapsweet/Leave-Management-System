@@ -1,15 +1,13 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
 import { toast } from "./Toast";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import type { LeavePool } from "../services/leaveService";
 
 type LeaveUnit = "day" | "hour";
-
-import type { LeavePool } from "../services/leaveService";
+type RequestKind = "leave" | "late";
 
 interface LeaveType {
   id: number;
@@ -19,6 +17,7 @@ interface LeaveType {
 }
 
 export interface LeaveRequestForm {
+  request_type: RequestKind;
   leave_type_id: number;
   leave_unit: LeaveUnit;
   start_date: string;
@@ -26,6 +25,7 @@ export interface LeaveRequestForm {
   start_time: Dayjs | null;
   end_time: Dayjs | null;
   reason: string;
+  attachments: File[];
 }
 
 export interface LeaveRequestModalProps {
@@ -36,7 +36,18 @@ export interface LeaveRequestModalProps {
   isLoading?: boolean;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+interface FormErrors {
+  leave_type_id?: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
+  reason?: string;
+}
+
+const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5";
+const INPUT_CLASS = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-shadow bg-white";
+const ERROR_CLASS = "text-xs text-red-500 mt-1";
 
 function calcDays(from: string, to: string): number {
   if (!from || !to) return 0;
@@ -51,23 +62,17 @@ function calcHours(startTime: Dayjs | null, endTime: Dayjs | null): number {
 
 function isWeekend(dateStr: string): boolean {
   if (!dateStr) return false;
-  const day = new Date(dateStr).getUTCDay(); // 0 = อาทิตย์, 6 = เสาร์
+  const day = new Date(dateStr).getUTCDay();
   return day === 0 || day === 6;
 }
 
-const LABEL_CLASS = "block text-xs font-medium text-gray-500 mb-1.5";
-const INPUT_CLASS = "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-shadow bg-white";
-const ERROR_CLASS = "text-xs text-red-500 mt-1";
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${Math.round((size / (1024 * 1024)) * 10) / 10} MB`;
+}
 
-// ── Validation ────────────────────────────────────────────────────────────────
-
-interface FormErrors {
-  leave_type_id?: string;
-  start_date?: string;
-  end_date?: string;
-  start_time?: string;
-  end_time?: string;
-  reason?: string;
+function isAllowedAttachment(file: File) {
+  return file.type.startsWith("image/") || file.type === "application/pdf";
 }
 
 function validate(form: LeaveRequestForm): FormErrors {
@@ -103,38 +108,61 @@ function validate(form: LeaveRequestForm): FormErrors {
   return errors;
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function UnitToggle({ value, onChange }: { value: LeaveUnit; onChange: (v: LeaveUnit) => void }) {
+function ClockIcon() {
   return (
-    <div className="flex gap-2">
-      {(["day", "hour"] as const).map((u) => (
-        <button
-          key={u}
-          type="button"
-          onClick={() => onChange(u)}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-all ${value === u
-            ? "bg-indigo-600 text-white border-indigo-600"
-            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function UnitToggle({
+  value,
+  requestType,
+  onChange,
+}: {
+  value: LeaveUnit;
+  requestType: RequestKind;
+  onChange: (requestType: RequestKind, unit: LeaveUnit) => void;
+}) {
+  const options = [
+    { key: "day", requestType: "leave" as const, unit: "day" as const, label: "ลาเป็นวัน" },
+    { key: "hour", requestType: "leave" as const, unit: "hour" as const, label: "ลาเป็นชั่วโมง" },
+    { key: "late", requestType: "late" as const, unit: "hour" as const, label: "ลาสาย" },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {options.map((option) => {
+        const selected = requestType === option.requestType && value === option.unit;
+        return (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => onChange(option.requestType, option.unit)}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-all ${
+              selected
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             }`}
-        >
-          {u === "day" ? (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              ลาเป็นวัน
-            </>
-          ) : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
-              </svg>
-              ลาเป็นชั่วโมง
-            </>
-          )}
-        </button>
-      ))}
+          >
+            {option.unit === "day" ? <CalendarIcon /> : <ClockIcon />}
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -150,20 +178,20 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
       </div>
     );
   }
+
   const hours = calcHours(form.start_time, form.end_time);
   if (!hours) return null;
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
-      <span className="text-xs text-indigo-600 font-medium">รวม</span>
+      <span className="text-xs text-indigo-600 font-medium">{form.request_type === "late" ? "ลาสาย" : "รวม"}</span>
       <span className="text-sm font-bold text-indigo-700">{hours} ชั่วโมง</span>
     </div>
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
-
 export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoading = false }: LeaveRequestModalProps) {
   const [form, setForm] = useState<LeaveRequestForm>({
+    request_type: "leave",
     leave_type_id: 0,
     leave_unit: "day",
     start_date: "",
@@ -171,21 +199,31 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
     start_time: null,
     end_time: null,
     reason: "",
+    attachments: [],
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    if (form.leave_unit === "hour" && form.start_date)
-      setForm((f) => ({ ...f, end_date: f.start_date }));
-    if (form.leave_unit === "day")
-      setForm((f) => ({ ...f, start_time: null, end_time: null }));
-  }, [form.leave_unit]);
+    if (form.leave_unit === "hour" && form.start_date) setForm((f) => ({ ...f, end_date: f.start_date }));
+    if (form.leave_unit === "day") setForm((f) => ({ ...f, request_type: "leave", start_time: null, end_time: null }));
+  }, [form.leave_unit, form.start_date]);
 
   const set = <K extends keyof LeaveRequestForm>(key: K, value: LeaveRequestForm[K]) => {
     const updated = { ...form, [key]: value };
     setForm(updated);
     if (submitted) setErrors(validate(updated));
+  };
+
+  const setRequestMode = (requestType: RequestKind, unit: LeaveUnit) => {
+    const updated = { ...form, request_type: requestType, leave_unit: unit };
+    setForm(updated);
+    if (submitted) setErrors(validate(updated));
+  };
+
+  const removeAttachment = (index: number) => {
+    const updated = { ...form, attachments: form.attachments.filter((_, i) => i !== index) };
+    setForm(updated);
   };
 
   const handleSubmit = async () => {
@@ -196,27 +234,27 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
 
     try {
       await onSubmit(form);
-      toast.success("ส่งคำขอลาสำเร็จ!");
+      toast.success(form.request_type === "late" ? "ส่งคำขอลาสายสำเร็จ!" : "ส่งคำขอลาสำเร็จ!");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
     }
   };
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const isLate = form.request_type === "late";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
 
-      {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
@@ -225,45 +263,44 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">ยื่นคำขอลา</h2>
-              <p className="text-xs text-gray-400">กรอกข้อมูลการลาให้ครบถ้วน</p>
+              <h2 className="text-base font-semibold text-gray-900">{isLate ? "ยื่นคำขอลาสาย" : "ยื่นคำขอลา"}</h2>
+              <p className="text-xs text-gray-400">{isLate ? "กรอกข้อมูลการมาสายให้ครบถ้วน" : "กรอกข้อมูลการลาให้ครบถ้วน"}</p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-xl"
           >
-            ×
+            x
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto px-6 py-5 space-y-5 flex-1">
-
-          {/* รูปแบบการลา */}
           <div>
-            <label className={LABEL_CLASS}>รูปแบบการลา</label>
-            <UnitToggle value={form.leave_unit} onChange={(v) => set("leave_unit", v)} />
+            <label className={LABEL_CLASS}>รูปแบบคำขอ</label>
+            <UnitToggle value={form.leave_unit} requestType={form.request_type} onChange={setRequestMode} />
           </div>
 
-          {/* ประเภทการลา */}
           <div>
-            <label className={LABEL_CLASS}>ประเภทการลา <span className="text-red-400">*</span></label>
+            <label className={LABEL_CLASS}>
+              {isLate ? "ประเภทที่ใช้บันทึก" : "ประเภทการลา"} <span className="text-red-400">*</span>
+            </label>
             <div className="grid grid-cols-2 gap-2">
               {leaveTypes.map((t) => {
-                const bal = pool?.balances?.find(b => b.leave_type_id === t.id);
+                const bal = pool?.balances?.find((b) => b.leave_type_id === t.id);
                 const remaining = bal ? bal.remaining : 0;
                 const isSelected = form.leave_type_id === t.id;
-                
+
                 return (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => set("leave_type_id", t.id)}
-                    className={`flex flex-col items-start px-4 py-3 rounded-2xl text-xs font-medium border transition-all ${isSelected
-                      ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
-                      : "bg-white text-gray-600 border-gray-100 hover:border-indigo-200 hover:bg-slate-50"
-                      }`}
+                    className={`flex flex-col items-start px-4 py-3 rounded-2xl text-xs font-medium border transition-all ${
+                      isSelected
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-100"
+                        : "bg-white text-gray-600 border-gray-100 hover:border-indigo-200 hover:bg-slate-50"
+                    }`}
                   >
                     <span className="text-sm mb-1">{t.name}</span>
                     <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
@@ -276,7 +313,6 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
             {errors.leave_type_id && <p className={ERROR_CLASS}>{errors.leave_type_id}</p>}
           </div>
 
-          {/* วันที่ */}
           {form.leave_unit === "day" ? (
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -304,7 +340,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
           ) : (
             <div className="space-y-4">
               <div>
-                <label className={LABEL_CLASS}>วันที่ลา <span className="text-red-400">*</span></label>
+                <label className={LABEL_CLASS}>{isLate ? "วันที่ลาสาย" : "วันที่ลา"} <span className="text-red-400">*</span></label>
                 <input
                   type="date"
                   className={`${INPUT_CLASS} ${errors.start_date ? "border-red-300 focus:ring-red-200" : ""}`}
@@ -316,7 +352,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
               <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={LABEL_CLASS}>เวลาเริ่ม <span className="text-red-400">*</span></label>
+                    <label className={LABEL_CLASS}>{isLate ? "เวลาเริ่มงานปกติ" : "เวลาเริ่ม"} <span className="text-red-400">*</span></label>
                     <TimeField
                       value={form.start_time}
                       onChange={(v) => set("start_time", v)}
@@ -342,7 +378,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                     {errors.start_time && <p className={ERROR_CLASS}>{errors.start_time}</p>}
                   </div>
                   <div>
-                    <label className={LABEL_CLASS}>เวลาสิ้นสุด <span className="text-red-400">*</span></label>
+                    <label className={LABEL_CLASS}>{isLate ? "เวลาเข้างานจริง" : "เวลาสิ้นสุด"} <span className="text-red-400">*</span></label>
                     <TimeField
                       value={form.end_time}
                       onChange={(v) => set("end_time", v)}
@@ -372,24 +408,65 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
             </div>
           )}
 
-          {/* Summary pill */}
           <SummaryPill form={form} />
 
-          {/* เหตุผล */}
           <div>
-            <label className={LABEL_CLASS}>เหตุผลการลา <span className="text-red-400">*</span></label>
+            <label className={LABEL_CLASS}>{isLate ? "เหตุผลการลาสาย" : "เหตุผลการลา"} <span className="text-red-400">*</span></label>
             <textarea
               className={`${INPUT_CLASS} resize-none`}
               rows={3}
-              placeholder="ระบุเหตุผลการลา..."
+              placeholder={isLate ? "ระบุเหตุผลการลาสาย..." : "ระบุเหตุผลการลา..."}
               value={form.reason}
               onChange={(e) => set("reason", e.target.value)}
             />
             {errors.reason && <p className={ERROR_CLASS}>{errors.reason}</p>}
           </div>
+
+          <div>
+            <label className={LABEL_CLASS}>ไฟล์แนบประกอบเหตุผล</label>
+            <label className="flex flex-col items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl px-4 py-4 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 cursor-pointer transition-colors">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+              <span>เลือกไฟล์แนบ</span>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const selected = Array.from(e.target.files ?? []);
+                  const allowed = selected.filter(isAllowedAttachment);
+                  if (allowed.length !== selected.length) {
+                    toast.error("แนบได้เฉพาะไฟล์รูปภาพหรือ PDF");
+                  }
+                  set("attachments", [...form.attachments, ...allowed]);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {form.attachments.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {form.attachments.map((file, index) => (
+                  <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-gray-700">{file.name}</p>
+                      <p className="text-gray-400">{formatFileSize(file.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(index)}
+                      className="flex-shrink-0 text-gray-400 hover:text-red-500"
+                    >
+                      ลบ
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end flex-shrink-0">
           <button
             onClick={onClose}
@@ -415,7 +492,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M5 12l5 5L20 7" />
                 </svg>
-                ส่งคำขอลา
+                {isLate ? "ส่งคำขอลาสาย" : "ส่งคำขอลา"}
               </>
             )}
           </button>
