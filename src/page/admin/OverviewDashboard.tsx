@@ -93,6 +93,9 @@ export default function OverviewDashboard() {
 
     // ---- Role Update State (NEW) ----
     const [roleUpdatingId, setRoleUpdatingId] = useState<number | null>(null);
+    const [resetPasswordTarget, setResetPasswordTarget] = useState<EmployeeWithBalance | null>(null);
+    const [resetPasswordForm, setResetPasswordForm] = useState({ password: "", confirm: "" });
+    const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
     // ---- Departments State (NEW) ----
     const [departments, setDepartments] = useState<{id: number, name: string}[]>([]);
@@ -355,6 +358,37 @@ export default function OverviewDashboard() {
         }
     };
 
+    const openResetPasswordModal = (employee: EmployeeWithBalance) => {
+        setResetPasswordTarget(employee);
+        setResetPasswordForm({ password: "", confirm: "" });
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetPasswordTarget) return;
+        if (resetPasswordForm.password.length < 6) {
+            toast.error("รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร");
+            return;
+        }
+        if (resetPasswordForm.password !== resetPasswordForm.confirm) {
+            toast.error("รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน");
+            return;
+        }
+
+        try {
+            setResetPasswordLoading(true);
+            await api.patch(`/api/super-admin/users/${resetPasswordTarget.id}/password`, {
+                password: resetPasswordForm.password,
+            });
+            toast.success("Reset password เรียบร้อย");
+            setResetPasswordTarget(null);
+            setResetPasswordForm({ password: "", confirm: "" });
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "Reset password ไม่สำเร็จ");
+        } finally {
+            setResetPasswordLoading(false);
+        }
+    };
+
     // NEW: Save Department
     const handleSaveDepartment = async () => {
         if (!deptForm.name) return toast.error("กรุณาระบุชื่อแผนก");
@@ -511,6 +545,63 @@ export default function OverviewDashboard() {
                     onClose={() => setShowCreateModal(false)}
                     loading={createLoading}
                 />
+            )}
+            {resetPasswordTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setResetPasswordTarget(null)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M15 7a2 2 0 1 1 2 2m4-2a6 6 0 0 1-8.9 5.2L3 21l-2-2 8.8-9.1A6 6 0 1 1 21 7Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">Reset password</h3>
+                                <p className="text-xs text-gray-400">{resetPasswordTarget.full_name} · {resetPasswordTarget.employee_code}</p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">รหัสผ่านใหม่ *</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    type="password"
+                                    value={resetPasswordForm.password}
+                                    onChange={(e) => setResetPasswordForm((form) => ({ ...form, password: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">ยืนยันรหัสผ่าน *</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    type="password"
+                                    value={resetPasswordForm.confirm}
+                                    onChange={(e) => setResetPasswordForm((form) => ({ ...form, confirm: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleResetPassword();
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 pb-6 flex gap-3 justify-end">
+                            <button
+                                onClick={() => setResetPasswordTarget(null)}
+                                disabled={resetPasswordLoading}
+                                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleResetPassword}
+                                disabled={resetPasswordLoading || !resetPasswordForm.password || !resetPasswordForm.confirm}
+                                className="px-4 py-2.5 text-sm bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {resetPasswordLoading ? "กำลังบันทึก..." : "Reset password"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {showDeptModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1054,6 +1145,15 @@ export default function OverviewDashboard() {
                                                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
                                                                     className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">
                                                                     เพิ่มวันลา
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => openResetPasswordModal(emp)}
+                                                                    className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                                                    title="Reset password"
+                                                                >
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M15 7a2 2 0 1 1 2 2m4-2a6 6 0 0 1-8.9 5.2L3 21l-2-2 8.8-9.1A6 6 0 1 1 21 7Z" />
+                                                                    </svg>
                                                                 </button>
                                                                 <button
                                                                     onClick={() => handleDeleteUser(emp.id)}

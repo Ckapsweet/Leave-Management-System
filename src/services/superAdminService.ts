@@ -8,7 +8,7 @@ export type AuditAction =
   | "leave.approve" | "leave.reject"
   | "balance.update"
   | "user.create" | "user.update"
-  | "user.delete" | "user.role_change"
+  | "user.delete" | "user.role_change" | "user.password_reset"
   | "auth.login" | "auth.logout" | "auth.login_failed";
 
 export interface AuditLog {

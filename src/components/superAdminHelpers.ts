@@ -12,6 +12,7 @@ export const ACTION_META: Record<string, { label: string; color: string; bg: str
   "user.create": { label: "สร้าง user", color: "text-teal-700", bg: "bg-teal-50 border-teal-200", icon: "👤" },
   "user.delete": { label: "ลบ user", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: "🗑" },
   "user.role_change": { label: "เปลี่ยน role", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: "⚑" },
+  "user.password_reset": { label: "Reset password", color: "text-slate-700", bg: "bg-slate-50 border-slate-200", icon: "⌁" },
   "auth.login": { label: "เข้าสู่ระบบ", color: "text-slate-600", bg: "bg-slate-50 border-slate-200", icon: "→" },
   "auth.logout": { label: "ออกจากระบบ", color: "text-slate-600", bg: "bg-slate-50 border-slate-200", icon: "←" },
   "auth.login_failed": { label: "Login ล้มเหลว", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: "!" },
