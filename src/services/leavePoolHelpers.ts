@@ -1,4 +1,5 @@
 import type { LeavePool, LeaveRequest } from "./leaveService";
+import { leaveHoursToDays } from "./leaveTime";
 
 function toNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -6,7 +7,7 @@ function toNumber(value: number | string | null | undefined) {
 }
 
 export function getLeaveUsageDays(request: LeaveRequest) {
-  if (request.leave_unit === "hour") return toNumber(request.total_hours) / 8;
+  if (request.leave_unit === "hour") return leaveHoursToDays(request.total_hours);
   return toNumber(request.total_days);
 }
 

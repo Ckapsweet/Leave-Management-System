@@ -5,6 +5,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
 import { toast } from "./Toast";
 import type { LeavePool } from "../services/leaveService";
+import { calculateLeaveHours } from "../services/leaveTime";
 
 type LeaveUnit = "day" | "hour";
 type RequestKind = "leave" | "late";
@@ -55,9 +56,7 @@ function calcDays(from: string, to: string): number {
 }
 
 function calcHours(startTime: Dayjs | null, endTime: Dayjs | null): number {
-  if (!startTime || !endTime) return 0;
-  const diff = endTime.diff(startTime, "minute");
-  return Math.max(0, Math.round((diff / 60) * 10) / 10);
+  return calculateLeaveHours(startTime, endTime);
 }
 
 function isWeekend(dateStr: string): boolean {

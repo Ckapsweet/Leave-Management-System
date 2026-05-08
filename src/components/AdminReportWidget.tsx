@@ -1,4 +1,5 @@
 import type { LeaveRequest } from "../services/leaveService";
+import { leaveHoursToDays } from "../services/leaveTime";
 import type { Employee, EmployeeWithBalance } from "./adminHelpers";
 
 function toNumber(value: number | string | null | undefined) {
@@ -7,7 +8,7 @@ function toNumber(value: number | string | null | undefined) {
 }
 
 function getLeaveDays(request: LeaveRequest) {
-  if (request.leave_unit === "hour") return toNumber(request.total_hours) / 8;
+  if (request.leave_unit === "hour") return leaveHoursToDays(request.total_hours);
   return toNumber(request.total_days);
 }
 
