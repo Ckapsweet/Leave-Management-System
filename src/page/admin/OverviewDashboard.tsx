@@ -1521,7 +1521,7 @@ export default function OverviewDashboard() {
                                     <table className="w-full">
                                         <thead>
                                             <tr className="bg-slate-50 border-b border-gray-100 text-left">
-                                                {["เวลา", "Action", "ผู้กระทำ", "เป้าหมาย", "หมายเหตุ", "IP"].map((h) => (
+                                                {["เวลา", "Action", "ผู้กระทำ", "เป้าหมาย", "หมายเหตุ"].map((h) => (
                                                     <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 whitespace-nowrap">{h}</th>
                                                 ))}
                                             </tr>
@@ -1545,8 +1545,7 @@ export default function OverviewDashboard() {
                                                         <td className="px-5 py-4 text-xs font-mono text-gray-600 whitespace-nowrap">
                                                             {log.target_type ? `${log.target_type} #${log.target_id ?? "-"}` : "-"}
                                                         </td>
-                                                        <td className="px-5 py-4 text-sm text-gray-500 max-w-[260px] truncate">{log.note ?? "-"}</td>
-                                                        <td className="px-5 py-4 text-xs font-mono text-gray-500 whitespace-nowrap">{log.ip_address ?? "-"}</td>
+                                                        <td className="px-5 py-4 text-sm text-gray-500 max-w-[320px] truncate">{log.note ?? "-"}</td>
                                                     </tr>
                                                 );
                                             })}
