@@ -12,9 +12,23 @@ function formatAttachmentSize(size: number | string | null | undefined) {
 }
 
 function resolveAttachmentUrl(url: string) {
-  if (/^https?:\/\//i.test(url) || url.startsWith("/")) return url;
-  const base = import.meta.env.VITE_API_URL ?? "";
-  return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+  const normalizedUrl = url.replace(/\\/g, "/");
+  if (/^https?:\/\//i.test(normalizedUrl) || /^data:/i.test(normalizedUrl) || /^blob:/i.test(normalizedUrl)) return normalizedUrl;
+
+  const base = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+  const withBase = (path: string) => (base ? `${base}${path}` : path);
+  const cleanPath = normalizedUrl.replace(/^\/+/, "");
+
+  if (cleanPath.includes("uploads/")) {
+    return withBase(`/${cleanPath.slice(cleanPath.indexOf("uploads/"))}`);
+  }
+
+  if (cleanPath.includes("leave-attachments/")) {
+    return withBase(`/uploads/${cleanPath.slice(cleanPath.indexOf("leave-attachments/"))}`);
+  }
+
+  const filename = cleanPath.split("/").filter(Boolean).pop() ?? cleanPath;
+  return withBase(`/uploads/leave-attachments/${filename}`);
 }
 
 function decodeMojibakeName(name: string) {
