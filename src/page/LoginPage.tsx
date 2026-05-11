@@ -4,6 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { login } from "../services/authService";
 import Footer from "../components/Footer";
 
+function roleToPath(role: string): string {
+  if (role === "lead") return "/lead";
+  if (role === "assistant manager") return "/manager";
+  if (role === "manager") return "/manager";
+  if (role === "admin") return "/admin-reports";
+  return "/dashboard";
+}
+
 export default function LoginPage() {
   const [employeeCode, setEmployeeCode] = useState("");
   const [password, setPassword] = useState("");
@@ -20,7 +28,7 @@ export default function LoginPage() {
 
       localStorage.setItem("role", user.role);
       localStorage.setItem("user", JSON.stringify(user));
-      navigate("/select-system", { replace: true });
+      navigate(roleToPath(user.role), { replace: true });
 
     } catch (err: any) {
       setError(err.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");

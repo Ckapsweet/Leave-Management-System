@@ -1,6 +1,7 @@
 // components/EmployeeLeaveDrawer.tsx
 import { useState } from "react";
 import type { LeaveRequest, LeaveStatus } from "../services/leaveService";
+import { formatLeaveHours } from "../services/leaveTime";
 import type { EmployeeWithBalance } from "./adminHelpers";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
@@ -178,7 +179,7 @@ export function EmployeeLeaveDrawer({
                     <div className="flex justify-between">
                       <span className="text-gray-400">จำนวน</span>
                       <span className="font-semibold text-gray-700">
-                        {isHourly ? `${req.total_hours} ชั่วโมง` : `${req.total_days} วัน`}
+                        {isHourly ? formatLeaveHours(req.total_hours) : `${req.total_days} วัน`}
                       </span>
                     </div>
                     {req.reason && (

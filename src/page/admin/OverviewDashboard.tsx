@@ -23,6 +23,7 @@ import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { CreateUserModal } from "../../components/CreateUserModal";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
+import { formatLeaveHours } from "../../services/leaveTime";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
 
@@ -841,7 +842,7 @@ export default function OverviewDashboard() {
                                                             {isHourly && r.start_time && <p className="text-xs text-gray-400">{r.start_time} – {r.end_time} น.</p>}
                                                         </td>
                                                         <td className="px-5 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                                                            {isHourly ? `${r.total_hours} ชม.` : `${r.total_days} วัน`}
+                                                            {isHourly ? formatLeaveHours(r.total_hours) : `${r.total_days} วัน`}
                                                         </td>
                                                         <td className="px-5 py-4 text-sm text-gray-500 max-w-[160px] truncate">{r.reason}</td>
                                                         <td className="px-5 py-4">

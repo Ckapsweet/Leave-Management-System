@@ -13,6 +13,7 @@ import { EditProfileModal } from "../components/EditProfileModal";
 import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
+import { formatLeaveHours } from "../services/leaveTime";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
         </svg>
-        {req.total_hours} ชม.
+        {formatLeaveHours(req.total_hours)}
       </span>
     );
   }
@@ -231,7 +232,7 @@ function DetailDrawer({
             <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
               <span className="text-gray-500 text-sm">รวมทั้งหมด</span>
               {isHourly
-                ? <span className="font-bold text-indigo-700 text-base">{req.total_hours} ชั่วโมง</span>
+                ? <span className="font-bold text-indigo-700 text-base">{formatLeaveHours(req.total_hours)}</span>
                 : <span className="font-bold text-gray-900 text-base">{req.total_days} วัน</span>}
             </div>
           </div>

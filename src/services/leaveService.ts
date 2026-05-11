@@ -2,7 +2,7 @@
 import api from "./api";
 import type { Dayjs } from "dayjs";
 import type { UserRole } from "./superAdminService";
-import { calculateLeaveHours } from "./leaveTime";
+import { calculateLateLeaveHours, calculateLeaveHours } from "./leaveTime";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -140,7 +140,9 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
 
   // คำนวณ total_hours จาก Dayjs start_time/end_time
   const total_hours = isHour && payload.start_time && payload.end_time
-    ? calculateLeaveHours(payload.start_time, payload.end_time)
+    ? request_type === "late"
+      ? calculateLateLeaveHours(payload.start_time, payload.end_time)
+      : calculateLeaveHours(payload.start_time, payload.end_time)
     : null;
 
   // คำนวณ total_days จาก string start_date/end_date
