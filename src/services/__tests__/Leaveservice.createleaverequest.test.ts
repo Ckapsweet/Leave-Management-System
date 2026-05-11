@@ -65,6 +65,14 @@ const hourPayload: LeaveRequestPayload = {
   reason:        "นัดแพทย์",
 };
 
+const latePayload: LeaveRequestPayload = {
+  ...hourPayload,
+  request_type: "late",
+  start_time: dayjs("2026-03-01 08:00"),
+  end_time: dayjs("2026-03-01 08:22"),
+  reason: "รถติด",
+};
+
 // ── Tests ─────────────────────────────────────────────────────
 
 describe("createLeaveRequest — ลาเป็นวัน", () => {
@@ -164,6 +172,32 @@ describe("createLeaveRequest — ลาเป็นชั่วโมง", () =>
   it("ส่ง end_date = start_date เสมอ (ลาชั่วโมงอยู่วันเดียว)", async () => {
     await createLeaveRequest({ ...hourPayload, start_date: "2026-03-01", end_date: "2026-03-05" });
     expect(lastCallBody().end_date).toBe("2026-03-01");
+  });
+
+  it("ปัด total_hours ขึ้นเป็นครึ่งชั่วโมง", async () => {
+    await createLeaveRequest({
+      ...hourPayload,
+      start_time: dayjs("2026-03-01 08:00"),
+      end_time: dayjs("2026-03-01 08:22"),
+    });
+    expect(lastCallBody().total_hours).toBe(0.5);
+  });
+});
+
+describe("createLeaveRequest — ลาสาย", () => {
+  beforeEach(() => {
+    mockPost.mockClear();
+    mockPost.mockResolvedValue({
+      data: { ...mockLeaveRequest, leave_unit: "hour", request_type: "late", total_hours: 0.5, total_days: 0 },
+    });
+  });
+
+  it("ปัด total_hours ขึ้นเป็นครึ่งชั่วโมง", async () => {
+    await createLeaveRequest(latePayload);
+    expect(lastCallBody().request_type).toBe("late");
+    expect(lastCallBody().total_hours).toBe(0.5);
+    expect(lastCallBody().start_time).toBe("08:00");
+    expect(lastCallBody().end_time).toBe("08:22");
   });
 });
 

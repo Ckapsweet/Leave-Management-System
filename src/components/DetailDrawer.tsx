@@ -1,5 +1,7 @@
 // components/DetailDrawer.tsx
+import { useState } from "react";
 import type { LeaveAttachment, LeaveRequest } from "../services/leaveService";
+import { formatLeaveHours } from "../services/leaveTime";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
 function formatAttachmentSize(size: number | string | null | undefined) {
@@ -41,10 +43,18 @@ function getAttachments(req: LeaveRequest) {
         id: file.id ?? `${url}-${index}`,
         name: decodeMojibakeName(file.original_name ?? file.file_name ?? file.filename ?? file.name ?? `ไฟล์แนบ ${index + 1}`),
         url: url ? resolveAttachmentUrl(url) : "",
+        mimeType: file.mime_type ?? "",
         size: formatAttachmentSize(file.size),
       };
     })
     .filter((file) => file.url);
+}
+
+function isImageAttachment(file: { name: string; url: string; mimeType?: string }) {
+  if (file.mimeType?.startsWith("image/")) return true;
+  const cleanUrl = file.url.split("?")[0].toLowerCase();
+  const cleanName = file.name.toLowerCase();
+  return /\.(apng|avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(cleanUrl) || /\.(apng|avif|bmp|gif|jpe?g|png|svg|webp)$/i.test(cleanName);
 }
 
 interface DetailDrawerProps {
@@ -61,6 +71,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
   const isHourly = req.leave_unit === "hour";
   const ac = avatarColor(req.user?.department);
   const attachments = getAttachments(req);
+  const [previewImage, setPreviewImage] = useState<{ name: string; url: string } | null>(null);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -139,7 +150,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             <div className="border-t border-gray-200 pt-3 flex justify-between">
               <span className="text-gray-500">รวม</span>
               <span className="font-bold text-gray-900">
-                {isHourly ? `${req.total_hours} ชั่วโมง` : `${req.total_days} วัน`}
+                {isHourly ? formatLeaveHours(req.total_hours) : `${req.total_days} วัน`}
               </span>
             </div>
           </div>
@@ -154,23 +165,41 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             <div>
               <p className="text-xs font-medium text-gray-400 mb-2">ไฟล์แนบ</p>
               <div className="space-y-2">
-                {attachments.map((file) => (
-                  <a
-                    key={file.id}
-                    href={file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm hover:bg-slate-100 transition-colors"
-                  >
-                    <span className="flex items-center gap-2 min-w-0">
-                      <svg className="flex-shrink-0 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                      </svg>
-                      <span className="truncate font-medium text-gray-700">{file.name}</span>
-                    </span>
-                    <span className="flex-shrink-0 text-xs text-gray-400">{file.size || "เปิดดู"}</span>
-                  </a>
-                ))}
+                {attachments.map((file) => {
+                  const image = isImageAttachment(file);
+                  const content = (
+                    <>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <svg className="flex-shrink-0 text-gray-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        <span className="truncate font-medium text-gray-700">{file.name}</span>
+                      </span>
+                      <span className="flex-shrink-0 text-xs text-gray-400">{file.size || "เปิดดู"}</span>
+                    </>
+                  );
+
+                  return image ? (
+                    <button
+                      key={file.id}
+                      type="button"
+                      onClick={() => setPreviewImage({ name: file.name, url: file.url })}
+                      className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-left text-sm hover:bg-slate-100 transition-colors"
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <a
+                      key={file.id}
+                      href={file.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm hover:bg-slate-100 transition-colors"
+                    >
+                      {content}
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -209,6 +238,31 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={() => setPreviewImage(null)}>
+          <div className="relative flex max-h-full max-w-full flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 shadow-lg">
+              <p className="min-w-0 truncate text-sm font-medium text-gray-800">{previewImage.name}</p>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="ปิดรูปภาพ"
+              >
+                x
+              </button>
+            </div>
+            <div className="flex max-h-[calc(100vh-7rem)] max-w-[calc(100vw-2rem)] items-center justify-center overflow-hidden rounded-xl bg-white shadow-2xl">
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="block max-h-[calc(100vh-7rem)] max-w-[calc(100vw-2rem)] object-contain"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

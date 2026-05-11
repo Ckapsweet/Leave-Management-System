@@ -14,6 +14,7 @@ import type { Employee } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
+import { formatLeaveHours } from "../../services/leaveTime";
 import {
   useAdminAuthUser,
   useAdminEmployees,
@@ -426,7 +427,7 @@ export default function AdminDashboard() {
                               {isHourly && r.start_time && <p className="text-xs text-gray-400">{r.start_time} – {r.end_time} น.</p>}
                             </td>
                             <td className="px-5 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                              {isHourly ? `${r.total_hours} ชม.` : `${r.total_days} วัน`}
+                              {isHourly ? formatLeaveHours(r.total_hours) : `${r.total_days} วัน`}
                             </td>
                             <td className="px-5 py-4 text-sm text-gray-500 max-w-[160px] truncate">{r.reason}</td>
                             <td className="px-5 py-4">

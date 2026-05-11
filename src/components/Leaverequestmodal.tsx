@@ -5,7 +5,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
 import { toast } from "./Toast";
 import type { LeavePool } from "../services/leaveService";
-import { calculateLeaveHours } from "../services/leaveTime";
+import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours } from "../services/leaveTime";
 
 type LeaveUnit = "day" | "hour";
 type RequestKind = "leave" | "late";
@@ -55,8 +55,10 @@ function calcDays(from: string, to: string): number {
   return Math.max(0, Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000) + 1);
 }
 
-function calcHours(startTime: Dayjs | null, endTime: Dayjs | null): number {
-  return calculateLeaveHours(startTime, endTime);
+function calcHours(form: LeaveRequestForm): number {
+  return form.request_type === "late"
+    ? calculateLateLeaveHours(form.start_time, form.end_time)
+    : calculateLeaveHours(form.start_time, form.end_time);
 }
 
 function isWeekend(dateStr: string): boolean {
@@ -178,12 +180,12 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
     );
   }
 
-  const hours = calcHours(form.start_time, form.end_time);
+  const hours = calcHours(form);
   if (!hours) return null;
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
       <span className="text-xs text-indigo-600 font-medium">{form.request_type === "late" ? "ลาสาย" : "รวม"}</span>
-      <span className="text-sm font-bold text-indigo-700">{hours} ชั่วโมง</span>
+      <span className="text-sm font-bold text-indigo-700">{formatLeaveHours(hours)}</span>
     </div>
   );
 }

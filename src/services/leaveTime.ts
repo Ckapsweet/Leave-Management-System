@@ -4,6 +4,7 @@ export const WORK_HOURS_PER_DAY = 7.5;
 
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
+const HOURLY_ROUNDING_MINUTES = 30;
 
 function round(value: number, digits = 2) {
   const factor = 10 ** digits;
@@ -31,6 +32,16 @@ function calculateMinutes(startMinute: number | null, endMinute: number | null) 
   return Math.max(0, endMinute - startMinute - lunchOverlap);
 }
 
+function roundMinutesUp(minutes: number, interval: number) {
+  if (minutes <= 0) return 0;
+  return Math.ceil(minutes / interval) * interval;
+}
+
+function calculateRoundedHours(startMinute: number | null, endMinute: number | null) {
+  const minutes = calculateMinutes(startMinute, endMinute);
+  return round(roundMinutesUp(minutes, HOURLY_ROUNDING_MINUTES) / 60, 1);
+}
+
 export function calculateLeaveHours(startTime: Dayjs | null, endTime: Dayjs | null): number;
 export function calculateLeaveHours(startTime: string | null | undefined, endTime: string | null | undefined): number;
 export function calculateLeaveHours(
@@ -40,14 +51,48 @@ export function calculateLeaveHours(
   if (!startTime || !endTime) return 0;
 
   if (typeof startTime === "string" && typeof endTime === "string") {
-    return round(calculateMinutes(timeToMinutes(startTime), timeToMinutes(endTime)) / 60, 1);
+    return calculateRoundedHours(timeToMinutes(startTime), timeToMinutes(endTime));
   }
 
   if (typeof startTime !== "string" && typeof endTime !== "string" && startTime.isValid() && endTime.isValid()) {
-    return round(calculateMinutes(dayjsToMinutes(startTime), dayjsToMinutes(endTime)) / 60, 1);
+    return calculateRoundedHours(dayjsToMinutes(startTime), dayjsToMinutes(endTime));
   }
 
   return 0;
+}
+
+export function calculateLateLeaveHours(startTime: Dayjs | null, endTime: Dayjs | null): number;
+export function calculateLateLeaveHours(startTime: string | null | undefined, endTime: string | null | undefined): number;
+export function calculateLateLeaveHours(
+  startTime: Dayjs | string | null | undefined,
+  endTime: Dayjs | string | null | undefined
+): number {
+  if (!startTime || !endTime) return 0;
+
+  if (typeof startTime === "string" && typeof endTime === "string") {
+    return calculateLeaveHours(startTime, endTime);
+  }
+
+  if (typeof startTime !== "string" && typeof endTime !== "string") {
+    return calculateLeaveHours(startTime, endTime);
+  }
+
+  return 0;
+}
+
+export function formatLeaveHours(hours: number | string | null | undefined): string {
+  const parsed = Number(hours ?? 0);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "0 นาที";
+
+  const totalMinutes = Math.round(parsed * 60);
+  const hourPart = Math.floor(totalMinutes / 60);
+  const minutePart = totalMinutes % 60;
+  const parts: string[] = [];
+
+  if (hourPart > 0) parts.push(`${hourPart} ชั่วโมง`);
+  if (minutePart > 0) parts.push(`${minutePart} นาที`);
+
+  return parts.join(" ") || "0 นาที";
 }
 
 export function leaveHoursToDays(hours: number | string | null | undefined): number {

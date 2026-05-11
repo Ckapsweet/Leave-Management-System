@@ -1,6 +1,7 @@
 // components/ConfirmModal.tsx
 import { useState } from "react";
 import type { LeaveRequest } from "../services/leaveService";
+import { formatLeaveHours } from "../services/leaveTime";
 import { fmtDate } from "./adminHelpers";
 
 interface ConfirmModalProps {
@@ -51,7 +52,7 @@ export function ConfirmModal({ type, request, onConfirm, onClose, loading }: Con
               <span className="text-gray-500">จำนวน</span>
               <span className="font-medium">
                 {request.leave_unit === "hour"
-                  ? `${request.total_hours} ชั่วโมง`
+                  ? formatLeaveHours(request.total_hours)
                   : `${request.total_days} วัน`}
               </span>
             </div>
