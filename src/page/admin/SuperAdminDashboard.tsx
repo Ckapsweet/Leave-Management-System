@@ -1,223 +1,144 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { logout } from "../../services/authService";
+import { useCallback, useEffect, useState } from "react";
 import api from "../../services/api";
-import {
-  getAdminLeaveRequests, approveLeaveRequest, rejectLeaveRequest,
-  getAdminUserPool, updateLeavePool,
-} from "../../services/leaveService";
-import type { LeaveRequest, LeaveStatus, LeavePool } from "../../services/leaveService";
+import type { LeaveStatus } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
-import { ToastContainer, toast } from "../../components/Toast";
+import { ToastContainer } from "../../components/Toast";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { EditProfileModal } from "../../components/EditProfileModal";
-import type { AuthUser } from "../../services/authService";
 import {
   STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
-  type Employee, type EmployeeWithBalance,
 } from "../../components/adminHelpers";
+import type { Employee } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
+import {
+  useAdminAuthUser,
+  useAdminEmployees,
+  useAdminLeaveRequests,
+} from "./adminDashboardHooks";
+
+function normalizeDepartment(value?: string | null) {
+  return (value ?? "").trim();
+}
 
 
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();
-
-  // ── Leave requests state ───────────────────────────────────────────────────
-  const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
-  const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"all" | "yearly" | "monthly">("all");
-  const [selYear, setSelYear] = useState<number>(new Date().getFullYear());
-  const [selMonth, setSelMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selected, setSelected] = useState<LeaveRequest | null>(null);
-  const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
-
-  // ── Employees state ────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "reports">("requests");
-  const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
-  const [empLoading, setEmpLoading] = useState(false);
-  const [empSearch, setEmpSearch] = useState("");
-  const [empDeptFilter, setEmpDeptFilter] = useState("all");
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithBalance | null>(null);
-  const [empLeaveRequests, setEmpLeaveRequests] = useState<LeaveRequest[]>([]);
-  const [empLeaveLoading, setEmpLeaveLoading] = useState(false);
-
-  // ── Balance modal state ────────────────────────────────────────────────────
-  const [balanceModal, setBalanceModal] = useState<{
-    user: { id: number; full_name: string; employee_code: string; department: string };
-    pool: LeavePool;
-  } | null>(null);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  useEffect(() => {
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "reports">(() => {
     const stored = localStorage.getItem("user");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setUser(parsed);
-      if (parsed.role === "admin") {
-        setActiveTab("reports");
-      }
+    if (!stored) return "requests";
+    try {
+      return JSON.parse(stored)?.role === "admin" ? "reports" : "requests";
+    } catch {
+      return "requests";
     }
-  }, []);
-
+  });
+  const [reportTeamUsers, setReportTeamUsers] = useState<Employee[]>([]);
+  const [reportTeamLoading, setReportTeamLoading] = useState(false);
   const year = new Date().getFullYear();
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
+  const {
+    user,
+    showEditProfile,
+    setShowEditProfile,
+    updateUser,
+    handleLogout,
+    navigate,
+  } = useAdminAuthUser();
 
-  const fetchRequests = useCallback(async () => {
+  const {
+    requests,
+    loading,
+    actionLoading,
+    error,
+    statusFilter,
+    setStatusFilter,
+    search,
+    setSearch,
+    viewMode,
+    setViewMode,
+    selYear,
+    setSelYear,
+    selMonth,
+    setSelMonth,
+    selected,
+    setSelected,
+    confirm,
+    setConfirm,
+    fetchRequests,
+    handleAction,
+    filtered,
+    pending,
+    approved,
+    rejected,
+  } = useAdminLeaveRequests();
+
+  const {
+    employees,
+    empLoading,
+    empSearch,
+    setEmpSearch,
+    empDeptFilter,
+    setEmpDeptFilter,
+    selectedEmployee,
+    setSelectedEmployee,
+    empLeaveRequests,
+    setEmpLeaveRequests,
+    empLeaveLoading,
+    balanceModal,
+    setBalanceModal,
+    fetchEmployees,
+    openBalanceModal,
+    handleUpdateBalance,
+    handleEmployeeClick,
+    filteredEmployees,
+  } = useAdminEmployees({
+    year,
+    user,
+    requests,
+    filterToSupervisor:
+      user?.role === "lead" ||
+      user?.role === "assistant manager",
+    departmentScope: user?.role === "manager" ? user.department : null,
+  });
+  const canEditEmployeeBalance = user?.role === "admin";
+
+  const fetchReportTeamUsers = useCallback(async () => {
     try {
-      setLoading(true);
-      const data = await getAdminLeaveRequests();
-      setRequests(data);
-    } catch (err: any) {
-      setError(err.response?.data?.message || "โหลดข้อมูลไม่สำเร็จ");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchRequests(); }, [fetchRequests]);
-
-  const fetchEmployees = useCallback(async () => {
-    try {
-      setEmpLoading(true);
-      const usersRes = await api.get("/api/admin/users");
-      let users: Employee[] = usersRes.data.filter((u: Employee) => u.role !== "admin");
-
-      // Lead/Manager/Assistant Manager: แสดงเฉพาะทีมของตัวเอง (supervisor_id === user.id)
-      // admin, hr: ไม่ filter (เห็นทุกคน)
-      if (user?.role === "lead" || user?.role === "manager" || user?.role === "assistant manager") {
-        users = users.filter((u: Employee) => u.supervisor_id === user.id);
+      setReportTeamLoading(true);
+      const res = await api.get<Employee[]>("/api/admin/users");
+      const users = res.data.filter((employee) => employee.role !== "admin");
+      if (user?.role !== "manager") {
+        setReportTeamUsers(users);
+        return;
       }
-      const withPool = await Promise.all(
-        users.map(async (u) => {
-          try {
-            const res = await api.get(`/api/admin/leave-pool/${u.id}`, { params: { year } });
-            return { ...u, pool: res.data };
-          } catch {
-            return { ...u, pool: null };
-          }
-        })
+
+      const directSubordinateIds = new Set(
+        users.filter((employee) => employee.supervisor_id === user.id).map((employee) => employee.id)
       );
-      setEmployees(withPool);
-    } catch (err: any) {
-      console.error("fetch employees failed", err);
+      setReportTeamUsers(
+        users.filter(
+          (employee) =>
+            employee.id === user.id ||
+            employee.supervisor_id === user.id ||
+            (employee.supervisor_id != null && directSubordinateIds.has(employee.supervisor_id))
+        )
+      );
+    } catch (err) {
+      console.error("fetch report team users failed", err);
+      setReportTeamUsers([]);
     } finally {
-      setEmpLoading(false);
+      setReportTeamLoading(false);
     }
-  }, [year, user]);
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (activeTab === "employees" || activeTab === "reports") fetchEmployees();
-  }, [activeTab, fetchEmployees]);
-
-  // ── Actions ────────────────────────────────────────────────────────────────
-
-  const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
-    try {
-      setActionLoading(true);
-      if (type === "approve") await approveLeaveRequest(id, comment);
-      else await rejectLeaveRequest(id, comment);
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? { ...r, status: type === "approve" ? "approved" : "rejected", approved_at: new Date().toISOString(), comment: comment || undefined }
-            : r
-        )
-      );
-      setConfirm(null);
-      setSelected(null);
-      toast.success(type === "approve" ? "อนุมัติคำขอลาเรียบร้อย" : "ปฏิเสธคำขอลาเรียบร้อย");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const openBalanceModal = async (user: { id: number; full_name: string; employee_code: string; department: string }) => {
-    try {
-      const pool = await getAdminUserPool(user.id, year);
-      setBalanceModal({ user, pool });
-    } catch {
-      toast.error("โหลดข้อมูลวันลาไม่สำเร็จ");
-    }
-  };
-
-  const handleUpdateBalance = async (remaining_days: number) => {
-    if (!balanceModal) return;
-    try {
-      const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
-      setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
-      if (activeTab === "employees") {
-        setEmployees((prev) => prev.map((e) =>
-          e.id === balanceModal.user.id ? { ...e, pool: updated } : e
-        ));
-      }
-      toast.success("อัปเดตวันลาเรียบร้อย");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "อัปเดตวันลาไม่สำเร็จ");
-    }
-  };
-
-  const handleEmployeeClick = async (emp: EmployeeWithBalance) => {
-    setSelectedEmployee(emp);
-    setEmpLeaveRequests([]);
-    setEmpLeaveLoading(true);
-    try {
-      const data = await getAdminLeaveRequests({ user_id: emp.id });
-      setEmpLeaveRequests(data);
-    } catch {
-      setEmpLeaveRequests(requests.filter((r) => r.user_id === emp.id));
-    } finally {
-      setEmpLeaveLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    localStorage.removeItem("role");
-    navigate("/", { replace: true });
-  };
-
-  // ── Derived data ───────────────────────────────────────────────────────────
-
-  const filtered = requests.filter((r) => {
-    const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
-    const reqYear = new Date(r.start_date).getFullYear();
-    const reqMonth = new Date(r.start_date).getMonth() + 1;
-    const matchDate =
-      viewMode === "all" ? true :
-        viewMode === "yearly" ? reqYear === selYear :
-          reqYear === selYear && reqMonth === selMonth;
-
-
-
-    return matchStatus && matchSearch && matchDate;
-  });
-
-  const pending = requests.filter((r) => r.status === "pending").length;
-  const approved = requests.filter((r) => r.status === "approved").length;
-  const rejected = requests.filter((r) => r.status === "rejected").length;
-
-  const filteredEmployees = employees.filter((e) => {
-    const ms = empDeptFilter === "all" || e.department === empDeptFilter;
-    const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
-    return ms && mq;
-  });
-
-  // ── Loading / Error states ─────────────────────────────────────────────────
-
+    if (activeTab === "reports") fetchReportTeamUsers();
+  }, [activeTab, fetchEmployees, fetchReportTeamUsers]);
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="text-center space-y-3">
@@ -255,7 +176,7 @@ export default function AdminDashboard() {
         />
       )}
 
-      {balanceModal && (
+      {canEditEmployeeBalance && balanceModal && (
         <AddLeaveBalanceModal
           user={balanceModal.user}
           pool={balanceModal.pool}
@@ -278,6 +199,7 @@ export default function AdminDashboard() {
           leaveRequests={empLeaveRequests}
           loading={empLeaveLoading}
           onClose={() => { setSelectedEmployee(null); setEmpLeaveRequests([]); }}
+          canEditBalance={canEditEmployeeBalance}
           onOpenBalance={() => openBalanceModal({
             id: selectedEmployee.id,
             full_name: selectedEmployee.full_name,
@@ -291,10 +213,7 @@ export default function AdminDashboard() {
         <EditProfileModal
           user={user}
           onClose={() => setShowEditProfile(false)}
-          onUpdateUser={(updated) => {
-            setUser(updated);
-            localStorage.setItem("user", JSON.stringify(updated));
-          }}
+          onUpdateUser={updateUser}
         />
       )}
 
@@ -372,7 +291,13 @@ export default function AdminDashboard() {
 
         {/* ── Reports Tab ────────────────────────────────────────────────────── */}
         {activeTab === "reports" && (
-          <AdminReportWidget requests={requests} employees={employees} />
+          <AdminReportWidget
+            requests={requests}
+            employees={employees}
+            teamEmployees={reportTeamUsers.length > 0 ? reportTeamUsers : employees}
+            currentUser={user}
+            teamLoading={reportTeamLoading || empLoading}
+          />
         )}
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
@@ -551,7 +476,10 @@ export default function AdminDashboard() {
                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
                   value={empDeptFilter} onChange={(e) => setEmpDeptFilter(e.target.value)}>
                   <option value="all">ทุกแผนก</option>
-                  {Array.from(new Set(employees.map((e) => e.department))).map((d) => (
+                  {Array.from(new Set([
+                    ...employees.map((e) => normalizeDepartment(e.department)),
+                    ...requests.map((request) => normalizeDepartment(request.user?.department)),
+                  ].filter(Boolean))).sort().map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -583,7 +511,7 @@ export default function AdminDashboard() {
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
-                        <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>
+                        {canEditEmployeeBalance && <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -625,7 +553,7 @@ export default function AdminDashboard() {
                                 {pool ? `${remaining} วัน` : "—"}
                               </span>
                             </td>
-                            <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                            {canEditEmployeeBalance && <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
@@ -637,7 +565,7 @@ export default function AdminDashboard() {
                                   <path d="M9 18l6-6-6-6" />
                                 </svg>
                               </div>
-                            </td>
+                            </td>}
                           </tr>
                         );
                       })}

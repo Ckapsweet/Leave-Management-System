@@ -4,7 +4,8 @@ import { logout } from "../services/authService";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
-import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload } from "../services/leaveService";
+import { deriveLeavePoolFromRequests } from "../services/leavePoolHelpers";
+import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload, LeaveBalance } from "../services/leaveService";
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
 import { ToastContainer, toast } from "../components/Toast";
@@ -36,13 +37,17 @@ function fmtDate(d: string) {
 function fmtDatetime(d: string) {
   return new Date(d).toLocaleString("th-TH", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
+function isLateRequest(req: LeaveRequest) {
+  return req.request_type === "late";
+}
 
 // ── DurationBadge ─────────────────────────────────────────────────────────────
 
 function DurationBadge({ req }: { req: LeaveRequest }) {
   if (req.leave_unit === "hour") {
+    const late = isLateRequest(req);
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${late ? "bg-amber-50 text-amber-700" : "bg-indigo-50 text-indigo-700"}`}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
         </svg>
@@ -296,7 +301,7 @@ export default function UserLeaveDashboard() {
   const navigate = useNavigate();
   const year = new Date().getFullYear();
 
-  const [user, setUser] = useState<{ full_name: string; employee_code: string; department: string } | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [leavePool, setLeavePool] = useState<LeavePool | null>(null);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -343,7 +348,8 @@ export default function UserLeaveDashboard() {
     setSubmitting(true);
     try {
       const newReq = await createLeaveRequest(form as LeaveRequestPayload);
-      setRequests((prev) => [newReq, ...prev]);
+      const requestWithType = { ...newReq, request_type: newReq.request_type ?? form.request_type };
+      setRequests((prev) => [requestWithType, ...prev]);
       setShowModal(false);
     } catch (err) {
       throw err;
@@ -389,8 +395,9 @@ export default function UserLeaveDashboard() {
     return matchStatus && matchDate;
   });
 
-  const totalUsed = leavePool?.used_days ?? 0;
-  const totalRemaining = leavePool?.remaining ?? 0;
+  const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
+  const totalUsed = displayLeavePool?.used_days ?? 0;
+  const totalRemaining = displayLeavePool?.remaining ?? 0;
   const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   // ── Loading / Error ──────────────────────────────────────────
@@ -441,6 +448,7 @@ export default function UserLeaveDashboard() {
       {showModal && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
+          pool={displayLeavePool}
           onSubmit={handleAddLeave}
           onClose={() => setShowModal(false)}
           isLoading={submitting}
@@ -539,89 +547,27 @@ export default function UserLeaveDashboard() {
         {/* ── Today's Leaves Component ── */}
         <TodayLeavesWidget />
 
-        {/* Leave pool */}
+        {/* Leave balances by type */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือ</h3>
-          {leavePool ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 flex items-center justify-center flex-shrink-0">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-400 mb-1">วันลาคงเหลือทั้งหมด</p>
-                  <div className="flex items-baseline gap-2">
-                    <span className={`text-3xl font-bold ${leavePool.remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
-                      {leavePool.remaining}
-                    </span>
-                    <span className="text-sm text-gray-400">/ {leavePool.total_days} วัน</span>
-                  </div>
-                  <div className="mt-2 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                    {leavePool.total_days > 0 && (
-                      <div
-                        className={`h-full rounded-full transition-all ${leavePool.remaining / leavePool.total_days < 0.2 ? "bg-red-400" :
-                          leavePool.remaining / leavePool.total_days < 0.5 ? "bg-amber-400" : "bg-indigo-500"
-                          }`}
-                        style={{ width: `${Math.min(100, (leavePool.remaining / leavePool.total_days) * 100)}%` }}
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-5 flex-shrink-0">
-                  <div className="text-center">
-                    <p className="text-xs text-gray-400 mb-0.5">สิทธิ์รวม</p>
-                    <p className="text-lg font-bold text-gray-700">{leavePool.total_days}</p>
-                    <p className="text-xs text-gray-400">วัน</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-gray-400 mb-0.5">ใช้ไปแล้ว</p>
-                    <p className="text-lg font-bold text-gray-700">{leavePool.used_days}</p>
-                    <p className="text-xs text-gray-400">วัน</p>
-                  </div>
-                </div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือแต่ละประเภท</h3>
+          {displayLeavePool ? (
+            displayLeavePool.balances && displayLeavePool.balances.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {displayLeavePool.balances.map((balance) => (
+                  <LeaveBalanceCard key={balance.leave_type_id} balance={balance} />
+                ))}
               </div>
-
-              {leaveTypes.length > 0 && (() => {
-                const breakdown = leaveTypes.map((t) => {
-                  const used = requests
-                    .filter((r) => r.status === "approved" && r.leave_type_id === t.id)
-                    .reduce((sum, r) => sum + (r.leave_unit === "hour" ? (r.total_hours ?? 0) / 8 : r.total_days), 0);
-                  return { ...t, used: Math.round(used * 10) / 10 };
-                }).filter((t) => t.used > 0);
-
-                if (breakdown.length === 0) return null;
-
-                const COLORS: Record<number, string> = {
-                  1: "bg-sky-100 text-sky-700",
-                  2: "bg-teal-100 text-teal-700",
-                  3: "bg-violet-100 text-violet-700",
-                  4: "bg-orange-100 text-orange-700",
-                };
-
-                return (
-                  <div className="border-t border-gray-100 pt-4">
-                    <p className="text-xs font-medium text-gray-400 mb-2">แยกตามประเภทที่ใช้ไป</p>
-                    <div className="flex flex-wrap gap-2">
-                      {breakdown.map((t) => (
-                        <div key={t.id} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium ${COLORS[t.id] ?? "bg-gray-100 text-gray-600"}`}>
-                          <span>{t.name}</span>
-                          <span className="font-bold">{t.used} วัน</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 text-sm text-gray-500">
+                ไม่พบข้อมูลวันลาแยกตามประเภท
+              </div>
+            )
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 text-center text-sm text-gray-400">
               ยังไม่มีสิทธิ์วันลาสำหรับปีนี้ กรุณาติดต่อ HR
             </div>
           )}
         </div>
-
         {/* Leave history */}
         <div>
           <div className="flex flex-col gap-3 mb-3 px-1">
@@ -692,6 +638,54 @@ export default function UserLeaveDashboard() {
         </div>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
+  const typeColor = TYPE_COLORS[balance.leave_type_id] ?? "bg-gray-100 text-gray-600";
+  const total = Math.max(0, balance.total_days);
+  const remaining = Math.max(0, balance.remaining);
+  const used = Math.max(0, balance.used_days);
+  const remainingRatio = total > 0 ? remaining / total : 0;
+  const barColor = remainingRatio < 0.2 ? "bg-red-400" : remainingRatio < 0.5 ? "bg-amber-400" : "bg-indigo-500";
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${typeColor}`}>
+            {balance.name}
+          </span>
+          <p className="text-xs text-gray-400 mt-2">สิทธิ์ประจำปี</p>
+        </div>
+        <div className="text-right">
+          <p className={`text-3xl font-bold ${remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
+            {remaining}
+          </p>
+          <p className="text-xs text-gray-400">วันคงเหลือ</p>
+        </div>
+      </div>
+
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        {total > 0 && (
+          <div
+            className={`h-full rounded-full transition-all ${barColor}`}
+            style={{ width: `${Math.min(100, remainingRatio * 100)}%` }}
+          />
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
+        <div>
+          <p className="text-xs text-gray-400">สิทธิ์รวม</p>
+          <p className="text-sm font-bold text-gray-800">{total} วัน</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400">ใช้ไปแล้ว</p>
+          <p className="text-sm font-bold text-gray-800">{used} วัน</p>
+        </div>
+      </div>
     </div>
   );
 }

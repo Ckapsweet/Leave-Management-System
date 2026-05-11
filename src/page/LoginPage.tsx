@@ -19,13 +19,7 @@ export default function LoginPage() {
       const { user } = await login(employeeCode, password);
 
       localStorage.setItem("role", user.role);
-      localStorage.setItem("user", JSON.stringify({
-        id: user.id,
-        full_name: user.full_name,
-        employee_code: user.employee_code,
-        department: user.department,
-        role: user.role,
-      }));
+      localStorage.setItem("user", JSON.stringify(user));
       navigate("/select-system", { replace: true });
 
     } catch (err: any) {

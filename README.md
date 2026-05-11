@@ -88,4 +88,13 @@ mysql-server
 phpmyadmin
 Java
 Jenkins
+
+
+
+add แจ้งเตือน file 
+noti mail
+settime มาเวลามา setครึ่งชั่วโมง 
+admin re-set password
+1วัน = 7:30ชม
+type ลาสาย
 ```

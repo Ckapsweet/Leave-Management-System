@@ -2,11 +2,13 @@
 import api from "./api";
 import type { Dayjs } from "dayjs";
 import type { UserRole } from "./superAdminService";
+import { calculateLeaveHours } from "./leaveTime";
 
 // ── Types ─────────────────────────────────────────────────────
 
 export type LeaveStatus = "pending" | "approved" | "rejected";
 export type LeaveUnit   = "day" | "hour";
+export type RequestKind = "leave" | "late";
 
 export interface LeaveType {
   id:          number;
@@ -16,6 +18,14 @@ export interface LeaveType {
 }
 
 // Pool รวมของ user (ไม่แยกประเภท)
+export interface LeaveBalance {
+  leave_type_id: number;
+  name:          string;
+  total_days:    number;
+  used_days:     number;
+  remaining:     number;
+}
+
 export interface LeavePool {
   id?:        number | null;
   user_id:    number;
@@ -23,6 +33,7 @@ export interface LeavePool {
   used_days:  number;
   remaining:  number;
   year:       number;
+  balances?:  LeaveBalance[];
 }
 
 export interface LeaveRequest {
@@ -34,16 +45,20 @@ export interface LeaveRequest {
   start_time?:    string;
   end_time?:      string;
   leave_unit:     LeaveUnit;
+  request_type?:   RequestKind;
   total_days:     number;
   total_hours?:   number | null;
   reason:         string;
   status:         LeaveStatus;
   approved_by?:   number;
   approved_at?:   string;
+  current_assignee_id?: number | null;
   created_at:     string;
   leave_type:     LeaveType;
   approver_name?: string;
   comment?:       string;
+  attachments?:   LeaveAttachment[];
+  attachment_urls?: string[];
   user?: {
     id:            number;
     full_name:     string;
@@ -51,18 +66,37 @@ export interface LeaveRequest {
     department:    string;
     role:          UserRole;
     supervisor_id: number | null;
+    email?:        string | null;
+    email_2?:      string | null;
+    phone?:        string | null;
   };
+}
+
+export interface LeaveAttachment {
+  id?: number | string;
+  name?: string;
+  file_name?: string;
+  original_name?: string;
+  filename?: string;
+  url?: string;
+  file_url?: string;
+  download_url?: string;
+  path?: string;
+  mime_type?: string;
+  size?: number | string | null;
 }
 
 // ✅ LeaveRequestPayload ใช้ string แทน Dayjs เพื่อให้ตรงกับ LeaveRequestForm จาก Modal
 export interface LeaveRequestPayload {
   leave_type_id: number;
   leave_unit:    LeaveUnit;
+  request_type?:  RequestKind;
   start_date:    string;
   end_date:      string;
   start_time?:   Dayjs | null;
   end_time?:     Dayjs | null;
   reason:        string;
+  attachments?:   File[];
 }
 
 // ── Leave Types ───────────────────────────────────────────────
@@ -94,12 +128,19 @@ export async function getTodayLeaves(): Promise<LeaveRequest[]> {
   return res.data;
 }
 
+export async function getThisWeekLeaves(): Promise<LeaveRequest[]> {
+  const res = await api.get("/api/leave-requests/week");
+  return res.data;
+}
+
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
+  const request_type = payload.request_type ?? "leave";
+  const hasAttachments = (payload.attachments?.length ?? 0) > 0;
 
   // คำนวณ total_hours จาก Dayjs start_time/end_time
   const total_hours = isHour && payload.start_time && payload.end_time
-    ? Math.max(0, Math.round((payload.end_time.diff(payload.start_time, "minute") / 60) * 10) / 10)
+    ? calculateLeaveHours(payload.start_time, payload.end_time)
     : null;
 
   // คำนวณ total_days จาก string start_date/end_date
@@ -117,12 +158,25 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
     end_date:      isHour ? payload.start_date : payload.end_date,
     reason:        payload.reason,
     total_days,
+    request_type,
     start_time:    isHour && payload.start_time?.isValid() ? payload.start_time.format("HH:mm") : null,
     end_time:      isHour && payload.end_time?.isValid()   ? payload.end_time.format("HH:mm")   : null,
     total_hours:   isHour ? total_hours : null,
   };
 
-  const res = await api.post("/api/leave-requests", body);
+  const requestBody = hasAttachments
+    ? (() => {
+        const formData = new FormData();
+        Object.entries(body).forEach(([key, value]) => {
+          if (value === null || value === undefined) return;
+          formData.append(key, String(value));
+        });
+        payload.attachments?.forEach((file) => formData.append("attachments", file));
+        return formData;
+      })()
+    : body;
+
+  const res = await api.post("/api/leave-requests", requestBody);
   return res.data;
 }
 
@@ -141,12 +195,14 @@ export async function getAdminLeaveRequests(params?: {
   return res.data;
 }
 
-export async function approveLeaveRequest(id: number, comment?: string): Promise<void> {
-  await api.patch(`/api/admin/leave-requests/${id}/approve`, { comment });
+export async function approveLeaveRequest(id: number, comment?: string): Promise<{ status: LeaveStatus, current_assignee_id: number | null }> {
+  const res = await api.patch(`/api/admin/leave-requests/${id}/approve`, { comment });
+  return res.data;
 }
 
-export async function rejectLeaveRequest(id: number, comment: string): Promise<void> {
-  await api.patch(`/api/admin/leave-requests/${id}/reject`, { comment });
+export async function rejectLeaveRequest(id: number, comment: string): Promise<{ status: LeaveStatus, current_assignee_id: number | null }> {
+  const res = await api.patch(`/api/admin/leave-requests/${id}/reject`, { comment });
+  return res.data;
 }
 
 // ── Admin Leave Pool ──────────────────────────────────────────
@@ -160,11 +216,11 @@ export async function getAdminUserPool(userId: number, year?: number): Promise<L
 
 export async function updateLeavePool(
   userId: number,
-  remaining_days: number,
+  balances: { leave_type_id: number; total_days: number }[],
   year?: number
 ): Promise<LeavePool> {
   const res = await api.patch(`/api/admin/leave-pool/${userId}`, {
-    remaining_days,
+    balances,
     year: year ?? new Date().getFullYear(),
   });
   return res.data;

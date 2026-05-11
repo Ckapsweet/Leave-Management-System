@@ -26,6 +26,10 @@ import Footer from "../../components/Footer";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
 
+function normalizeDepartment(value?: string | null) {
+    return (value ?? "").trim();
+}
+
 interface DashboardData {
     summary: {
         total_users: number;
@@ -82,12 +86,16 @@ export default function OverviewDashboard() {
     // ---- Team Management State (NEW) ----
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [allUsersLoaded, setAllUsersLoaded] = useState(false);
+    const [selectedTeamDepartment, setSelectedTeamDepartment] = useState("");
     const [selectedLeaderId, setSelectedLeaderId] = useState<number | "">("");
     const [subSearch, setSubSearch] = useState("");
     const [teamLoading, setTeamLoading] = useState(false);
 
     // ---- Role Update State (NEW) ----
     const [roleUpdatingId, setRoleUpdatingId] = useState<number | null>(null);
+    const [resetPasswordTarget, setResetPasswordTarget] = useState<EmployeeWithBalance | null>(null);
+    const [resetPasswordForm, setResetPasswordForm] = useState({ password: "", confirm: "" });
+    const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
     // ---- Departments State (NEW) ----
     const [departments, setDepartments] = useState<{id: number, name: string}[]>([]);
@@ -185,8 +193,8 @@ export default function OverviewDashboard() {
         if (activeTab === "reports") fetchDashboardData();
         if (activeTab === "employees") fetchEmployees();
         if (activeTab === "teams" && !allUsersLoaded) fetchAllUsers();
-        if (activeTab === "departments") fetchDepartments();
-    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded]);
+        if ((activeTab === "teams" || activeTab === "departments") && departments.length === 0) fetchDepartments();
+    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded, departments.length]);
 
     // ---- Handlers ----
 
@@ -206,10 +214,10 @@ export default function OverviewDashboard() {
         }
     };
 
-    const handleUpdateBalance = async (remaining_days: number) => {
+    const handleUpdateBalance = async (balances: { leave_type_id: number; total_days: number }[]) => {
         if (!balanceModal) return;
         try {
-            const updated = await updateLeavePool(balanceModal.user.id, remaining_days, year);
+            const updated = await updateLeavePool(balanceModal.user.id, balances, year);
             setBalanceModal((prev) => prev ? { ...prev, pool: updated } : null);
             if (activeTab === "employees") {
                 setEmployees((prev) => prev.map((e) =>
@@ -222,7 +230,7 @@ export default function OverviewDashboard() {
         }
     };
 
-    const handleEmployeeClick = async (emp: EmployeeWithBalance) => {
+    const handleEmployeeClick = async (emp: EmployeeWithBalance) =>  {
         setSelectedEmployee(emp);
         setEmpLeaveRequests([]);
         setEmpLeaveLoading(true);
@@ -239,12 +247,24 @@ export default function OverviewDashboard() {
     const handleAction = async (id: number, type: "approve" | "reject", comment: string) => {
         try {
             setActionLoading(true);
-            if (type === "approve") await approveLeaveRequest(id, comment);
-            else await rejectLeaveRequest(id, comment);
+            
+            let response;
+            if (type === "approve") {
+                response = await approveLeaveRequest(id, comment);
+            } else {
+                response = await rejectLeaveRequest(id, comment);
+            }
+
             setRequests((prev) =>
                 prev.map((r) =>
                     r.id === id
-                        ? { ...r, status: type === "approve" ? "approved" : "rejected", approved_at: new Date().toISOString(), comment: comment || undefined }
+                        ? { 
+                            ...r, 
+                            status: response.status, 
+                            current_assignee_id: response.current_assignee_id,
+                            approved_at: new Date().toISOString(), 
+                            comment: comment || undefined 
+                          }
                         : r
                 )
             );
@@ -338,6 +358,37 @@ export default function OverviewDashboard() {
         }
     };
 
+    const openResetPasswordModal = (employee: EmployeeWithBalance) => {
+        setResetPasswordTarget(employee);
+        setResetPasswordForm({ password: "", confirm: "" });
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetPasswordTarget) return;
+        if (resetPasswordForm.password.length < 6) {
+            toast.error("รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร");
+            return;
+        }
+        if (resetPasswordForm.password !== resetPasswordForm.confirm) {
+            toast.error("รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน");
+            return;
+        }
+
+        try {
+            setResetPasswordLoading(true);
+            await api.patch(`/api/super-admin/users/${resetPasswordTarget.id}/password`, {
+                password: resetPasswordForm.password,
+            });
+            toast.success("Reset password เรียบร้อย");
+            setResetPasswordTarget(null);
+            setResetPasswordForm({ password: "", confirm: "" });
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "Reset password ไม่สำเร็จ");
+        } finally {
+            setResetPasswordLoading(false);
+        }
+    };
+
     // NEW: Save Department
     const handleSaveDepartment = async () => {
         if (!deptForm.name) return toast.error("กรุณาระบุชื่อแผนก");
@@ -394,19 +445,40 @@ export default function OverviewDashboard() {
     const pending = requests.filter((r) => r.status === "pending").length;
     const approved = requests.filter((r) => r.status === "approved").length;
     const rejected = requests.filter((r) => r.status === "rejected").length;
+    const leaveUsageByDepartment = Object.entries(
+        (data?.leaveTypeStats ?? []).reduce<Record<string, { total: number; leaveTypes: { name: string; days: number }[] }>>((acc, row) => {
+            const department = normalizeDepartment(row.department) || "ไม่ระบุแผนก";
+            const days = Number(row.total_leave_days) || 0;
+            if (!acc[department]) acc[department] = { total: 0, leaveTypes: [] };
+            acc[department].total += days;
+            acc[department].leaveTypes.push({ name: row.leave_type, days });
+            return acc;
+        }, {})
+    ).sort(([, a], [, b]) => b.total - a.total);
 
     // NEW: derived lists for team management
+    const departmentOptions = Array.from(new Set([
+        ...departments.map((department) => normalizeDepartment(department.name)),
+        ...allUsers.map((u) => normalizeDepartment(u.department)),
+        ...employees.map((employee) => normalizeDepartment(employee.department)),
+        ...requests.map((request) => normalizeDepartment(request.user?.department)),
+    ].filter(Boolean))).sort();
+    const selectedDepartment = normalizeDepartment(selectedTeamDepartment);
     const leaderOptions = allUsers.filter((u) =>
+        selectedDepartment &&
+        normalizeDepartment(u.department) === selectedDepartment &&
         ["lead", "manager", "assistant manager"].includes(u.role?.toLowerCase() ?? "")
     );
     const currentSubordinates = allUsers.filter(
-        (u) => u.supervisor_id === Number(selectedLeaderId)
+        (u) => u.supervisor_id === Number(selectedLeaderId) && normalizeDepartment(u.department) === selectedDepartment
     );
     const freeEmployees = allUsers.filter(
         (u) =>
+            selectedDepartment &&
+            normalizeDepartment(u.department) === selectedDepartment &&
             !u.supervisor_id &&
             u.role !== "admin" &&
-            u.full_name.includes(subSearch)
+            (!subSearch || u.full_name.includes(subSearch) || u.employee_code?.includes(subSearch))
     );
 
     // ---- Render ----
@@ -473,6 +545,63 @@ export default function OverviewDashboard() {
                     onClose={() => setShowCreateModal(false)}
                     loading={createLoading}
                 />
+            )}
+            {resetPasswordTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={() => setResetPasswordTarget(null)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M15 7a2 2 0 1 1 2 2m4-2a6 6 0 0 1-8.9 5.2L3 21l-2-2 8.8-9.1A6 6 0 1 1 21 7Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">Reset password</h3>
+                                <p className="text-xs text-gray-400">{resetPasswordTarget.full_name} · {resetPasswordTarget.employee_code}</p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">รหัสผ่านใหม่ *</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    type="password"
+                                    value={resetPasswordForm.password}
+                                    onChange={(e) => setResetPasswordForm((form) => ({ ...form, password: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">ยืนยันรหัสผ่าน *</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    type="password"
+                                    value={resetPasswordForm.confirm}
+                                    onChange={(e) => setResetPasswordForm((form) => ({ ...form, confirm: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleResetPassword();
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 pb-6 flex gap-3 justify-end">
+                            <button
+                                onClick={() => setResetPasswordTarget(null)}
+                                disabled={resetPasswordLoading}
+                                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleResetPassword}
+                                disabled={resetPasswordLoading || !resetPasswordForm.password || !resetPasswordForm.confirm}
+                                className="px-4 py-2.5 text-sm bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {resetPasswordLoading ? "กำลังบันทึก..." : "Reset password"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {showDeptModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -830,6 +959,40 @@ export default function OverviewDashboard() {
                                 {/* Leave Type Stats Table */}
                                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="p-5 border-b border-gray-100">
+                                        <h2 className="text-sm font-semibold text-gray-700">ภาพรวมการใช้วันลารายแผนก</h2>
+                                    </div>
+                                    <div className="p-5">
+                                        {leaveUsageByDepartment.length > 0 ? (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {leaveUsageByDepartment.map(([department, stat]) => (
+                                                    <div key={department} className="border border-gray-100 rounded-xl p-4 bg-slate-50/40">
+                                                        <div className="flex items-start justify-between gap-3 mb-3">
+                                                            <div>
+                                                                <h3 className="text-sm font-semibold text-gray-800">{department}</h3>
+                                                                <p className="text-xs text-gray-400">{stat.leaveTypes.length} ประเภทการลา</p>
+                                                            </div>
+                                                            <span className="text-sm font-bold text-slate-800 bg-white border border-gray-100 rounded-full px-3 py-1">
+                                                                {stat.total.toFixed(2)} วัน
+                                                            </span>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            {stat.leaveTypes.map((leaveType) => (
+                                                                <div key={`${department}-${leaveType.name}`} className="flex items-center justify-between text-xs">
+                                                                    <span className="text-gray-600">{leaveType.name}</span>
+                                                                    <span className="font-semibold text-gray-800">{leaveType.days.toFixed(2)} วัน</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="py-8 text-center text-sm text-gray-400">ไม่มีประวัติการอนุมัติวันลาในปีนี้</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="hidden">
+                                    <div className="p-5 border-b border-gray-100">
                                         <h2 className="text-sm font-semibold text-gray-700">📑 รายละเอียดวันลาแยกตามแผนกและประเภทการลา</h2>
                                     </div>
                                     <div className="overflow-x-auto">
@@ -984,6 +1147,15 @@ export default function OverviewDashboard() {
                                                                     เพิ่มวันลา
                                                                 </button>
                                                                 <button
+                                                                    onClick={() => openResetPasswordModal(emp)}
+                                                                    className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                                                                    title="Reset password"
+                                                                >
+                                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M15 7a2 2 0 1 1 2 2m4-2a6 6 0 0 1-8.9 5.2L3 21l-2-2 8.8-9.1A6 6 0 1 1 21 7Z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
                                                                     onClick={() => handleDeleteUser(emp.id)}
                                                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                                                                     title="ลบพนักงาน"
@@ -1020,8 +1192,28 @@ export default function OverviewDashboard() {
                             </div>
 
                             <div className="p-5 space-y-5">
-                                {/* Leader Selector */}
-                                <div className="max-w-md">
+                                {/* Department and Leader Selector */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-600 block mb-2">
+                                            เลือกแผนก
+                                        </label>
+                                        <select
+                                            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-slate-300 text-gray-700"
+                                            value={selectedTeamDepartment}
+                                            onChange={(e) => {
+                                                setSelectedTeamDepartment(e.target.value);
+                                                setSelectedLeaderId("");
+                                                setSubSearch("");
+                                            }}
+                                        >
+                                            <option value="">-- กรุณาเลือกแผนกก่อน --</option>
+                                            {departmentOptions.map((department) => (
+                                                <option key={department} value={department}>{department}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
                                     <label className="text-xs font-semibold text-gray-600 block mb-2">
                                         เลือกหัวหน้างาน (Manager / Lead)
                                     </label>
@@ -1034,6 +1226,7 @@ export default function OverviewDashboard() {
                                         <select
                                             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-slate-300 text-gray-700"
                                             value={selectedLeaderId}
+                                            disabled={!selectedTeamDepartment}
                                             onChange={(e) => setSelectedLeaderId(e.target.value === "" ? "" : Number(e.target.value))}
                                         >
                                             <option value="">-- กรุณาเลือกหัวหน้างาน --</option>
@@ -1046,8 +1239,14 @@ export default function OverviewDashboard() {
                                     )}
                                 </div>
 
+                                </div>
+
                                 {/* Team Grid */}
-                                {selectedLeaderId ? (
+                                {!selectedTeamDepartment ? (
+                                    <div className="py-12 text-center text-sm text-gray-400">
+                                        กรุณาเลือกแผนกก่อนเพื่อจัดการทีม
+                                    </div>
+                                ) : selectedLeaderId ? (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                                         {/* Left: Current Subordinates */}

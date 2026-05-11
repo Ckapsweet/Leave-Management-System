@@ -9,7 +9,8 @@ interface EmployeeLeaveDrawerProps {
   leaveRequests: LeaveRequest[];
   loading: boolean;
   onClose: () => void;
-  onOpenBalance: () => void;
+  onOpenBalance?: () => void;
+  canEditBalance?: boolean;
 }
 
 export function EmployeeLeaveDrawer({
@@ -18,11 +19,11 @@ export function EmployeeLeaveDrawer({
   loading,
   onClose,
   onOpenBalance,
+  canEditBalance = true,
 }: EmployeeLeaveDrawerProps) {
   const ac = avatarColor(emp.department);
   const pool = emp.pool;
   const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
-  const pct = pool && pool.total_days > 0 ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
 
   const [leaveFilter, setLeaveFilter] = useState<"all" | LeaveStatus>("all");
   const filtered = leaveRequests.filter((r) => leaveFilter === "all" || r.status === leaveFilter);
@@ -50,47 +51,61 @@ export function EmployeeLeaveDrawer({
         </div>
 
         {/* Leave balance summary */}
-        <div className="px-6 py-4 border-b border-gray-100">
-          <p className="text-xs font-medium text-gray-400 mb-3">สรุปวันลาประจำปี</p>
-          {pool ? (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className="text-xl font-bold text-gray-800">{pool.total_days}</p>
-                <p className="text-xs text-gray-400 mt-0.5">สิทธิ์รวม</p>
-              </div>
-              <div className="bg-amber-50 rounded-xl p-3 text-center">
-                <p className="text-xl font-bold text-amber-600">{pool.used_days}</p>
-                <p className="text-xs text-gray-400 mt-0.5">ใช้ไปแล้ว</p>
-              </div>
-              <div className={`rounded-xl p-3 text-center ${remaining <= 3 ? "bg-red-50" : remaining <= 7 ? "bg-amber-50" : "bg-emerald-50"}`}>
-                <p className={`text-xl font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                  {remaining}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">คงเหลือ</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400">ไม่พบข้อมูลวันลา</p>
-          )}
-          {pool && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>ใช้ไป {pct}%</span>
-                <span>{pool.used_days}/{pool.total_days} วัน</span>
-              </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
+        <div className="px-6 py-4 border-b border-gray-100 space-y-4">
+          {(emp.email || emp.email_2 || emp.phone) && (
+            <div className="rounded-xl bg-slate-50 border border-gray-100 p-3 space-y-1.5 text-xs text-gray-600">
+              {emp.email && <p className="truncate">Email 1: <span className="font-medium text-gray-800">{emp.email}</span></p>}
+              {emp.email_2 && <p className="truncate">Email 2: <span className="font-medium text-gray-800">{emp.email_2}</span></p>}
+              {emp.phone && <p className="truncate">เบอร์โทร: <span className="font-medium text-gray-800">{emp.phone}</span></p>}
             </div>
           )}
+          <div>
+            <p className="text-xs font-medium text-gray-400 mb-3">สรุปวันลาประจำปี</p>
+            {pool ? (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 rounded-xl p-3 text-center">
+                  <p className="text-xl font-bold text-gray-800">{pool.total_days}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">สิทธิ์รวม</p>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-3 text-center">
+                  <p className="text-xl font-bold text-amber-600">{pool.used_days}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">ใช้ไปแล้ว</p>
+                </div>
+                <div className={`rounded-xl p-3 text-center ${remaining <= 3 ? "bg-red-50" : remaining <= 7 ? "bg-amber-50" : "bg-emerald-50"}`}>
+                  <p className={`text-xl font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
+                    {remaining}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">คงเหลือ</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">ไม่พบข้อมูลวันลา</p>
+            )}
+          </div>
+
+          {pool?.balances && pool.balances.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-400 mb-2">สิทธิ์แยกตามประเภท</p>
+              <div className="space-y-1.5">
+                {pool.balances.map((b) => (
+                  <div key={b.leave_type_id} className="flex items-center justify-between text-xs bg-slate-50/50 px-3 py-2 rounded-lg">
+                    <span className="font-medium text-gray-600">{b.name}</span>
+                    <span className="text-gray-500">
+                      คงเหลือ <strong className="text-gray-800">{b.remaining}</strong> / {b.total_days} วัน
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={onOpenBalance}
-            className="mt-3 w-full py-2 text-xs border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-medium transition-colors"
+            hidden={!canEditBalance || !onOpenBalance}
+            className="w-full py-2.5 text-xs bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium transition-colors flex items-center justify-center gap-2"
           >
-            ✏️ แก้ไขวันลา
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            แก้ไขวันลา
           </button>
         </div>
 

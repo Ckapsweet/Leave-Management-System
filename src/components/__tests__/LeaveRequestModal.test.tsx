@@ -43,8 +43,23 @@ const mockLeaveTypes = [
   { id: 3, name: "ลาพักร้อน", description: "",  max_days: 15 },
 ];
 
+const mockPool = {
+  id: 1,
+  user_id: 1,
+  total_days: 15,
+  used_days: 2,
+  remaining: 13,
+  year: 2026,
+  balances: [
+    { leave_type_id: 1, name: "ลาป่วย", total_days: 30, used_days: 1, remaining: 29 },
+    { leave_type_id: 2, name: "ลากิจ", total_days: 10, used_days: 0, remaining: 10 },
+    { leave_type_id: 3, name: "ลาพักร้อน", total_days: 15, used_days: 0, remaining: 15 },
+  ]
+};
+
 const defaultProps = {
   leaveTypes: mockLeaveTypes,
+  pool: mockPool,
   onSubmit: vi.fn().mockResolvedValue(undefined),
   onClose: vi.fn(),
   isLoading: false,
