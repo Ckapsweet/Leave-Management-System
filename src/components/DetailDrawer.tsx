@@ -11,10 +11,65 @@ function formatAttachmentSize(size: number | string | null | undefined) {
   return `${Math.round((value / (1024 * 1024)) * 10) / 10} MB`;
 }
 
+function uniqueUrls(urls: string[]) {
+  return Array.from(new Set(urls.filter(Boolean)));
+}
+
+function getAttachmentPath(url: string) {
+  const normalizedUrl = url.replace(/\\/g, "/");
+  const cleanPath = normalizedUrl.replace(/^\/+/, "");
+
+  if (cleanPath.includes("uploads/")) {
+    return `/${cleanPath.slice(cleanPath.indexOf("uploads/"))}`;
+  }
+
+  if (cleanPath.includes("leave-attachments/")) {
+    return `/uploads/${cleanPath.slice(cleanPath.indexOf("leave-attachments/"))}`;
+  }
+
+  const filename = cleanPath.split("/").filter(Boolean).pop() ?? cleanPath;
+  return `/uploads/leave-attachments/${filename}`;
+}
+
+function getAttachmentBaseUrl() {
+  const envBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+  if (!envBase || typeof window === "undefined") return envBase;
+
+  try {
+    const apiUrl = new URL(envBase, window.location.origin);
+    const pageHost = window.location.hostname;
+    const apiHost = apiUrl.hostname;
+    const localApi = apiHost === "localhost" || apiHost === "127.0.0.1";
+    const localPage = pageHost === "localhost" || pageHost === "127.0.0.1";
+    return localApi && !localPage ? "" : envBase;
+  } catch {
+    return envBase;
+  }
+}
+
+function resolveAttachmentUrls(url: string) {
+  const normalizedUrl = url.replace(/\\/g, "/");
+  if (/^https?:\/\//i.test(normalizedUrl) || /^data:/i.test(normalizedUrl) || /^blob:/i.test(normalizedUrl)) return [normalizedUrl];
+
+  const base = getAttachmentBaseUrl();
+  if (normalizedUrl.startsWith("/api/") || normalizedUrl.startsWith("api/")) {
+    const apiPath = normalizedUrl.startsWith("/") ? normalizedUrl : `/${normalizedUrl}`;
+    return uniqueUrls([
+      base ? `${base}${apiPath}` : "",
+      apiPath,
+    ]);
+  }
+
+  const path = getAttachmentPath(normalizedUrl);
+  return uniqueUrls([
+    base ? `${base}${path}` : "",
+    path,
+    `/api${path}`,
+  ]);
+}
+
 function resolveAttachmentUrl(url: string) {
-  if (/^https?:\/\//i.test(url) || url.startsWith("/")) return url;
-  const base = import.meta.env.VITE_API_URL ?? "";
-  return `${base.replace(/\/$/, "")}/${url.replace(/^\//, "")}`;
+  return resolveAttachmentUrls(url)[0] ?? "";
 }
 
 function decodeMojibakeName(name: string) {
@@ -43,6 +98,7 @@ function getAttachments(req: LeaveRequest) {
         id: file.id ?? `${url}-${index}`,
         name: decodeMojibakeName(file.original_name ?? file.file_name ?? file.filename ?? file.name ?? `ไฟล์แนบ ${index + 1}`),
         url: url ? resolveAttachmentUrl(url) : "",
+        urls: url ? resolveAttachmentUrls(url) : [],
         mimeType: file.mime_type ?? "",
         size: formatAttachmentSize(file.size),
       };
@@ -71,7 +127,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
   const isHourly = req.leave_unit === "hour";
   const ac = avatarColor(req.user?.department);
   const attachments = getAttachments(req);
-  const [previewImage, setPreviewImage] = useState<{ name: string; url: string } | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ name: string; urls: string[]; index: number } | null>(null);
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end">
@@ -183,7 +239,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
                     <button
                       key={file.id}
                       type="button"
-                      onClick={() => setPreviewImage({ name: file.name, url: file.url })}
+                      onClick={() => setPreviewImage({ name: file.name, urls: file.urls.length > 0 ? file.urls : [file.url], index: 0 })}
                       className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-left text-sm hover:bg-slate-100 transition-colors"
                     >
                       {content}
@@ -255,9 +311,15 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             </div>
             <div className="flex max-h-[calc(100vh-7rem)] max-w-[calc(100vw-2rem)] items-center justify-center overflow-hidden rounded-xl bg-white shadow-2xl">
               <img
-                src={previewImage.url}
+                src={previewImage.urls[previewImage.index]}
                 alt={previewImage.name}
                 className="block max-h-[calc(100vh-7rem)] max-w-[calc(100vw-2rem)] object-contain"
+                onError={() => {
+                  setPreviewImage((current) => {
+                    if (!current || current.index >= current.urls.length - 1) return current;
+                    return { ...current, index: current.index + 1 };
+                  });
+                }}
               />
             </div>
           </div>
