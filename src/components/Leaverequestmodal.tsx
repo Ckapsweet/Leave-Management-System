@@ -272,7 +272,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors text-xl"
           >
-            x
+            ×
           </button>
         </div>
 

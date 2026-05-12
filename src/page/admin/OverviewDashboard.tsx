@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { logout } from "../../services/authService";
 import api from "../../services/api";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -27,12 +26,10 @@ import Footer from "../../components/Footer";
 import { formatLeaveHours } from "../../services/leaveTime";
 import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
+import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment } from "../../services/leaveFilters";
+import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
-
-function normalizeDepartment(value?: string | null) {
-    return (value ?? "").trim();
-}
 
 interface DashboardData {
     summary: {
@@ -124,8 +121,7 @@ export default function OverviewDashboard() {
     const [showEditProfile, setShowEditProfile] = useState(false);
 
     useEffect(() => {
-        const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
+        setUser(readStoredUser());
     }, []);
 
     // ---- Fetch Functions ----
@@ -251,10 +247,7 @@ export default function OverviewDashboard() {
     // ---- Handlers ----
 
     const handleLogout = async () => {
-        await logout();
-        localStorage.removeItem("role");
-        localStorage.removeItem("user");
-        navigate("/", { replace: true });
+        await logoutAndRedirect(navigate);
     };
 
     const openBalanceModal = async (u: { id: number; full_name: string; employee_code: string; department: string }) => {
@@ -482,21 +475,15 @@ export default function OverviewDashboard() {
         return ms && mq;
     });
 
-    const filteredRequests = requests.filter((r) => {
-        const matchStatus = statusFilter === "all" || r.status === statusFilter;
-        const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
-        const reqYear = new Date(r.start_date).getFullYear();
-        const reqMonth = new Date(r.start_date).getMonth() + 1;
-        const matchDate =
-            viewMode === "all" ? true :
-                viewMode === "yearly" ? reqYear === selYear :
-                    reqYear === selYear && reqMonth === selMonth;
-        return matchStatus && matchSearch && matchDate;
+    const filteredRequests = filterLeaveRequests(requests, {
+        status: statusFilter,
+        search,
+        viewMode,
+        year: selYear,
+        month: selMonth,
     });
 
-    const pending = requests.filter((r) => r.status === "pending").length;
-    const approved = requests.filter((r) => r.status === "approved").length;
-    const rejected = requests.filter((r) => r.status === "rejected").length;
+    const { pending, approved, rejected } = countLeaveRequestsByStatus(requests);
     const leaveUsageByDepartment = Object.entries(
         (data?.leaveTypeStats ?? []).reduce<Record<string, { total: number; leaveTypes: { name: string; days: number }[] }>>((acc, row) => {
             const department = normalizeDepartment(row.department) || "ไม่ระบุแผนก";

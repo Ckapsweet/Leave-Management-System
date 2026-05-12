@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { logout } from "../services/authService";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
@@ -14,6 +13,8 @@ import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 import { formatLeaveHours } from "../services/leaveTime";
+import { countLeaveRequestsByStatus, filterLeaveRequests, type RequestViewMode } from "../services/leaveFilters";
+import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -316,7 +317,7 @@ export default function UserLeaveDashboard() {
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
-  const [viewMode, setViewMode] = useState<"all" | "monthly" | "yearly">("all");
+  const [viewMode, setViewMode] = useState<RequestViewMode>("all");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
@@ -333,8 +334,7 @@ export default function UserLeaveDashboard() {
       setLeavePool(poolRes);
       setRequests(reqRes);
 
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) setUser(JSON.parse(storedUser));
+      setUser(readStoredUser());
     } catch (err: any) {
       setError(err.response?.data?.message || "โหลดข้อมูลไม่สำเร็จ");
     } finally {
@@ -378,28 +378,25 @@ export default function UserLeaveDashboard() {
 
   // ── Logout ──────────────────────────────────────────────────
   const handleLogout = async () => {
-    await logout();
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
-    navigate("/", { replace: true });
+    await logoutAndRedirect(navigate);
   };
 
   // ── Derived ─────────────────────────────────────────────────
-  const filtered = requests.filter((r) => {
-    const matchStatus = statusFilter === "all" || r.status === statusFilter;
-    const reqYear = new Date(r.start_date).getFullYear();
-    const reqMonth = new Date(r.start_date).getMonth() + 1;
-    const matchDate =
-      viewMode === "all" ? true :
-        viewMode === "yearly" ? reqYear === selectedYear :
-          reqYear === selectedYear && reqMonth === selectedMonth;
-    return matchStatus && matchDate;
-  });
+  const filtered = useMemo(
+    () =>
+      filterLeaveRequests(requests, {
+        status: statusFilter,
+        viewMode,
+        year: selectedYear,
+        month: selectedMonth,
+      }),
+    [requests, selectedMonth, selectedYear, statusFilter, viewMode]
+  );
 
   const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
   const totalUsed = displayLeavePool?.used_days ?? 0;
   const totalRemaining = displayLeavePool?.remaining ?? 0;
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const pendingCount = useMemo(() => countLeaveRequestsByStatus(requests).pending, [requests]);
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) return (
@@ -462,7 +459,7 @@ export default function UserLeaveDashboard() {
           onClose={() => setShowEditProfile(false)}
           onUpdateUser={(updated) => {
             setUser(updated);
-            localStorage.setItem("user", JSON.stringify(updated));
+            writeStoredUser(updated);
           }}
         />
       )}
