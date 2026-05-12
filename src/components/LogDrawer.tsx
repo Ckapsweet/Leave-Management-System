@@ -65,12 +65,6 @@ export function LogDrawer({ log, onClose }: LogDrawerProps) {
                 <span className="font-mono text-xs text-gray-700">{log.target_type} #{log.target_id}</span>
               </div>
             )}
-            {log.ip_address && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">IP</span>
-                <span className="font-mono text-xs text-gray-700">{log.ip_address}</span>
-              </div>
-            )}
           </div>
 
           {/* Note */}
