@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AuthUser } from "../../services/authService";
 import api from "../../services/api";
@@ -16,6 +16,7 @@ import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../../services/authSession";
 import { getErrorMessage } from "../../services/errors";
 import { normalizeDepartment } from "../../services/leaveFilters";
+import { useEmployeeFilters } from "../../hooks/useEmployeeFilters";
 import { useLeaveRequestFilters } from "../../hooks/useLeaveRequestFilters";
 
 export type ConfirmLeaveAction = { type: "approve" | "reject"; req: LeaveRequest };
@@ -194,12 +195,17 @@ export function useAdminEmployees(options: {
   const { year, user, requests, filterToSupervisor = false, departmentScope = null } = options;
   const [employees, setEmployees] = useState<EmployeeWithBalance[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
-  const [empSearch, setEmpSearch] = useState("");
-  const [empDeptFilter, setEmpDeptFilter] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithBalance | null>(null);
   const [empLeaveRequests, setEmpLeaveRequests] = useState<LeaveRequest[]>([]);
   const [empLeaveLoading, setEmpLeaveLoading] = useState(false);
   const [balanceModal, setBalanceModal] = useState<BalanceModalState>(null);
+  const {
+    empSearch,
+    setEmpSearch,
+    empDeptFilter,
+    setEmpDeptFilter,
+    filteredEmployees,
+  } = useEmployeeFilters(employees);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -268,18 +274,6 @@ export function useAdminEmployees(options: {
       }
     },
     [requests]
-  );
-
-  const filteredEmployees = useMemo(
-    () =>
-      employees.filter((employee) => {
-        const matchDepartment = empDeptFilter === "all" || normalizeDepartment(employee.department) === normalizeDepartment(empDeptFilter);
-        const query = empSearch.trim();
-        const matchSearch =
-          !query || employee.full_name.includes(query) || employee.employee_code.includes(query);
-        return matchDepartment && matchSearch;
-      }),
-    [empDeptFilter, empSearch, employees]
   );
 
   return {
