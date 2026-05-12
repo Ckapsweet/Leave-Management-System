@@ -14,11 +14,11 @@ import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { formatLeaveHours } from "../../services/leaveTime";
 import {
-  getErrorMessage,
   useAdminAuthUser,
   useAdminEmployees,
   useAdminLeaveRequests,
 } from "./adminDashboardHooks";
+import { getErrorMessage } from "../../services/errors";
 
 // ── Subordinate User type ────────────────────────────────────────────────────
 interface SubordinateUser {

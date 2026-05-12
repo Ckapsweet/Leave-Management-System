@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AxiosError } from "axios";
-import { logout } from "../../services/authService";
 import type { AuthUser } from "../../services/authService";
 import api from "../../services/api";
 import {
@@ -11,35 +9,20 @@ import {
   rejectLeaveRequest,
   updateLeavePool,
 } from "../../services/leaveService";
-import type { LeavePool, LeaveRequest, LeaveStatus } from "../../services/leaveService";
+import type { LeavePool, LeaveRequest } from "../../services/leaveService";
 import { toast } from "../../components/Toast";
 import type { Employee, EmployeeWithBalance } from "../../components/adminHelpers";
 import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
+import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../../services/authSession";
+import { getErrorMessage } from "../../services/errors";
+import { normalizeDepartment } from "../../services/leaveFilters";
+import { useLeaveRequestFilters } from "../../hooks/useLeaveRequestFilters";
 
-export type RequestViewMode = "all" | "yearly" | "monthly";
 export type ConfirmLeaveAction = { type: "approve" | "reject"; req: LeaveRequest };
 export type BalanceModalState = {
   user: { id: number; full_name: string; employee_code: string; department: string };
   pool: LeavePool;
 } | null;
-
-export function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof AxiosError) {
-    return error.response?.data?.message ?? fallback;
-  }
-  return fallback;
-}
-
-function readStoredUser(): AuthUser | null {
-  const stored = localStorage.getItem("user");
-  if (!stored) return null;
-  try {
-    return JSON.parse(stored) as AuthUser;
-  } catch {
-    localStorage.removeItem("user");
-    return null;
-  }
-}
 
 export function useAdminAuthUser() {
   const navigate = useNavigate();
@@ -48,14 +31,11 @@ export function useAdminAuthUser() {
 
   const updateUser = useCallback((updated: AuthUser) => {
     setUser(updated);
-    localStorage.setItem("user", JSON.stringify(updated));
+    writeStoredUser(updated);
   }, []);
 
   const handleLogout = useCallback(async () => {
-    await logout();
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
-    navigate("/", { replace: true });
+    await logoutAndRedirect(navigate);
   }, [navigate]);
 
   return {
@@ -69,18 +49,28 @@ export function useAdminAuthUser() {
 }
 
 export function useAdminLeaveRequests(onActionComplete?: () => void) {
-  const year = new Date().getFullYear();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
-  const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<RequestViewMode>("all");
-  const [selYear, setSelYear] = useState<number>(year);
-  const [selMonth, setSelMonth] = useState<number>(new Date().getMonth() + 1);
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
   const [confirm, setConfirm] = useState<ConfirmLeaveAction | null>(null);
+  const {
+    statusFilter,
+    setStatusFilter,
+    search,
+    setSearch,
+    viewMode,
+    setViewMode,
+    selYear,
+    setSelYear,
+    selMonth,
+    setSelMonth,
+    filtered,
+    pending,
+    approved,
+    rejected,
+  } = useLeaveRequestFilters(requests, { initialStatus: "pending" });
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -134,36 +124,6 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
     [onActionComplete]
   );
 
-  const filtered = useMemo(
-    () =>
-      requests.filter((request) => {
-        const matchStatus = statusFilter === "all" || request.status === statusFilter;
-        const query = search.trim();
-        const matchSearch =
-          !query ||
-          request.user?.full_name?.includes(query) ||
-          request.user?.employee_code?.includes(query);
-        const requestDate = new Date(request.start_date);
-        const matchDate =
-          viewMode === "all" ||
-          (viewMode === "yearly" && requestDate.getFullYear() === selYear) ||
-          (viewMode === "monthly" &&
-            requestDate.getFullYear() === selYear &&
-            requestDate.getMonth() + 1 === selMonth);
-        return matchStatus && matchSearch && matchDate;
-      }),
-    [requests, search, selMonth, selYear, statusFilter, viewMode]
-  );
-
-  const counts = useMemo(
-    () => ({
-      pending: requests.filter((request) => request.status === "pending").length,
-      approved: requests.filter((request) => request.status === "approved").length,
-      rejected: requests.filter((request) => request.status === "rejected").length,
-    }),
-    [requests]
-  );
-
   return {
     requests,
     setRequests,
@@ -187,14 +147,10 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
     fetchRequests,
     handleAction,
     filtered,
-    pending: counts.pending,
-    approved: counts.approved,
-    rejected: counts.rejected,
+    pending,
+    approved,
+    rejected,
   };
-}
-
-function normalizeDepartment(value?: string | null) {
-  return (value ?? "").trim();
 }
 
 function mergeUsers(primary: Employee[], secondary: Employee[]) {

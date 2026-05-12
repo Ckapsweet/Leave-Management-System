@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { logout } from "../../services/authService";
 import api from "../../services/api";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -21,15 +20,16 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { CreateUserModal } from "../../components/CreateUserModal";
+import { LogDrawer } from "../../components/LogDrawer";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { formatLeaveHours } from "../../services/leaveTime";
+import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
+import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
+import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment } from "../../services/leaveFilters";
+import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
-
-function normalizeDepartment(value?: string | null) {
-    return (value ?? "").trim();
-}
 
 interface DashboardData {
     summary: {
@@ -48,7 +48,7 @@ export default function OverviewDashboard() {
     const year = new Date().getFullYear();
 
     // ---- Tab State (เพิ่ม "teams" และ "departments") ----
-    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams" | "departments">("requests");
+    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams" | "departments" | "logs">("requests");
 
     // ---- Requests State ----
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -104,13 +104,24 @@ export default function OverviewDashboard() {
     const [showDeptModal, setShowDeptModal] = useState(false);
     const [deptForm, setDeptForm] = useState<{id: number | null, name: string}>({ id: null, name: "" });
 
+    // ---- Audit Logs State ----
+    const [logs, setLogs] = useState<AuditLog[]>([]);
+    const [logLoading, setLogLoading] = useState(false);
+    const [logActions, setLogActions] = useState<string[]>([]);
+    const [logActionFilter, setLogActionFilter] = useState("all");
+    const [logDateFrom, setLogDateFrom] = useState("");
+    const [logDateTo, setLogDateTo] = useState("");
+    const [logPage, setLogPage] = useState(1);
+    const [logTotalPages, setLogTotalPages] = useState(1);
+    const [logTotal, setLogTotal] = useState(0);
+    const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+
     // ---- Auth ----
     const [user, setUser] = useState<AuthUser | null>(null);
     const [showEditProfile, setShowEditProfile] = useState(false);
 
     useEffect(() => {
-        const stored = localStorage.getItem("user");
-        if (stored) setUser(JSON.parse(stored));
+        setUser(readStoredUser());
     }, []);
 
     // ---- Fetch Functions ----
@@ -189,21 +200,54 @@ export default function OverviewDashboard() {
         }
     }, []);
 
+    const fetchLogs = useCallback(async () => {
+        try {
+            setLogLoading(true);
+            const res = await getAuditLogs({
+                action: logActionFilter === "all" ? undefined : logActionFilter,
+                date_from: logDateFrom || undefined,
+                date_to: logDateTo || undefined,
+                page: logPage,
+                limit: 25,
+            });
+            setLogs(res.data);
+            setLogTotal(res.pagination.total);
+            setLogTotalPages(Math.max(1, res.pagination.totalPages));
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "โหลด log ไม่สำเร็จ");
+        } finally {
+            setLogLoading(false);
+        }
+    }, [logActionFilter, logDateFrom, logDateTo, logPage]);
+
+    const fetchLogActions = useCallback(async () => {
+        try {
+            setLogActions(await getAuditActions());
+        } catch {
+            setLogActions([]);
+        }
+    }, []);
+
     useEffect(() => {
         if (activeTab === "requests" || activeTab === "reports") fetchRequests();
         if (activeTab === "reports") fetchDashboardData();
         if (activeTab === "employees") fetchEmployees();
         if (activeTab === "teams" && !allUsersLoaded) fetchAllUsers();
         if ((activeTab === "teams" || activeTab === "departments") && departments.length === 0) fetchDepartments();
-    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, allUsersLoaded, departments.length]);
+        if (activeTab === "logs") {
+            fetchLogs();
+            if (logActions.length === 0) fetchLogActions();
+        }
+    }, [activeTab, fetchRequests, fetchDashboardData, fetchEmployees, fetchAllUsers, fetchDepartments, fetchLogs, fetchLogActions, allUsersLoaded, departments.length, logActions.length]);
+
+    useEffect(() => {
+        setLogPage(1);
+    }, [logActionFilter, logDateFrom, logDateTo]);
 
     // ---- Handlers ----
 
     const handleLogout = async () => {
-        await logout();
-        localStorage.removeItem("role");
-        localStorage.removeItem("user");
-        navigate("/", { replace: true });
+        await logoutAndRedirect(navigate);
     };
 
     const openBalanceModal = async (u: { id: number; full_name: string; employee_code: string; department: string }) => {
@@ -431,21 +475,15 @@ export default function OverviewDashboard() {
         return ms && mq;
     });
 
-    const filteredRequests = requests.filter((r) => {
-        const matchStatus = statusFilter === "all" || r.status === statusFilter;
-        const matchSearch = !search || r.user?.full_name?.includes(search) || r.user?.employee_code?.includes(search);
-        const reqYear = new Date(r.start_date).getFullYear();
-        const reqMonth = new Date(r.start_date).getMonth() + 1;
-        const matchDate =
-            viewMode === "all" ? true :
-                viewMode === "yearly" ? reqYear === selYear :
-                    reqYear === selYear && reqMonth === selMonth;
-        return matchStatus && matchSearch && matchDate;
+    const filteredRequests = filterLeaveRequests(requests, {
+        status: statusFilter,
+        search,
+        viewMode,
+        year: selYear,
+        month: selMonth,
     });
 
-    const pending = requests.filter((r) => r.status === "pending").length;
-    const approved = requests.filter((r) => r.status === "approved").length;
-    const rejected = requests.filter((r) => r.status === "rejected").length;
+    const { pending, approved, rejected } = countLeaveRequestsByStatus(requests);
     const leaveUsageByDepartment = Object.entries(
         (data?.leaveTypeStats ?? []).reduce<Record<string, { total: number; leaveTypes: { name: string; days: number }[] }>>((acc, row) => {
             const department = normalizeDepartment(row.department) || "ไม่ระบุแผนก";
@@ -545,6 +583,12 @@ export default function OverviewDashboard() {
                     onSubmit={handleCreateUser}
                     onClose={() => setShowCreateModal(false)}
                     loading={createLoading}
+                />
+            )}
+            {selectedLog && (
+                <LogDrawer
+                    log={selectedLog}
+                    onClose={() => setSelectedLog(null)}
                 />
             )}
             {resetPasswordTarget && (
@@ -679,6 +723,10 @@ export default function OverviewDashboard() {
                     <button onClick={() => setActiveTab("departments")}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "departments" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                         จัดการแผนก
+                    </button>
+                    <button onClick={() => setActiveTab("logs")}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "logs" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                        Logs
                     </button>
                 </div>
 
@@ -1403,6 +1451,116 @@ export default function OverviewDashboard() {
                                     </table>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== TAB: LOGS ===== */}
+                {activeTab === "logs" && (
+                    <div className="space-y-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                    <h2 className="text-sm font-semibold text-gray-700">Audit Logs</h2>
+                                    <p className="text-xs text-gray-400 mt-0.5">{logTotal} รายการ</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <select
+                                        value={logActionFilter}
+                                        onChange={(e) => setLogActionFilter(e.target.value)}
+                                        className="border border-gray-200 rounded-xl px-3 py-2 text-xs bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                    >
+                                        <option value="all">ทุก action</option>
+                                        {logActions.map((action) => (
+                                            <option key={action} value={action}>{getActionMeta(action).label}</option>
+                                        ))}
+                                    </select>
+                                    <input
+                                        type="date"
+                                        value={logDateFrom}
+                                        onChange={(e) => setLogDateFrom(e.target.value)}
+                                        className="border border-gray-200 rounded-xl px-3 py-2 text-xs bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                    />
+                                    <input
+                                        type="date"
+                                        value={logDateTo}
+                                        onChange={(e) => setLogDateTo(e.target.value)}
+                                        className="border border-gray-200 rounded-xl px-3 py-2 text-xs bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                    />
+                                    <button
+                                        onClick={fetchLogs}
+                                        className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                                        รีเฟรช
+                                    </button>
+                                </div>
+                            </div>
+
+                            {logLoading ? (
+                                <div className="py-16 flex justify-center">
+                                    <div className="w-6 h-6 border-2 border-slate-800 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : logs.length === 0 ? (
+                                <div className="py-16 text-center text-gray-400 text-sm">ไม่พบ log</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-gray-100 text-left">
+                                                {["เวลา", "Action", "ผู้กระทำ", "เป้าหมาย", "หมายเหตุ"].map((h) => (
+                                                    <th key={h} className="px-5 py-3 text-xs font-semibold text-gray-400 whitespace-nowrap">{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {logs.map((log) => {
+                                                const meta = getActionMeta(log.action);
+                                                return (
+                                                    <tr key={log.id} className="hover:bg-slate-50/70 cursor-pointer transition-colors" onClick={() => setSelectedLog(log)}>
+                                                        <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">{fmtLogDatetime(log.created_at)}</td>
+                                                        <td className="px-5 py-4">
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${meta.bg} ${meta.color}`}>
+                                                                <span>{meta.icon}</span>
+                                                                {meta.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-4">
+                                                            <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{log.actor_name}</p>
+                                                            <p className="text-xs text-gray-400">{log.actor_code} · {log.actor_role}</p>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-xs font-mono text-gray-600 whitespace-nowrap">
+                                                            {log.target_type ? `${log.target_type} #${log.target_id ?? "-"}` : "-"}
+                                                        </td>
+                                                        <td className="px-5 py-4 text-sm text-gray-500 max-w-[320px] truncate">{log.note ?? "-"}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+
+                            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+                                <p className="text-xs text-gray-400">คลิกแถวเพื่อดูรายละเอียด log</p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setLogPage((page) => Math.max(1, page - 1))}
+                                        disabled={logPage <= 1 || logLoading}
+                                        className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span className="text-xs text-gray-500">หน้า {logPage} / {logTotalPages}</span>
+                                    <button
+                                        onClick={() => setLogPage((page) => Math.min(logTotalPages, page + 1))}
+                                        disabled={logPage >= logTotalPages || logLoading}
+                                        className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

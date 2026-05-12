@@ -226,8 +226,8 @@ describe("LeaveRequestModal — SummaryPill", () => {
   it("แสดงจำนวนวันเมื่อเลือกวันครบ", async () => {
     renderModal();
     const dateInputs = screen.getAllByDisplayValue("");
-    fireEvent.change(dateInputs[0], { target: { value: "2026-03-01" } });
-    fireEvent.change(dateInputs[1], { target: { value: "2026-03-03" } });
+    fireEvent.change(dateInputs[0], { target: { value: "2026-03-02" } });
+    fireEvent.change(dateInputs[1], { target: { value: "2026-03-04" } });
     expect(await screen.findByText("3 วัน")).toBeInTheDocument();
   });
 });
@@ -241,8 +241,8 @@ describe("LeaveRequestModal — submit สำเร็จ", () => {
 
     await userEvent.click(screen.getByText(/ลาป่วย/));
     const dateInputs = screen.getAllByDisplayValue("");
-    fireEvent.change(dateInputs[0], { target: { value: "2026-03-01" } });
-    fireEvent.change(dateInputs[1], { target: { value: "2026-03-03" } });
+    fireEvent.change(dateInputs[0], { target: { value: "2026-03-02" } });
+    fireEvent.change(dateInputs[1], { target: { value: "2026-03-04" } });
     await userEvent.type(screen.getByPlaceholderText("ระบุเหตุผลการลา..."), "ป่วยไข้");
     await userEvent.click(screen.getByText("ส่งคำขอลา"));
 
@@ -252,8 +252,8 @@ describe("LeaveRequestModal — submit สำเร็จ", () => {
         expect.objectContaining({
           leave_type_id: 1,
           leave_unit: "day",
-          start_date: "2026-03-01",
-          end_date: "2026-03-03",
+          start_date: "2026-03-02",
+          end_date: "2026-03-04",
           reason: "ป่วยไข้",
         })
       );

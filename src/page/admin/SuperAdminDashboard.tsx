@@ -20,10 +20,7 @@ import {
   useAdminEmployees,
   useAdminLeaveRequests,
 } from "./adminDashboardHooks";
-
-function normalizeDepartment(value?: string | null) {
-  return (value ?? "").trim();
-}
+import { normalizeDepartment } from "../../services/leaveFilters";
 
 
 
