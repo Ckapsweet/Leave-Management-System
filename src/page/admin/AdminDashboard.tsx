@@ -19,6 +19,7 @@ import {
   useAdminLeaveRequests,
 } from "./adminDashboardHooks";
 import { getErrorMessage } from "../../services/errors";
+import { normalizeDepartment } from "../../services/leaveFilters";
 
 // ── Subordinate User type ────────────────────────────────────────────────────
 interface SubordinateUser {
@@ -47,6 +48,8 @@ export default function AdminDashboard() {
     navigate,
   } = useAdminAuthUser();
 
+  const departmentScope = user?.role === "lead" ? user.department : null;
+
   const {
     requests,
     loading,
@@ -72,7 +75,7 @@ export default function AdminDashboard() {
     pending,
     approved,
     rejected,
-  } = useAdminLeaveRequests();
+  } = useAdminLeaveRequests(undefined, { departmentScope });
 
   const {
     employees,
@@ -98,18 +101,28 @@ export default function AdminDashboard() {
     user,
     requests,
     filterToSupervisor: user?.role === "lead" || user?.role === "manager",
+    departmentScope,
   });
   const fetchAllUsersForLead = useCallback(async () => {
     try {
       setSubLoading(true);
       const res = await api.get<SubordinateUser[]>("/api/admin/users");
-      setAllUsers(res.data);
+      setAllUsers(
+        user?.role === "lead"
+          ? res.data.filter(
+              (employee) =>
+                employee.id !== user.id &&
+                employee.role === "user" &&
+                normalizeDepartment(employee.department) === normalizeDepartment(user.department)
+            )
+          : res.data
+      );
     } catch (err) {
       console.error("fetch users for subordinate management failed", err);
     } finally {
       setSubLoading(false);
     }
-  }, []);
+  }, [user?.department, user?.id, user?.role]);
 
   useEffect(() => {
     if (activeTab === "employees") fetchEmployees();
@@ -292,7 +305,7 @@ export default function AdminDashboard() {
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
 
         {/* ── Today's Leaves Component ── */}
-        <TodayLeavesWidget />
+        <TodayLeavesWidget departmentScope={departmentScope} />
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (

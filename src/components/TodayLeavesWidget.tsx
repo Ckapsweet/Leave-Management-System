@@ -1,8 +1,20 @@
 import { useState, useEffect } from "react";
 import { getThisWeekLeaves, getTodayLeaves } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
+import { normalizeDepartment } from "../services/leaveFilters";
 
-export function TodayLeavesWidget() {
+interface TodayLeavesWidgetProps {
+    departmentScope?: string | null;
+}
+
+function filterByDepartment(leaves: LeaveRequest[], departmentScope?: string | null) {
+    if (!departmentScope) return leaves;
+    return leaves.filter(
+        (leave) => normalizeDepartment(leave.user?.department) === normalizeDepartment(departmentScope)
+    );
+}
+
+export function TodayLeavesWidget({ departmentScope = null }: TodayLeavesWidgetProps) {
     const [todayLeaves, setTodayLeaves] = useState<LeaveRequest[]>([]);
     const [weekLeaves, setWeekLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -10,12 +22,12 @@ export function TodayLeavesWidget() {
     useEffect(() => {
         Promise.all([getTodayLeaves(), getThisWeekLeaves()])
             .then(([today, week]) => {
-                setTodayLeaves(today);
-                setWeekLeaves(week);
+                setTodayLeaves(filterByDepartment(today, departmentScope));
+                setWeekLeaves(filterByDepartment(week, departmentScope));
             })
             .catch((err) => console.error("Failed to load department leaves", err))
             .finally(() => setLoading(false));
-    }, []);
+    }, [departmentScope]);
 
     const renderLeaves = (leaves: LeaveRequest[], emptyText: string) => {
         if (loading) {

@@ -6,6 +6,8 @@ import {
   approveLeaveRequest,
   getAdminLeaveRequests,
   getAdminUserPool,
+  getThisWeekLeaves,
+  getTodayLeaves,
   rejectLeaveRequest,
   updateLeavePool,
 } from "../../services/leaveService";
@@ -49,7 +51,11 @@ export function useAdminAuthUser() {
   };
 }
 
-export function useAdminLeaveRequests(onActionComplete?: () => void) {
+export function useAdminLeaveRequests(
+  onActionComplete?: () => void,
+  options: { departmentScope?: string | null } = {}
+) {
+  const { departmentScope = null } = options;
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -78,13 +84,20 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
       setLoading(true);
       setError("");
       const data = await getAdminLeaveRequests();
-      setRequests(data);
+      setRequests(
+        departmentScope
+          ? data.filter(
+              (request) =>
+                normalizeDepartment(request.user?.department) === normalizeDepartment(departmentScope)
+            )
+          : data
+      );
     } catch (err) {
       setError(getErrorMessage(err, "โหลดข้อมูลไม่สำเร็จ"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [departmentScope]);
 
   useEffect(() => {
     fetchRequests();
@@ -163,6 +176,20 @@ function mergeUsers(primary: Employee[], secondary: Employee[]) {
   }, []);
 }
 
+function isSameId(a: number | string | null | undefined, b: number | string | null | undefined) {
+  return a != null && b != null && String(a) === String(b);
+}
+
+function isInSupervisorTree(employee: Employee, supervisorId: number | string | null | undefined, users: Employee[]) {
+  if (isSameId(employee.supervisor_id, supervisorId)) return true;
+  const supervisor = users.find((item) => isSameId(item.id, employee.supervisor_id));
+  return isSameId(supervisor?.supervisor_id, supervisorId);
+}
+
+function isInSeedUsers(employee: Employee, seedUsers: Employee[]) {
+  return seedUsers.some((seedUser) => isSameId(seedUser.id, employee.id));
+}
+
 async function fetchEmployeesWithPools(
   year: number,
   shouldInclude: (user: Employee, users: Employee[]) => boolean,
@@ -210,16 +237,20 @@ export function useAdminEmployees(options: {
   const fetchEmployees = useCallback(async () => {
     try {
       setEmpLoading(true);
+      const leaveWidgetUsers = [
+        ...(await getTodayLeaves()),
+        ...(await getThisWeekLeaves()),
+      ].flatMap((request) => (request.user ? [request.user] : []));
       const requestUsers = requests.flatMap((request) => (request.user ? [request.user] : []));
+      const seedUsers = [...requestUsers, ...leaveWidgetUsers];
       const withPool = await fetchEmployeesWithPools(year, (employee, users) => {
         if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
           return false;
         }
         if (!filterToSupervisor) return true;
-        if (employee.supervisor_id === user?.id) return true;
-        const supervisor = users.find((item) => item.id === employee.supervisor_id);
-        return supervisor?.supervisor_id === user?.id;
-      }, requestUsers, requests);
+        if (isInSeedUsers(employee, requestUsers)) return true;
+        return isInSupervisorTree(employee, user?.id, users);
+      }, seedUsers, requests);
       setEmployees(withPool);
     } catch (err) {
       console.error("fetch employees failed", err);

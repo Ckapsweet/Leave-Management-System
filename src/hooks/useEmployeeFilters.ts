@@ -1,10 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { EmployeeWithBalance } from "../components/adminHelpers";
 import { normalizeDepartment } from "../services/leaveFilters";
 
 export function useEmployeeFilters(employees: EmployeeWithBalance[]) {
   const [empSearch, setEmpSearch] = useState("");
   const [empDeptFilter, setEmpDeptFilter] = useState("all");
+
+  useEffect(() => {
+    if (
+      empDeptFilter !== "all" &&
+      !employees.some((employee) => normalizeDepartment(employee.department) === normalizeDepartment(empDeptFilter))
+    ) {
+      setEmpDeptFilter("all");
+    }
+  }, [empDeptFilter, employees]);
 
   const filteredEmployees = useMemo(
     () =>
