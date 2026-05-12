@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
@@ -13,8 +13,8 @@ import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 import { formatLeaveHours } from "../services/leaveTime";
-import { countLeaveRequestsByStatus, filterLeaveRequests, type RequestViewMode } from "../services/leaveFilters";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
+import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -316,10 +316,18 @@ export default function UserLeaveDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("all");
-  const [viewMode, setViewMode] = useState<RequestViewMode>("all");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const {
+    statusFilter,
+    setStatusFilter,
+    viewMode,
+    setViewMode,
+    selYear: selectedYear,
+    setSelYear: setSelectedYear,
+    selMonth: selectedMonth,
+    setSelMonth: setSelectedMonth,
+    filtered,
+    pending: pendingCount,
+  } = useLeaveRequestFilters(requests);
 
   // ── Fetch all data ──────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -382,21 +390,9 @@ export default function UserLeaveDashboard() {
   };
 
   // ── Derived ─────────────────────────────────────────────────
-  const filtered = useMemo(
-    () =>
-      filterLeaveRequests(requests, {
-        status: statusFilter,
-        viewMode,
-        year: selectedYear,
-        month: selectedMonth,
-      }),
-    [requests, selectedMonth, selectedYear, statusFilter, viewMode]
-  );
-
   const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
   const totalUsed = displayLeavePool?.used_days ?? 0;
   const totalRemaining = displayLeavePool?.remaining ?? 0;
-  const pendingCount = useMemo(() => countLeaveRequestsByStatus(requests).pending, [requests]);
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) return (

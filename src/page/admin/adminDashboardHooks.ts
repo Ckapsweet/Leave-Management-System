@@ -9,18 +9,14 @@ import {
   rejectLeaveRequest,
   updateLeavePool,
 } from "../../services/leaveService";
-import type { LeavePool, LeaveRequest, LeaveStatus } from "../../services/leaveService";
+import type { LeavePool, LeaveRequest } from "../../services/leaveService";
 import { toast } from "../../components/Toast";
 import type { Employee, EmployeeWithBalance } from "../../components/adminHelpers";
 import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../../services/authSession";
 import { getErrorMessage } from "../../services/errors";
-import {
-  countLeaveRequestsByStatus,
-  filterLeaveRequests,
-  normalizeDepartment,
-  type RequestViewMode,
-} from "../../services/leaveFilters";
+import { normalizeDepartment } from "../../services/leaveFilters";
+import { useLeaveRequestFilters } from "../../hooks/useLeaveRequestFilters";
 
 export type ConfirmLeaveAction = { type: "approve" | "reject"; req: LeaveRequest };
 export type BalanceModalState = {
@@ -53,18 +49,28 @@ export function useAdminAuthUser() {
 }
 
 export function useAdminLeaveRequests(onActionComplete?: () => void) {
-  const year = new Date().getFullYear();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | LeaveStatus>("pending");
-  const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<RequestViewMode>("all");
-  const [selYear, setSelYear] = useState<number>(year);
-  const [selMonth, setSelMonth] = useState<number>(new Date().getMonth() + 1);
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
   const [confirm, setConfirm] = useState<ConfirmLeaveAction | null>(null);
+  const {
+    statusFilter,
+    setStatusFilter,
+    search,
+    setSearch,
+    viewMode,
+    setViewMode,
+    selYear,
+    setSelYear,
+    selMonth,
+    setSelMonth,
+    filtered,
+    pending,
+    approved,
+    rejected,
+  } = useLeaveRequestFilters(requests, { initialStatus: "pending" });
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -118,23 +124,6 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
     [onActionComplete]
   );
 
-  const filtered = useMemo(
-    () =>
-      filterLeaveRequests(requests, {
-        status: statusFilter,
-        search,
-        viewMode,
-        year: selYear,
-        month: selMonth,
-      }),
-    [requests, search, selMonth, selYear, statusFilter, viewMode]
-  );
-
-  const counts = useMemo(
-    () => countLeaveRequestsByStatus(requests),
-    [requests]
-  );
-
   return {
     requests,
     setRequests,
@@ -158,9 +147,9 @@ export function useAdminLeaveRequests(onActionComplete?: () => void) {
     fetchRequests,
     handleAction,
     filtered,
-    pending: counts.pending,
-    approved: counts.approved,
-    rejected: counts.rejected,
+    pending,
+    approved,
+    rejected,
   };
 }
 
