@@ -95,6 +95,24 @@ export function formatLeaveHours(hours: number | string | null | undefined): str
   return parts.join(" ") || "0 นาที";
 }
 
+export function formatLeaveDays(value: number | string | null | undefined): string {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "0 วัน";
+
+  const minutesPerWorkDay = WORK_HOURS_PER_DAY * 60;
+  const totalMinutes = Math.round(parsed * minutesPerWorkDay);
+  const days = Math.floor(totalMinutes / minutesPerWorkDay);
+  const remainingMinutes = totalMinutes % minutesPerWorkDay;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} วัน`);
+  if (hours > 0) parts.push(`${hours} ชม.`);
+  if (minutes > 0) parts.push(`${minutes} นาที`);
+  return parts.join(" ") || "0 วัน";
+}
+
 export function leaveHoursToDays(hours: number | string | null | undefined): number {
   const parsed = Number(hours ?? 0);
   if (!Number.isFinite(parsed)) return 0;

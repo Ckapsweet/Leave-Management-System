@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import dayjs from "dayjs";
-import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours } from "../leaveTime";
+import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours, leaveHoursToDays } from "../leaveTime";
 
 describe("leaveTime", () => {
   it("rounds hourly leave up to the next half hour", () => {
@@ -17,5 +17,9 @@ describe("leaveTime", () => {
     expect(formatLeaveHours(0.5)).toBe("30 นาที");
     expect(formatLeaveHours(1.5)).toBe("1 ชั่วโมง 30 นาที");
     expect(formatLeaveHours(2)).toBe("2 ชั่วโมง");
+  });
+
+  it("converts hourly leave using 7.5 work hours per day", () => {
+    expect(leaveHoursToDays(3.5)).toBe(0.47);
   });
 });

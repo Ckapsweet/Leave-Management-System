@@ -13,7 +13,7 @@ import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 import { LeaveBalanceCard } from "../components/LeaveBalanceCard";
-import { formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
 
@@ -58,7 +58,7 @@ function DurationBadge({ req }: { req: LeaveRequest }) {
       </span>
     );
   }
-  return <span className="text-sm font-semibold text-gray-700">{req.total_days} วัน</span>;
+  return <span className="text-sm font-semibold text-gray-700">{formatLeaveDays(req.total_days)}</span>;
 }
 
 // ── RequestRow ────────────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ function DetailDrawer({
               <span className="text-gray-500 text-sm">รวมทั้งหมด</span>
               {isHourly
                 ? <span className="font-bold text-indigo-700 text-base">{formatLeaveHours(req.total_hours)}</span>
-                : <span className="font-bold text-gray-900 text-base">{req.total_days} วัน</span>}
+                : <span className="font-bold text-gray-900 text-base">{formatLeaveDays(req.total_days)}</span>}
             </div>
           </div>
 
@@ -524,11 +524,11 @@ export default function UserLeaveDashboard() {
             </div>
             <div className="flex gap-6 sm:gap-8">
               <div className="text-center">
-                <p className="text-2xl font-bold text-indigo-600">{totalRemaining}</p>
+                <p className="text-2xl font-bold text-indigo-600">{formatLeaveDays(totalRemaining)}</p>
                 <p className="text-xs text-gray-500">วันคงเหลือ</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-gray-700">{totalUsed}</p>
+                <p className="text-2xl font-bold text-gray-700">{formatLeaveDays(totalUsed)}</p>
                 <p className="text-xs text-gray-500">วันที่ใช้ไป</p>
               </div>
               <div className="text-center">

@@ -2,6 +2,7 @@
 // Shared report component สำหรับทั้ง User และ Admin
 import { useState, useEffect } from "react";
 import type { MonthlyReport, YearStat } from "../services/leaveService";
+import { formatLeaveDays } from "../services/leaveTime";
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -65,11 +66,11 @@ function BarChart({ data, maxVal }: { data: { label: string; value: number; by_t
       {tooltip && (
         <div className="fixed z-50 bg-gray-900 text-white rounded-xl p-3 text-xs shadow-xl pointer-events-none transform -translate-x-1/2"
           style={{ left: tooltip.x + 16, top: tooltip.y - 10 }}>
-          <p className="font-semibold mb-1">{tooltip.label} — {tooltip.total} วัน</p>
+          <p className="font-semibold mb-1">{tooltip.label} — {formatLeaveDays(tooltip.total)}</p>
           {Object.entries(tooltip.by_type).map(([name, val]) => (
             <div key={name} className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getColor(name, 0) }} />
-              <span>{name}: {val} วัน</span>
+              <span>{name}: {formatLeaveDays(val)}</span>
             </div>
           ))}
         </div>
@@ -214,11 +215,11 @@ export function LeaveReport({ fetchMonthly, fetchYearly, currentYear }: LeaveRep
                     {allTypes.map((t) => (
                       <td key={t} className="px-4 py-3 text-sm text-center">
                         {m.by_type[t] ? (
-                          <span className="font-medium text-gray-700">{m.by_type[t]}</span>
+                          <span className="font-medium text-gray-700">{formatLeaveDays(m.by_type[t])}</span>
                         ) : <span className="text-gray-300">—</span>}
                       </td>
                     ))}
-                    <td className="px-5 py-3 text-sm font-bold text-gray-900 text-center">{m.total_days}</td>
+                    <td className="px-5 py-3 text-sm font-bold text-gray-900 text-center">{formatLeaveDays(m.total_days)}</td>
                   </tr>
                 ))}
                 {/* Summary row */}
@@ -226,10 +227,10 @@ export function LeaveReport({ fetchMonthly, fetchYearly, currentYear }: LeaveRep
                   <td className="px-5 py-3 text-sm text-indigo-700">รวมทั้งปี {monthly.year}</td>
                   {allTypes.map((t) => {
                     const sum = monthly.months.reduce((s, m) => s + (m.by_type[t] ?? 0), 0);
-                    return <td key={t} className="px-4 py-3 text-sm text-center text-indigo-700">{sum > 0 ? sum : "—"}</td>;
+                    return <td key={t} className="px-4 py-3 text-sm text-center text-indigo-700">{sum > 0 ? formatLeaveDays(sum) : "—"}</td>;
                   })}
                   <td className="px-5 py-3 text-sm text-center text-indigo-700">
-                    {monthly.months.reduce((s, m) => s + m.total_days, 0)}
+                    {formatLeaveDays(monthly.months.reduce((s, m) => s + m.total_days, 0))}
                   </td>
                 </tr>
               </tbody>
@@ -249,10 +250,10 @@ export function LeaveReport({ fetchMonthly, fetchYearly, currentYear }: LeaveRep
                     <td className="px-5 py-3 text-sm font-medium text-gray-700">{y.year}</td>
                     {allTypes.map((t) => (
                       <td key={t} className="px-4 py-3 text-sm text-center">
-                        {y.by_type[t] ? <span className="font-medium text-gray-700">{y.by_type[t]}</span> : <span className="text-gray-300">—</span>}
+                        {y.by_type[t] ? <span className="font-medium text-gray-700">{formatLeaveDays(y.by_type[t])}</span> : <span className="text-gray-300">—</span>}
                       </td>
                     ))}
-                    <td className="px-5 py-3 text-sm font-bold text-gray-900 text-center">{y.total_days}</td>
+                    <td className="px-5 py-3 text-sm font-bold text-gray-900 text-center">{formatLeaveDays(y.total_days)}</td>
                   </tr>
                 ))}
               </tbody>

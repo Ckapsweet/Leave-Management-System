@@ -5,7 +5,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
 import { toast } from "./Toast";
 import type { LeavePool } from "../services/leaveService";
-import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours } from "../services/leaveTime";
+import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 
 type LeaveUnit = "day" | "hour";
 type RequestKind = "leave" | "late";
@@ -305,7 +305,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                   >
                     <span className="text-sm mb-1">{t.name}</span>
                     <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
-                      คงเหลือ: <strong className={isSelected ? "text-white" : "text-gray-600"}>{remaining} วัน</strong>
+                      คงเหลือ: <strong className={isSelected ? "text-white" : "text-gray-600"}>{formatLeaveDays(remaining)}</strong>
                     </span>
                   </button>
                 );

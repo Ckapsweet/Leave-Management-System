@@ -136,7 +136,7 @@ describe("createLeaveRequest — ลาเป็นชั่วโมง", () =>
   beforeEach(() => {
     mockPost.mockClear();
     mockPost.mockResolvedValue({
-      data: { ...mockLeaveRequest, leave_unit: "hour", total_hours: 3, total_days: 0.38 },
+      data: { ...mockLeaveRequest, leave_unit: "hour", total_hours: 3, total_days: 0.4 },
     });
   });
 
