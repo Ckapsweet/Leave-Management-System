@@ -7,6 +7,22 @@ const TYPE_COLORS: Record<number, string> = {
   4: "bg-orange-100 text-orange-700",
 };
 
+const MINUTES_PER_WORK_DAY = 8 * 60;
+
+export function formatLeaveDays(value: number) {
+  const totalMinutes = Math.max(0, Math.round(value * MINUTES_PER_WORK_DAY));
+  const days = Math.floor(totalMinutes / MINUTES_PER_WORK_DAY);
+  const remainingMinutes = totalMinutes % MINUTES_PER_WORK_DAY;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts = [];
+  if (days > 0) parts.push(`${days} วัน`);
+  if (hours > 0) parts.push(`${hours} ชม.`);
+  if (minutes > 0) parts.push(`${minutes} นาที`);
+  return parts.length > 0 ? parts.join(" ") : "0 วัน";
+}
+
 export function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
   const typeColor = TYPE_COLORS[balance.leave_type_id] ?? "bg-gray-100 text-gray-600";
   const total = Math.max(0, balance.total_days);
@@ -25,8 +41,8 @@ export function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
           <p className="text-xs text-gray-400 mt-2">สิทธิ์ประจำปี</p>
         </div>
         <div className="text-right">
-          <p className={`text-3xl font-bold ${remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
-            {remaining}
+          <p className={`text-2xl font-bold ${remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
+            {formatLeaveDays(remaining)}
           </p>
           <p className="text-xs text-gray-400">วันคงเหลือ</p>
         </div>
@@ -44,11 +60,11 @@ export function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
       <div className="grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
         <div>
           <p className="text-xs text-gray-400">สิทธิ์รวม</p>
-          <p className="text-sm font-bold text-gray-800">{total} วัน</p>
+          <p className="text-sm font-bold text-gray-800">{formatLeaveDays(total)}</p>
         </div>
         <div>
           <p className="text-xs text-gray-400">ใช้ไปแล้ว</p>
-          <p className="text-sm font-bold text-gray-800">{used} วัน</p>
+          <p className="text-sm font-bold text-gray-800">{formatLeaveDays(used)}</p>
         </div>
       </div>
     </div>
