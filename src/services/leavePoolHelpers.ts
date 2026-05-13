@@ -18,9 +18,16 @@ function balanceKey(name: string | null | undefined, id: number) {
 export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: LeaveRequest[], year = new Date().getFullYear()) {
   if (!pool) return pool;
 
-  const approvedRequests = requests.filter(
-    (request) => request.status === "approved" && new Date(request.start_date).getFullYear() === year
-  );
+  const usageByType = new Map<string, number>();
+  let usedFromRequests = 0;
+  requests.forEach((request) => {
+    if (request.status !== "approved" || new Date(request.start_date).getFullYear() !== year) return;
+
+    const usageDays = getLeaveUsageDays(request);
+    const key = balanceKey(request.leave_type?.name, request.leave_type_id);
+    usageByType.set(key, (usageByType.get(key) ?? 0) + usageDays);
+    usedFromRequests += usageDays;
+  });
 
   const groupedBalances = new Map<string, NonNullable<LeavePool["balances"]>[number]>();
   (pool.balances ?? []).forEach((balance) => {
@@ -39,9 +46,7 @@ export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: Le
 
   const balances = Array.from(groupedBalances.values()).map((balance) => {
     const key = balanceKey(balance.name, balance.leave_type_id);
-    const usedDays = approvedRequests
-      .filter((request) => balanceKey(request.leave_type?.name, request.leave_type_id) === key)
-      .reduce((sum, request) => sum + getLeaveUsageDays(request), 0);
+    const usedDays = usageByType.get(key) ?? 0;
     const used_days = Math.max(toNumber(balance.used_days), usedDays);
     const total_days = toNumber(balance.total_days);
     return {
@@ -53,7 +58,6 @@ export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: Le
   });
 
   const usedFromBalances = balances.reduce((sum, balance) => sum + toNumber(balance.used_days), 0);
-  const usedFromRequests = approvedRequests.reduce((sum, request) => sum + getLeaveUsageDays(request), 0);
   const used_days = Math.max(toNumber(pool.used_days), usedFromBalances, usedFromRequests);
   const total_days = toNumber(pool.total_days);
 

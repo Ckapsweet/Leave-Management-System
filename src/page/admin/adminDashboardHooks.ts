@@ -168,43 +168,66 @@ export function useAdminLeaveRequests(
 }
 
 function mergeUsers(primary: Employee[], secondary: Employee[]) {
-  return [...primary, ...secondary].reduce<Employee[]>((acc, employee) => {
-    if (!acc.some((item) => item.id === employee.id)) {
-      acc.push({ ...employee, department: normalizeDepartment(employee.department) });
+  const usersById = new Map<number, Employee>();
+  [...primary, ...secondary].forEach((employee) => {
+    if (!usersById.has(employee.id)) {
+      usersById.set(employee.id, { ...employee, department: normalizeDepartment(employee.department) });
     }
-    return acc;
-  }, []);
+  });
+  return Array.from(usersById.values());
 }
 
 function isSameId(a: number | string | null | undefined, b: number | string | null | undefined) {
   return a != null && b != null && String(a) === String(b);
 }
 
-function isInSupervisorTree(employee: Employee, supervisorId: number | string | null | undefined, users: Employee[]) {
+function idKey(value: number | string | null | undefined) {
+  return value == null ? "" : String(value);
+}
+
+function isInSupervisorTree(
+  employee: Employee,
+  supervisorId: number | string | null | undefined,
+  userById: Map<string, Employee>
+) {
   if (isSameId(employee.supervisor_id, supervisorId)) return true;
-  const supervisor = users.find((item) => isSameId(item.id, employee.supervisor_id));
+  const supervisor = userById.get(idKey(employee.supervisor_id));
   return isSameId(supervisor?.supervisor_id, supervisorId);
 }
 
-function isInSeedUsers(employee: Employee, seedUsers: Employee[]) {
-  return seedUsers.some((seedUser) => isSameId(seedUser.id, employee.id));
+function isInSeedUsers(employee: Employee, seedUserIds: Set<string>) {
+  return seedUserIds.has(idKey(employee.id));
+}
+
+function groupRequestsByUserId(requests: LeaveRequest[]) {
+  return requests.reduce<Map<number, LeaveRequest[]>>((grouped, request) => {
+    const userRequests = grouped.get(request.user_id);
+    if (userRequests) {
+      userRequests.push(request);
+    } else {
+      grouped.set(request.user_id, [request]);
+    }
+    return grouped;
+  }, new Map());
 }
 
 async function fetchEmployeesWithPools(
   year: number,
-  shouldInclude: (user: Employee, users: Employee[]) => boolean,
+  shouldInclude: (user: Employee, userById: Map<string, Employee>) => boolean,
   seedUsers: Employee[] = [],
   requests: LeaveRequest[] = []
 ) {
   const usersRes = await api.get<Employee[]>("/api/admin/users");
   const nonAdminUsers = mergeUsers(usersRes.data, seedUsers).filter((user) => user.role !== "admin");
-  const users = nonAdminUsers.filter((employee) => shouldInclude(employee, nonAdminUsers));
+  const userById = new Map(nonAdminUsers.map((employee) => [idKey(employee.id), employee]));
+  const users = nonAdminUsers.filter((employee) => shouldInclude(employee, userById));
+  const requestsByUserId = groupRequestsByUserId(requests);
 
   return Promise.all(
     users.map(async (user) => {
       try {
         const res = await getAdminUserPool(user.id, year);
-        return { ...user, pool: deriveLeavePoolFromRequests(res, requests.filter((request) => request.user_id === user.id), year) };
+        return { ...user, pool: deriveLeavePoolFromRequests(res, requestsByUserId.get(user.id) ?? [], year) };
       } catch {
         return { ...user, pool: null };
       }
@@ -243,13 +266,14 @@ export function useAdminEmployees(options: {
       ].flatMap((request) => (request.user ? [request.user] : []));
       const requestUsers = requests.flatMap((request) => (request.user ? [request.user] : []));
       const seedUsers = [...requestUsers, ...leaveWidgetUsers];
-      const withPool = await fetchEmployeesWithPools(year, (employee, users) => {
+      const requestUserIds = new Set(requestUsers.map((requestUser) => idKey(requestUser.id)));
+      const withPool = await fetchEmployeesWithPools(year, (employee, userById) => {
         if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
           return false;
         }
         if (!filterToSupervisor) return true;
-        if (isInSeedUsers(employee, requestUsers)) return true;
-        return isInSupervisorTree(employee, user?.id, users);
+        if (isInSeedUsers(employee, requestUserIds)) return true;
+        return isInSupervisorTree(employee, user?.id, userById);
       }, seedUsers, requests);
       setEmployees(withPool);
     } catch (err) {
