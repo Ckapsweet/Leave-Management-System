@@ -12,7 +12,7 @@ import {
 } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
-import { formatLeaveHours } from "../../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
 import {
   useAdminAuthUser,
   useAdminEmployees,
@@ -433,7 +433,7 @@ export default function AdminDashboard() {
                               {isHourly && r.start_time && <p className="text-xs text-gray-400">{r.start_time} – {r.end_time} น.</p>}
                             </td>
                             <td className="px-5 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                              {isHourly ? formatLeaveHours(r.total_hours) : `${r.total_days} วัน`}
+                              {isHourly ? formatLeaveHours(r.total_hours) : formatLeaveDays(r.total_days)}
                             </td>
                             <td className="px-5 py-4 text-sm text-gray-500 max-w-[160px] truncate">{r.reason}</td>
                             <td className="px-5 py-4">
@@ -538,13 +538,12 @@ export default function AdminDashboard() {
                               </div>
                             </td>
                             <td className="px-5 py-4 text-center">
-                              <span className="text-sm font-semibold text-gray-700">{pool ? pool.total_days : "—"}</span>
-                              {pool && <p className="text-xs text-gray-400">วัน</p>}
+                              <span className="text-sm font-semibold text-gray-700">{pool ? formatLeaveDays(pool.total_days) : "—"}</span>
                             </td>
                             <td className="px-5 py-4 text-center">
                               {pool ? (
                                 <div className="space-y-1">
-                                  <span className="text-sm font-semibold text-gray-700">{pool.used_days}</span>
+                                  <span className="text-sm font-semibold text-gray-700">{formatLeaveDays(pool.used_days)}</span>
                                   <div className="w-16 mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
                                     <div className={`h-full rounded-full ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
                                       style={{ width: `${pct}%` }} />
@@ -554,7 +553,7 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-5 py-4 text-center">
                               <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                                {pool ? `${remaining} วัน` : "—"}
+                                {pool ? formatLeaveDays(remaining) : "—"}
                               </span>
                             </td>
                             <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>

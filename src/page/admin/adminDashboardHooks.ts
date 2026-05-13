@@ -17,7 +17,7 @@ import type { Employee, EmployeeWithBalance } from "../../components/adminHelper
 import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../../services/authSession";
 import { getErrorMessage } from "../../services/errors";
-import { normalizeDepartment } from "../../services/leaveFilters";
+import { normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { useEmployeeFilters } from "../../hooks/useEmployeeFilters";
 import { useLeaveRequestFilters } from "../../hooks/useLeaveRequestFilters";
 
@@ -84,13 +84,14 @@ export function useAdminLeaveRequests(
       setLoading(true);
       setError("");
       const data = await getAdminLeaveRequests();
+      const uniqueRequests = uniqueLeaveRequestsById(data);
       setRequests(
         departmentScope
-          ? data.filter(
+          ? uniqueRequests.filter(
               (request) =>
                 normalizeDepartment(request.user?.department) === normalizeDepartment(departmentScope)
             )
-          : data
+          : uniqueRequests
       );
     } catch (err) {
       setError(getErrorMessage(err, "โหลดข้อมูลไม่สำเร็จ"));
@@ -321,7 +322,7 @@ export function useAdminEmployees(options: {
       setEmpLeaveLoading(true);
       try {
         const data = await getAdminLeaveRequests({ user_id: employee.id });
-        setEmpLeaveRequests(data);
+        setEmpLeaveRequests(uniqueLeaveRequestsById(data));
       } catch {
         setEmpLeaveRequests(requests.filter((request) => request.user_id === employee.id));
       } finally {

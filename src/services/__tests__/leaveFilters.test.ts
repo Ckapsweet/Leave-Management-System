@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment } from "../leaveFilters";
+import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment, uniqueLeaveRequestsById } from "../leaveFilters";
 import type { LeaveRequest } from "../leaveService";
 
 function request(overrides: Partial<LeaveRequest>): LeaveRequest {
@@ -62,12 +62,24 @@ describe("leaveFilters", () => {
   it("counts requests by status", () => {
     expect(
       countLeaveRequestsByStatus([
-        request({ status: "pending" }),
-        request({ status: "approved" }),
-        request({ status: "approved" }),
-        request({ status: "rejected" }),
+        request({ id: 1, status: "pending" }),
+        request({ id: 2, status: "approved" }),
+        request({ id: 3, status: "approved" }),
+        request({ id: 4, status: "rejected" }),
       ])
     ).toEqual({ pending: 1, approved: 2, rejected: 1 });
+  });
+
+  it("deduplicates requests by id before filtering and counting", () => {
+    const requests = [
+      request({ id: 1, status: "pending" }),
+      request({ id: 1, status: "pending" }),
+      request({ id: 2, status: "approved" }),
+    ];
+
+    expect(uniqueLeaveRequestsById(requests)).toHaveLength(2);
+    expect(filterLeaveRequests(requests, { status: "pending" })).toHaveLength(1);
+    expect(countLeaveRequestsByStatus(requests)).toEqual({ pending: 1, approved: 1, rejected: 0 });
   });
 
   it("normalizes blank department values", () => {

@@ -23,10 +23,10 @@ import { CreateUserModal } from "../../components/CreateUserModal";
 import { LogDrawer } from "../../components/LogDrawer";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
-import { formatLeaveHours } from "../../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
 import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
-import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment } from "../../services/leaveFilters";
+import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
@@ -180,7 +180,7 @@ export default function OverviewDashboard() {
         try {
             setReqLoading(true);
             const data = await getAdminLeaveRequests();
-            setRequests(data);
+            setRequests(uniqueLeaveRequestsById(data));
         } catch {
             toast.error("โหลดข้อมูลคำขอลาไม่สำเร็จ");
         } finally {
@@ -281,7 +281,7 @@ export default function OverviewDashboard() {
         setEmpLeaveLoading(true);
         try {
             const data = await getAdminLeaveRequests({ user_id: emp.id });
-            setEmpLeaveRequests(data);
+            setEmpLeaveRequests(uniqueLeaveRequestsById(data));
         } catch {
             toast.error("โหลดประวัติการลาไม่สำเร็จ");
         } finally {
@@ -890,7 +890,7 @@ export default function OverviewDashboard() {
                                                             {isHourly && r.start_time && <p className="text-xs text-gray-400">{r.start_time} – {r.end_time} น.</p>}
                                                         </td>
                                                         <td className="px-5 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                                                            {isHourly ? formatLeaveHours(r.total_hours) : `${r.total_days} วัน`}
+                                                            {isHourly ? formatLeaveHours(r.total_hours) : formatLeaveDays(r.total_days)}
                                                         </td>
                                                         <td className="px-5 py-4 text-sm text-gray-500 max-w-[160px] truncate">{r.reason}</td>
                                                         <td className="px-5 py-4">
@@ -1021,14 +1021,14 @@ export default function OverviewDashboard() {
                                                                 <p className="text-xs text-gray-400">{stat.leaveTypes.length} ประเภทการลา</p>
                                                             </div>
                                                             <span className="text-sm font-bold text-slate-800 bg-white border border-gray-100 rounded-full px-3 py-1">
-                                                                {stat.total.toFixed(2)} วัน
+                                                                {formatLeaveDays(stat.total)}
                                                             </span>
                                                         </div>
                                                         <div className="space-y-2">
                                                             {stat.leaveTypes.map((leaveType) => (
                                                                 <div key={`${department}-${leaveType.name}`} className="flex items-center justify-between text-xs">
                                                                     <span className="text-gray-600">{leaveType.name}</span>
-                                                                    <span className="font-semibold text-gray-800">{leaveType.days.toFixed(2)} วัน</span>
+                                                                    <span className="font-semibold text-gray-800">{formatLeaveDays(leaveType.days)}</span>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -1063,7 +1063,7 @@ export default function OverviewDashboard() {
                                                                     {row.leave_type}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-5 py-4 text-sm font-bold text-gray-800 text-right">{parseFloat(row.total_leave_days.toString()).toFixed(2)}</td>
+                                                            <td className="px-5 py-4 text-sm font-bold text-gray-800 text-right">{formatLeaveDays(row.total_leave_days)}</td>
                                                         </tr>
                                                     ))
                                                 ) : (
@@ -1169,13 +1169,12 @@ export default function OverviewDashboard() {
                                                             )}
                                                         </td>
                                                         <td className="px-5 py-4 text-center">
-                                                            <span className="text-sm font-semibold text-gray-700">{pool ? pool.total_days : "—"}</span>
-                                                            {pool && <p className="text-xs text-gray-400">วัน</p>}
+                                                            <span className="text-sm font-semibold text-gray-700">{pool ? formatLeaveDays(pool.total_days) : "—"}</span>
                                                         </td>
                                                         <td className="px-5 py-4 text-center">
                                                             {pool ? (
                                                                 <div className="space-y-1">
-                                                                    <span className="text-sm font-semibold text-gray-700">{pool.used_days}</span>
+                                                                    <span className="text-sm font-semibold text-gray-700">{formatLeaveDays(pool.used_days)}</span>
                                                                     <div className="w-16 mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
                                                                         <div className={`h-full rounded-full ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
                                                                             style={{ width: `${pct}%` }} />
@@ -1185,7 +1184,7 @@ export default function OverviewDashboard() {
                                                         </td>
                                                         <td className="px-5 py-4 text-center">
                                                             <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                                                                {pool ? `${remaining} วัน` : "—"}
+                                                                {pool ? formatLeaveDays(remaining) : "—"}
                                                             </span>
                                                         </td>
                                                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>

@@ -1,4 +1,6 @@
 import type { LeaveBalance } from "../services/leaveService";
+import { formatLeaveDays } from "../services/leaveTime";
+export { formatLeaveDays } from "../services/leaveTime";
 
 const TYPE_COLORS: Record<number, string> = {
   1: "bg-sky-100 text-sky-700",
@@ -6,22 +8,6 @@ const TYPE_COLORS: Record<number, string> = {
   3: "bg-violet-100 text-violet-700",
   4: "bg-orange-100 text-orange-700",
 };
-
-const MINUTES_PER_WORK_DAY = 8 * 60;
-
-export function formatLeaveDays(value: number) {
-  const totalMinutes = Math.max(0, Math.round(value * MINUTES_PER_WORK_DAY));
-  const days = Math.floor(totalMinutes / MINUTES_PER_WORK_DAY);
-  const remainingMinutes = totalMinutes % MINUTES_PER_WORK_DAY;
-  const hours = Math.floor(remainingMinutes / 60);
-  const minutes = remainingMinutes % 60;
-
-  const parts = [];
-  if (days > 0) parts.push(`${days} วัน`);
-  if (hours > 0) parts.push(`${hours} ชม.`);
-  if (minutes > 0) parts.push(`${minutes} นาที`);
-  return parts.length > 0 ? parts.join(" ") : "0 วัน";
-}
 
 export function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
   const typeColor = TYPE_COLORS[balance.leave_type_id] ?? "bg-gray-100 text-gray-600";

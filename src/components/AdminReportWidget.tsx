@@ -1,5 +1,5 @@
 import type { LeaveRequest } from "../services/leaveService";
-import { leaveHoursToDays } from "../services/leaveTime";
+import { formatLeaveDays, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 import type { Employee, EmployeeWithBalance } from "./adminHelpers";
 
 function toNumber(value: number | string | null | undefined) {
@@ -8,12 +8,8 @@ function toNumber(value: number | string | null | undefined) {
 }
 
 function getLeaveDays(request: LeaveRequest) {
-  if (request.leave_unit === "hour") return leaveHoursToDays(request.total_hours);
+  if (request.leave_unit === "hour") return toNumber(request.total_hours) / WORK_HOURS_PER_DAY;
   return toNumber(request.total_days);
-}
-
-function formatDays(days: number) {
-  return Number.isInteger(days) ? `${days} วัน` : `${days.toFixed(1)} วัน`;
 }
 
 function toDateOnly(value: Date | string) {
@@ -173,7 +169,7 @@ export function AdminReportWidget({
         </div>
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-gray-500 text-sm font-medium">วันลาที่ใช้ไปปีนี้</p>
-          <div className="mt-2 text-3xl font-bold text-sky-600">{formatDays(totalLeaveDaysUsed)}</div>
+          <div className="mt-2 text-3xl font-bold text-sky-600">{formatLeaveDays(totalLeaveDaysUsed)}</div>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
           <p className="text-gray-500 text-sm font-medium">รออนุมัติ</p>
@@ -200,7 +196,7 @@ export function AdminReportWidget({
                     <p className="text-xs text-gray-400">{request.leave_type?.name ?? "-"} • {fmtDate(request.start_date)}</p>
                   </div>
                   <span className="font-semibold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
-                    {formatDays(getLeaveDays(request))}
+                    {formatLeaveDays(getLeaveDays(request))}
                   </span>
                 </li>
               ))}
@@ -287,7 +283,7 @@ export function AdminReportWidget({
                     <p className="text-xs text-gray-400">{employee.employee_code} • {balance.name}</p>
                   </div>
                   <span className={`font-semibold px-3 py-1 rounded-full ${remaining <= 0 ? "text-red-700 bg-red-50" : "text-amber-700 bg-amber-50"}`}>
-                    {formatDays(remaining)}
+                    {formatLeaveDays(remaining)}
                   </span>
                 </li>
               ))}
@@ -322,7 +318,7 @@ export function AdminReportWidget({
               {Object.entries(typeStats).map(([type, days]) => (
                 <li key={type} className="flex justify-between items-center text-sm">
                   <span className="text-gray-600">{type}</span>
-                  <span className="font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">{formatDays(days)}</span>
+                  <span className="font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">{formatLeaveDays(days)}</span>
                 </li>
               ))}
             </ul>

@@ -1,7 +1,7 @@
 // components/DetailDrawer.tsx
 import { useState } from "react";
 import type { LeaveAttachment, LeaveRequest } from "../services/leaveService";
-import { formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
 function formatAttachmentSize(size: number | string | null | undefined) {
@@ -206,7 +206,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             <div className="border-t border-gray-200 pt-3 flex justify-between">
               <span className="text-gray-500">รวม</span>
               <span className="font-bold text-gray-900">
-                {isHourly ? formatLeaveHours(req.total_hours) : `${req.total_days} วัน`}
+                {isHourly ? formatLeaveHours(req.total_hours) : formatLeaveDays(req.total_days)}
               </span>
             </div>
           </div>

@@ -6,11 +6,11 @@ describe("formatLeaveDays", () => {
     expect(formatLeaveDays(3)).toBe("3 วัน");
   });
 
-  it("formats fractional days using 8 work hours per day", () => {
-    expect(formatLeaveDays(1.59)).toBe("1 วัน 4 ชม. 43 นาที");
+  it("formats fractional days using 7.5 work hours per day", () => {
+    expect(formatLeaveDays(1.59)).toBe("1 วัน 4 ชม. 26 นาที");
   });
 
   it("formats sub-day values", () => {
-    expect(formatLeaveDays(0.5)).toBe("4 ชม.");
+    expect(formatLeaveDays(0.5)).toBe("3 ชม. 45 นาที");
   });
 });

@@ -1,7 +1,7 @@
 // components/EmployeeLeaveDrawer.tsx
 import { useState } from "react";
 import type { LeaveRequest, LeaveStatus } from "../services/leaveService";
-import { formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 import type { EmployeeWithBalance } from "./adminHelpers";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
@@ -65,16 +65,16 @@ export function EmployeeLeaveDrawer({
             {pool ? (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-slate-50 rounded-xl p-3 text-center">
-                  <p className="text-xl font-bold text-gray-800">{pool.total_days}</p>
+                  <p className="text-xl font-bold text-gray-800">{formatLeaveDays(pool.total_days)}</p>
                   <p className="text-xs text-gray-400 mt-0.5">สิทธิ์รวม</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3 text-center">
-                  <p className="text-xl font-bold text-amber-600">{pool.used_days}</p>
+                  <p className="text-xl font-bold text-amber-600">{formatLeaveDays(pool.used_days)}</p>
                   <p className="text-xs text-gray-400 mt-0.5">ใช้ไปแล้ว</p>
                 </div>
                 <div className={`rounded-xl p-3 text-center ${remaining <= 3 ? "bg-red-50" : remaining <= 7 ? "bg-amber-50" : "bg-emerald-50"}`}>
                   <p className={`text-xl font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                    {remaining}
+                    {formatLeaveDays(remaining)}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">คงเหลือ</p>
                 </div>
@@ -92,7 +92,7 @@ export function EmployeeLeaveDrawer({
                   <div key={b.leave_type_id} className="flex items-center justify-between text-xs bg-slate-50/50 px-3 py-2 rounded-lg">
                     <span className="font-medium text-gray-600">{b.name}</span>
                     <span className="text-gray-500">
-                      คงเหลือ <strong className="text-gray-800">{b.remaining}</strong> / {b.total_days} วัน
+                      คงเหลือ <strong className="text-gray-800">{formatLeaveDays(b.remaining)}</strong> / {formatLeaveDays(b.total_days)}
                     </span>
                   </div>
                 ))}
@@ -179,7 +179,7 @@ export function EmployeeLeaveDrawer({
                     <div className="flex justify-between">
                       <span className="text-gray-400">จำนวน</span>
                       <span className="font-semibold text-gray-700">
-                        {isHourly ? formatLeaveHours(req.total_hours) : `${req.total_days} วัน`}
+                        {isHourly ? formatLeaveHours(req.total_hours) : formatLeaveDays(req.total_days)}
                       </span>
                     </div>
                     {req.reason && (

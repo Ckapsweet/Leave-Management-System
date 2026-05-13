@@ -1,5 +1,5 @@
 import type { LeavePool, LeaveRequest } from "./leaveService";
-import { leaveHoursToDays } from "./leaveTime";
+import { WORK_HOURS_PER_DAY } from "./leaveTime";
 
 function toNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -7,7 +7,7 @@ function toNumber(value: number | string | null | undefined) {
 }
 
 export function getLeaveUsageDays(request: LeaveRequest) {
-  if (request.leave_unit === "hour") return leaveHoursToDays(request.total_hours);
+  if (request.leave_unit === "hour") return toNumber(request.total_hours) / WORK_HOURS_PER_DAY;
   return toNumber(request.total_days);
 }
 
@@ -46,8 +46,8 @@ export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: Le
 
   const balances = Array.from(groupedBalances.values()).map((balance) => {
     const key = balanceKey(balance.name, balance.leave_type_id);
-    const usedDays = usageByType.get(key) ?? 0;
-    const used_days = Math.max(toNumber(balance.used_days), usedDays);
+    const usedDays = usageByType.get(key);
+    const used_days = usedDays ?? toNumber(balance.used_days);
     const total_days = toNumber(balance.total_days);
     return {
       ...balance,
@@ -58,7 +58,7 @@ export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: Le
   });
 
   const usedFromBalances = balances.reduce((sum, balance) => sum + toNumber(balance.used_days), 0);
-  const used_days = Math.max(toNumber(pool.used_days), usedFromBalances, usedFromRequests);
+  const used_days = usedFromRequests > 0 ? usedFromRequests : Math.max(toNumber(pool.used_days), usedFromBalances);
   const total_days = toNumber(pool.total_days);
 
   return {
