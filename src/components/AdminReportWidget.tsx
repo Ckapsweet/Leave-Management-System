@@ -46,6 +46,14 @@ function employeeName(request: LeaveRequest) {
   return request.user?.full_name ?? `User #${request.user_id}`;
 }
 
+function uniqueEmployeesById(employees: Employee[]) {
+  const employeeById = new Map<number, Employee>();
+  employees.forEach((employee) => {
+    if (!employeeById.has(employee.id)) employeeById.set(employee.id, employee);
+  });
+  return Array.from(employeeById.values());
+}
+
 export function AdminReportWidget({
   requests,
   employees,
@@ -100,11 +108,9 @@ export function AdminReportWidget({
     ...employees,
     ...requests.flatMap((request) => (request.user ? [request.user] : [])),
     ...(currentUser ? [currentUser] : []),
-  ].reduce<Employee[]>((acc, employee) => {
-    if (!acc.some((item) => item.id === employee.id)) acc.push(employee);
-    return acc;
-  }, []);
-  const employeeById = new Map(teamSource.map((employee) => [employee.id, employee]));
+  ];
+  const uniqueTeamSource = uniqueEmployeesById(teamSource);
+  const employeeById = new Map(uniqueTeamSource.map((employee) => [employee.id, employee]));
   const requestStatsByUserId = requests.reduce<Record<number, { pendingCount: number; totalRequests: number }>>(
     (acc, request) => {
       acc[request.user_id] = acc[request.user_id] ?? { pendingCount: 0, totalRequests: 0 };
@@ -114,7 +120,7 @@ export function AdminReportWidget({
     },
     {}
   );
-  const teamStats = teamSource.reduce<
+  const teamStats = uniqueTeamSource.reduce<
     Record<number, { leadName: string; members: Employee[]; pendingCount: number; totalRequests: number }>
   >((acc, employee) => {
     const supervisorId = employee.supervisor_id;
