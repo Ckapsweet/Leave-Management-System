@@ -26,7 +26,7 @@ import Footer from "../../components/Footer";
 import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
 import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
-import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment } from "../../services/leaveFilters";
+import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
@@ -180,7 +180,7 @@ export default function OverviewDashboard() {
         try {
             setReqLoading(true);
             const data = await getAdminLeaveRequests();
-            setRequests(data);
+            setRequests(uniqueLeaveRequestsById(data));
         } catch {
             toast.error("โหลดข้อมูลคำขอลาไม่สำเร็จ");
         } finally {
@@ -281,7 +281,7 @@ export default function OverviewDashboard() {
         setEmpLeaveLoading(true);
         try {
             const data = await getAdminLeaveRequests({ user_id: emp.id });
-            setEmpLeaveRequests(data);
+            setEmpLeaveRequests(uniqueLeaveRequestsById(data));
         } catch {
             toast.error("โหลดประวัติการลาไม่สำเร็จ");
         } finally {

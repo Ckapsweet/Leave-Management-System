@@ -17,6 +17,14 @@ export interface LeaveRequestStatusCounts {
   rejected: number;
 }
 
+export function uniqueLeaveRequestsById(requests: LeaveRequest[]) {
+  const byId = new Map<number, LeaveRequest>();
+  requests.forEach((request) => {
+    if (!byId.has(request.id)) byId.set(request.id, request);
+  });
+  return Array.from(byId.values());
+}
+
 function matchesSearch(request: LeaveRequest, query: string) {
   if (!query) return true;
   return (
@@ -48,14 +56,14 @@ export function filterLeaveRequests(
 ) {
   const query = search.trim();
 
-  return requests.filter((request) => {
+  return uniqueLeaveRequestsById(requests).filter((request) => {
     const matchStatus = status === "all" || request.status === status;
     return matchStatus && matchesSearch(request, query) && matchesDate(request, viewMode, year, month);
   });
 }
 
 export function countLeaveRequestsByStatus(requests: LeaveRequest[]): LeaveRequestStatusCounts {
-  return requests.reduce<LeaveRequestStatusCounts>(
+  return uniqueLeaveRequestsById(requests).reduce<LeaveRequestStatusCounts>(
     (counts, request) => {
       counts[request.status] += 1;
       return counts;
