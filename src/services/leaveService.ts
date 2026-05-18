@@ -50,6 +50,7 @@ export interface LeaveRequest {
   total_hours?:   number | null;
   reason:         string;
   status:         LeaveStatus;
+  workflow_status?: LeaveStatus;
   approved_by?:   number;
   approved_at?:   string;
   current_assignee_id?: number | null;

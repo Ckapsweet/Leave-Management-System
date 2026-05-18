@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom";
 import UserLeaveDashboard from "../Dashboard";
@@ -10,6 +10,7 @@ const {
   getMyLeaveRequests,
   createLeaveRequest,
   cancelLeaveRequest,
+  toastSuccess,
   toastError,
 } = vi.hoisted(() => ({
   getLeaveTypes: vi.fn(),
@@ -17,6 +18,7 @@ const {
   getMyLeaveRequests: vi.fn(),
   createLeaveRequest: vi.fn(),
   cancelLeaveRequest: vi.fn(),
+  toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
 
@@ -47,7 +49,7 @@ vi.mock("../../services/authSession", () => ({
 vi.mock("../../components/Toast", () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
   toast: {
-    success: vi.fn(),
+    success: toastSuccess,
     error: toastError,
   },
 }));
@@ -144,6 +146,20 @@ async function openCreateModal() {
   expect(screen.getByTestId("leave-request-modal")).toBeInTheDocument();
 }
 
+function getRequestRow(reason: string) {
+  const row = screen.getByText(reason).closest("tr");
+  expect(row).toBeInTheDocument();
+  return row as HTMLTableRowElement;
+}
+
+function getConfirmCancelButton() {
+  const button = Array.from(screen.getAllByRole("button")).find((el) =>
+    el.className.includes("bg-red-500")
+  );
+  expect(button).toBeInTheDocument();
+  return button as HTMLButtonElement;
+}
+
 describe("UserLeaveDashboard create leave flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -181,6 +197,40 @@ describe("UserLeaveDashboard create leave flow", () => {
       expect(createLeaveRequest).toHaveBeenCalled();
       expect(screen.getByTestId("leave-request-modal")).toBeInTheDocument();
       expect(toastError).toHaveBeenCalledWith("Balance is not enough");
+    });
+  });
+
+  it("cancels a pending leave request after confirmation", async () => {
+    await renderLoadedDashboard();
+
+    const row = getRequestRow("Existing request");
+    await userEvent.click(within(row).getByRole("button"));
+
+    expect(cancelLeaveRequest).not.toHaveBeenCalled();
+    await userEvent.click(getConfirmCancelButton());
+
+    await waitFor(() => {
+      expect(cancelLeaveRequest).toHaveBeenCalledWith(99);
+      expect(screen.queryByText("Existing request")).not.toBeInTheDocument();
+      expect(toastSuccess).toHaveBeenCalled();
+    });
+  });
+
+  it("keeps the request visible and shows an error when cancel request fails", async () => {
+    cancelLeaveRequest.mockRejectedValueOnce({
+      response: { data: { message: "Cannot cancel approved leave" } },
+    });
+
+    await renderLoadedDashboard();
+
+    const row = getRequestRow("Existing request");
+    await userEvent.click(within(row).getByRole("button"));
+    await userEvent.click(getConfirmCancelButton());
+
+    await waitFor(() => {
+      expect(cancelLeaveRequest).toHaveBeenCalledWith(99);
+      expect(screen.getByText("Existing request")).toBeInTheDocument();
+      expect(toastError).toHaveBeenCalledWith("Cannot cancel approved leave");
     });
   });
 });
