@@ -53,9 +53,9 @@ export function useAdminAuthUser() {
 
 export function useAdminLeaveRequests(
   onActionComplete?: () => void,
-  options: { departmentScope?: string | null } = {}
+  options: { departmentScope?: string | null; currentUser?: AuthUser | null; includeTeamHistory?: boolean } = {}
 ) {
-  const { departmentScope = null } = options;
+  const { departmentScope = null, currentUser = null, includeTeamHistory = false } = options;
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -84,21 +84,51 @@ export function useAdminLeaveRequests(
       setLoading(true);
       setError("");
       const data = await getAdminLeaveRequests();
-      const uniqueRequests = uniqueLeaveRequestsById(data);
+      const primaryRequests = uniqueLeaveRequestsById(data);
+      let uniqueRequests = primaryRequests;
+
+      if (includeTeamHistory && currentUser) {
+        const usersRes = await api.get<Employee[]>("/api/admin/users");
+        const teamUsers = usersRes.data.filter((employee) => {
+          if (employee.id === currentUser.id || employee.role === "admin") return false;
+          if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
+            return false;
+          }
+          if (departmentScope) return true;
+          return isInSupervisorTree(
+            employee,
+            currentUser.id,
+            new Map(usersRes.data.map((user) => [idKey(user.id), user]))
+          );
+        });
+
+        const teamHistory = (
+          await Promise.all(
+            teamUsers.map((employee) =>
+              getAdminLeaveRequests({ user_id: employee.id }).catch(() => [] as LeaveRequest[])
+            )
+          )
+        ).flat();
+
+        uniqueRequests = uniqueLeaveRequestsById([...primaryRequests, ...teamHistory]);
+      }
+
+      const formattedRequests = formatRequestsForLeadView(uniqueRequests, currentUser);
+
       setRequests(
         departmentScope
-          ? uniqueRequests.filter(
+          ? formattedRequests.filter(
               (request) =>
                 normalizeDepartment(request.user?.department) === normalizeDepartment(departmentScope)
             )
-          : uniqueRequests
+          : formattedRequests
       );
     } catch (err) {
       setError(getErrorMessage(err, "โหลดข้อมูลไม่สำเร็จ"));
     } finally {
       setLoading(false);
     }
-  }, [departmentScope]);
+  }, [currentUser, departmentScope, includeTeamHistory]);
 
   useEffect(() => {
     fetchRequests();
@@ -118,7 +148,14 @@ export function useAdminLeaveRequests(
             request.id === id
               ? {
                   ...request,
-                  status: response.status,
+                  status:
+                    currentUser?.role === "lead" &&
+                    response.status === "pending" &&
+                    response.current_assignee_id != null &&
+                    !isSameId(response.current_assignee_id, currentUser.id)
+                      ? "approved"
+                      : response.status,
+                  workflow_status: response.status,
                   current_assignee_id: response.current_assignee_id,
                   approved_at: new Date().toISOString(),
                   comment: comment || undefined,
@@ -136,7 +173,7 @@ export function useAdminLeaveRequests(
         setActionLoading(false);
       }
     },
-    [onActionComplete]
+    [currentUser, onActionComplete]
   );
 
   return {
@@ -210,6 +247,21 @@ function groupRequestsByUserId(requests: LeaveRequest[]) {
     }
     return grouped;
   }, new Map());
+}
+
+function formatRequestsForLeadView(requests: LeaveRequest[], currentUser: AuthUser | null) {
+  if (currentUser?.role !== "lead") return requests;
+
+  return requests.map((request) => {
+    const forwardedAfterLeadApproval =
+      request.status === "pending" &&
+      request.current_assignee_id != null &&
+      !isSameId(request.current_assignee_id, currentUser.id);
+
+    return forwardedAfterLeadApproval
+      ? { ...request, workflow_status: request.status, status: "approved" as const }
+      : { ...request, workflow_status: request.workflow_status ?? request.status };
+  });
 }
 
 async function fetchEmployeesWithPools(

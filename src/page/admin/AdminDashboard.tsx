@@ -34,6 +34,7 @@ interface SubordinateUser {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"requests" | "employees" | "subordinates">("requests");
   const [allUsers, setAllUsers] = useState<SubordinateUser[]>([]);
+  const [approvalUsers, setApprovalUsers] = useState<SubordinateUser[]>([]);
   const [subLoading, setSubLoading] = useState(false);
   const [subAssigning, setSubAssigning] = useState<number | null>(null);
   const [subSearch, setSubSearch] = useState("");
@@ -75,7 +76,11 @@ export default function AdminDashboard() {
     pending,
     approved,
     rejected,
-  } = useAdminLeaveRequests(undefined, { departmentScope });
+  } = useAdminLeaveRequests(undefined, {
+    departmentScope,
+    currentUser: user,
+    includeTeamHistory: user?.role === "lead",
+  });
 
   const {
     employees,
@@ -128,6 +133,30 @@ export default function AdminDashboard() {
     if (activeTab === "employees") fetchEmployees();
     if (activeTab === "subordinates") fetchAllUsersForLead();
   }, [activeTab, fetchEmployees, fetchAllUsersForLead]);
+
+  useEffect(() => {
+    if (user?.role !== "lead") return;
+    api.get<SubordinateUser[]>("/api/admin/users")
+      .then((res) => setApprovalUsers(res.data))
+      .catch((err) => console.error("fetch approval users failed", err));
+  }, [user?.role]);
+
+  const getApprovalProgress = (request: (typeof requests)[number]) => {
+    const workflowStatus = request.workflow_status ?? request.status;
+    if (workflowStatus === "approved") return "อนุมัติครบแล้ว";
+    if (workflowStatus === "rejected") return "ปฏิเสธแล้ว";
+    if (request.current_assignee_id && request.current_assignee_id !== user?.id) {
+      const assignee = approvalUsers.find((item) => item.id === request.current_assignee_id);
+      const assigneeName = assignee?.full_name ?? request.approver_name ?? "ผู้อนุมัติถัดไป";
+      const assigneeRole = assignee?.role ? ` (${assignee.role})` : "";
+      return `ส่งต่อแล้ว: รอ ${assigneeName}${assigneeRole}`;
+    }
+    return "รอคุณอนุมัติ";
+  };
+
+  const canActOnRequest = (request: (typeof requests)[number]) =>
+    (request.workflow_status ?? request.status) === "pending" &&
+    (!request.current_assignee_id || request.current_assignee_id === user?.id);
 
   const handleAssignSubordinate = async (userId: number, assign: boolean) => {
     try {
@@ -204,6 +233,7 @@ export default function AdminDashboard() {
           onClose={() => setSelected(null)}
           onApprove={() => setConfirm({ type: "approve", req: selected })}
           onReject={() => setConfirm({ type: "reject", req: selected })}
+          canApprove={canActOnRequest(selected)}
         />
       )}
       {selectedEmployee && !balanceModal && (
@@ -403,6 +433,8 @@ export default function AdminDashboard() {
                         const tc = TYPE_COLORS[r.leave_type_id] ?? "bg-gray-100 text-gray-600";
                         const ac = avatarColor(r.user?.department);
                         const isHourly = r.leave_unit === "hour";
+                        const progress = getApprovalProgress(r);
+                        const canAct = canActOnRequest(r);
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/70 cursor-pointer transition-colors" onClick={() => setSelected(r)}>
                             <td className="px-5 py-4">
@@ -437,14 +469,19 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-5 py-4 text-sm text-gray-500 max-w-[160px] truncate">{r.reason}</td>
                             <td className="px-5 py-4">
-                              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${meta.bg} ${meta.color}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${meta.dot}`} />
-                                {meta.label}
+                              <div className="space-y-1.5">
+                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${meta.bg} ${meta.color}`}>
+                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${meta.dot}`} />
+                                  {meta.label}
+                                </div>
+                                <p className={`text-xs whitespace-nowrap ${canAct ? "text-amber-600" : "text-gray-500"}`}>
+                                  {progress}
+                                </p>
                               </div>
                             </td>
                             <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex gap-2 flex-wrap">
-                                {r.status === "pending" && (
+                                {canAct && (
                                   <>
                                     <button onClick={() => setConfirm({ type: "reject", req: r })}
                                       className="px-3 py-1 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium">ปฏิเสธ</button>
