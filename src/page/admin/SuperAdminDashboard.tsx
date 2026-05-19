@@ -7,8 +7,9 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { EditProfileModal } from "../../components/EditProfileModal";
+import { DashboardHeader } from "../../components/admin/DashboardHeader";
 import {
-  STATUS_META, TYPE_COLORS, avatarColor, fmtDate,
+  STATUS_META, TYPE_COLORS, avatarColor, canEditEmployeeBalance, fmtDate,
 } from "../../components/adminHelpers";
 import type { Employee } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
@@ -102,7 +103,10 @@ export default function AdminDashboard() {
       user?.role === "assistant manager",
     departmentScope: user?.role === "manager" ? user.department : null,
   });
-  const canEditEmployeeBalance = user?.role === "admin";
+  const employeesById = new Map(employees.map((employee) => [String(employee.id), employee]));
+  const canEditAnyEmployeeBalance = filteredEmployees.some((employee) =>
+    canEditEmployeeBalance(user, employee, employeesById)
+  );
 
   const fetchReportTeamUsers = useCallback(async () => {
     try {
@@ -174,7 +178,7 @@ export default function AdminDashboard() {
         />
       )}
 
-      {canEditEmployeeBalance && balanceModal && (
+      {balanceModal && canEditEmployeeBalance(user, balanceModal.user, employeesById) && (
         <AddLeaveBalanceModal
           user={balanceModal.user}
           pool={balanceModal.pool}
@@ -197,7 +201,7 @@ export default function AdminDashboard() {
           leaveRequests={empLeaveRequests}
           loading={empLeaveLoading}
           onClose={() => { setSelectedEmployee(null); setEmpLeaveRequests([]); }}
-          canEditBalance={canEditEmployeeBalance}
+          canEditBalance={canEditEmployeeBalance(user, selectedEmployee, employeesById)}
           onOpenBalance={() => openBalanceModal({
             id: selectedEmployee.id,
             full_name: selectedEmployee.full_name,
@@ -215,72 +219,22 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold text-gray-900 capitalize">{user?.role} — ระบบการลา</h1>
-            <p className="text-xs text-gray-400">Ckapsweet</p>
-          </div>
-        </div>
-
-        {/* Tab switcher */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-          {([
-            { key: "requests", label: "คำขอลา" },
-            { key: "employees", label: "พนักงาน" },
-          ] as const).map(({ key, label }) => (
-            <button key={key} onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-              {label}
-              {key === "requests" && pending > 0 && (
-                <span className="bg-amber-400 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">{pending}</span>
-              )}
-            </button>
-          ))}
-          {/* Admin & Manager: Reports tab */}
-          {(user?.role === "admin" || user?.role === "manager") && (
-            <button onClick={() => setActiveTab("reports")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "reports" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                }`}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 20V10M12 20V4M6 20v-4" />
-              </svg>
-              ภาพรวม (Report)
-            </button>
-          )}
-        </div>
-
-        {/* User info */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setShowEditProfile(true)}>
-            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-700">
-              {user?.full_name?.slice(0, 2) || "??"}
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-xs font-semibold text-gray-800">{user?.full_name}</p>
-              <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
-            </div>
-          </div>
-          <button onClick={() => navigate("/dashboard")} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h18" /></svg>
-            วันลาของฉัน
-          </button>
-          <button onClick={() => navigate("/select-system")} className="text-xs text-slate-600 hover:text-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors font-medium flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3h5v5M8 21H3v-5M21 3L12 12M3 21l9-9" /></svg>
-            สลับระบบ
-          </button>
-          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
-            ออกจากระบบ
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        user={user}
+        tabs={[
+          { key: "requests", label: "คำขอลา", badge: pending },
+          { key: "employees", label: "พนักงาน" },
+          ...(user?.role === "admin" || user?.role === "manager"
+            ? [{ key: "reports", label: "ภาพรวม (Report)", icon: "reports" as const }]
+            : []),
+        ]}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
+        onEditProfile={() => setShowEditProfile(true)}
+        onMyLeave={() => navigate("/dashboard")}
+        onSelectSystem={() => navigate("/select-system")}
+        onLogout={handleLogout}
+      />
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 space-y-6">
 
@@ -509,7 +463,7 @@ export default function AdminDashboard() {
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
                         <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
-                        {canEditEmployeeBalance && <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>}
+                        {canEditAnyEmployeeBalance && <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -518,6 +472,7 @@ export default function AdminDashboard() {
                         const pool = emp.pool;
                         const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
                         const pct = pool && pool.total_days > 0 ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
+                        const canEditBalance = canEditEmployeeBalance(user, emp, employeesById);
                         return (
                           <tr key={emp.id} className="hover:bg-slate-50/50 cursor-pointer transition-colors" onClick={() => handleEmployeeClick(emp)}>
                             <td className="px-5 py-4">
@@ -550,14 +505,16 @@ export default function AdminDashboard() {
                                 {pool ? formatLeaveDays(remaining) : "—"}
                               </span>
                             </td>
-                            {canEditEmployeeBalance && <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
+                            {canEditAnyEmployeeBalance && <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
-                                  className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap"
-                                >
-                                  เพิ่มวันลา
-                                </button>
+                                {canEditBalance && (
+                                  <button
+                                    onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
+                                    className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap"
+                                  >
+                                    กำหนดวันลา
+                                  </button>
+                                )}
                                 <svg className="text-gray-300 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M9 18l6-6-6-6" />
                                 </svg>

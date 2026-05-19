@@ -6,6 +6,7 @@ import {
   approveLeaveRequest,
   getAdminLeaveRequests,
   getAdminUserPool,
+  getLeaveTypes,
   getThisWeekLeaves,
   getTodayLeaves,
   rejectLeaveRequest,
@@ -17,7 +18,7 @@ import type { Employee, EmployeeWithBalance } from "../../components/adminHelper
 import { deriveLeavePoolFromRequests } from "../../services/leavePoolHelpers";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../../services/authSession";
 import { getErrorMessage } from "../../services/errors";
-import { normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
+import { isSameDepartment, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { useEmployeeFilters } from "../../hooks/useEmployeeFilters";
 import { useLeaveRequestFilters } from "../../hooks/useLeaveRequestFilters";
 
@@ -89,18 +90,17 @@ export function useAdminLeaveRequests(
 
       if (includeTeamHistory && currentUser) {
         const usersRes = await api.get<Employee[]>("/api/admin/users");
+        const userById = new Map(usersRes.data.map((user) => [idKey(user.id), user]));
         const teamUsers = usersRes.data.filter((employee) => {
           if (employee.id === currentUser.id || employee.role === "admin") return false;
-          if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
+          if (departmentScope && !isSameDepartment(employee.department, departmentScope)) {
             return false;
           }
-          if (departmentScope) return true;
-          return isInSupervisorTree(
-            employee,
-            currentUser.id,
-            new Map(usersRes.data.map((user) => [idKey(user.id), user]))
-          );
+          return currentUser.role === "lead"
+            ? isSameId(employee.supervisor_id, currentUser.id)
+            : isInSupervisorTree(employee, currentUser.id, userById);
         });
+        const teamUserIds = new Set(teamUsers.map((employee) => idKey(employee.id)));
 
         const teamHistory = (
           await Promise.all(
@@ -111,6 +111,14 @@ export function useAdminLeaveRequests(
         ).flat();
 
         uniqueRequests = uniqueLeaveRequestsById([...primaryRequests, ...teamHistory]);
+        uniqueRequests = uniqueRequests.filter((request) => {
+          if (teamUserIds.has(idKey(request.user_id))) return true;
+          if (!request.user) return false;
+          if (departmentScope && !isSameDepartment(request.user.department, departmentScope)) {
+            return false;
+          }
+          return isSameId(request.user.supervisor_id, currentUser.id);
+        });
       }
 
       const formattedRequests = formatRequestsForLeadView(uniqueRequests, currentUser);
@@ -119,7 +127,7 @@ export function useAdminLeaveRequests(
         departmentScope
           ? formattedRequests.filter(
               (request) =>
-                normalizeDepartment(request.user?.department) === normalizeDepartment(departmentScope)
+                isSameDepartment(request.user?.department, departmentScope)
             )
           : formattedRequests
       );
@@ -233,10 +241,6 @@ function isInSupervisorTree(
   return isSameId(supervisor?.supervisor_id, supervisorId);
 }
 
-function isInSeedUsers(employee: Employee, seedUserIds: Set<string>) {
-  return seedUserIds.has(idKey(employee.id));
-}
-
 function groupRequestsByUserId(requests: LeaveRequest[]) {
   return requests.reduce<Map<number, LeaveRequest[]>>((grouped, request) => {
     const userRequests = grouped.get(request.user_id);
@@ -247,6 +251,22 @@ function groupRequestsByUserId(requests: LeaveRequest[]) {
     }
     return grouped;
   }, new Map());
+}
+
+async function ensurePoolBalances(pool: LeavePool) {
+  if ((pool.balances?.length ?? 0) > 0) return pool;
+
+  const leaveTypes = await getLeaveTypes();
+  return {
+    ...pool,
+    balances: leaveTypes.map((leaveType) => ({
+      leave_type_id: leaveType.id,
+      name: leaveType.name,
+      total_days: 0,
+      used_days: 0,
+      remaining: 0,
+    })),
+  };
 }
 
 function formatRequestsForLeadView(requests: LeaveRequest[], currentUser: AuthUser | null) {
@@ -319,14 +339,14 @@ export function useAdminEmployees(options: {
       ].flatMap((request) => (request.user ? [request.user] : []));
       const requestUsers = requests.flatMap((request) => (request.user ? [request.user] : []));
       const seedUsers = [...requestUsers, ...leaveWidgetUsers];
-      const requestUserIds = new Set(requestUsers.map((requestUser) => idKey(requestUser.id)));
       const withPool = await fetchEmployeesWithPools(year, (employee, userById) => {
-        if (departmentScope && normalizeDepartment(employee.department) !== normalizeDepartment(departmentScope)) {
+        if (departmentScope && !isSameDepartment(employee.department, departmentScope)) {
           return false;
         }
         if (!filterToSupervisor) return true;
-        if (isInSeedUsers(employee, requestUserIds)) return true;
-        return isInSupervisorTree(employee, user?.id, userById);
+        return user?.role === "lead"
+          ? isSameId(employee.supervisor_id, user.id)
+          : isInSupervisorTree(employee, user?.id, userById);
       }, seedUsers, requests);
       setEmployees(withPool);
     } catch (err) {
@@ -339,7 +359,7 @@ export function useAdminEmployees(options: {
   const openBalanceModal = useCallback(
     async (targetUser: { id: number; full_name: string; employee_code: string; department: string }) => {
       try {
-        const pool = await getAdminUserPool(targetUser.id, year);
+        const pool = await ensurePoolBalances(await getAdminUserPool(targetUser.id, year));
         setBalanceModal({ user: targetUser, pool });
       } catch {
         toast.error("โหลดข้อมูลวันลาไม่สำเร็จ");
@@ -362,6 +382,7 @@ export function useAdminEmployees(options: {
         toast.success("อัปเดตวันลาเรียบร้อย");
       } catch (err) {
         toast.error(getErrorMessage(err, "อัปเดตวันลาไม่สำเร็จ"));
+        throw err;
       }
     },
     [balanceModal, year]

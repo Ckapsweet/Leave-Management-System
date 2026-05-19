@@ -2,9 +2,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "./page/LoginPage";
 import Dashboard from "./page/Dashboard";
-import AdminDashboard from "./page/admin/AdminDashboard";
+import LeadDashboard from "./page/admin/LeadDashboard";
 import SystemSelectionPage from "./page/SystemSelectionPage";
-import SuperAdminDashboard from "./page/admin/SuperAdminDashboard";
+import ManagerDashboard from "./page/admin/ManagerDashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import OverviewDashboard from "./page/admin/OverviewDashboard";
 
@@ -40,7 +40,7 @@ export default function App() {
           path="/lead"
           element={
             <ProtectedRoute requiredRole={["lead"]}>
-              <AdminDashboard />
+              <LeadDashboard />
             </ProtectedRoute>
           }
         />
@@ -50,7 +50,7 @@ export default function App() {
           path="/manager"
           element={
             <ProtectedRoute requiredRole={["manager", "assistant manager"]}>
-              <SuperAdminDashboard />
+              <ManagerDashboard />
             </ProtectedRoute>
           }
         />

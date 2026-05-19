@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { EmployeeWithBalance } from "../components/adminHelpers";
-import { normalizeDepartment } from "../services/leaveFilters";
+import { isSameDepartment } from "../services/leaveFilters";
 
 export function useEmployeeFilters(employees: EmployeeWithBalance[]) {
   const [empSearch, setEmpSearch] = useState("");
@@ -9,7 +9,7 @@ export function useEmployeeFilters(employees: EmployeeWithBalance[]) {
   useEffect(() => {
     if (
       empDeptFilter !== "all" &&
-      !employees.some((employee) => normalizeDepartment(employee.department) === normalizeDepartment(empDeptFilter))
+      !employees.some((employee) => isSameDepartment(employee.department, empDeptFilter))
     ) {
       setEmpDeptFilter("all");
     }
@@ -20,7 +20,7 @@ export function useEmployeeFilters(employees: EmployeeWithBalance[]) {
       employees.filter((employee) => {
         const matchDepartment =
           empDeptFilter === "all" ||
-          normalizeDepartment(employee.department) === normalizeDepartment(empDeptFilter);
+          isSameDepartment(employee.department, empDeptFilter);
         const query = empSearch.trim();
         const matchSearch =
           !query || employee.full_name.includes(query) || employee.employee_code.includes(query);

@@ -26,7 +26,7 @@ import Footer from "../../components/Footer";
 import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
 import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
-import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
+import { countLeaveRequestsByStatus, filterLeaveRequests, isSameDepartment, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#F06292'];
@@ -470,7 +470,7 @@ export default function OverviewDashboard() {
     // ---- Derived / Filtered Data ----
 
     const filteredEmployees = employees.filter((e) => {
-        const ms = empDeptFilter === "all" || e.department === empDeptFilter;
+        const ms = empDeptFilter === "all" || isSameDepartment(e.department, empDeptFilter);
         const mq = !empSearch || e.full_name.includes(empSearch) || e.employee_code.includes(empSearch);
         return ms && mq;
     });
@@ -505,16 +505,16 @@ export default function OverviewDashboard() {
     const selectedDepartment = normalizeDepartment(selectedTeamDepartment);
     const leaderOptions = allUsers.filter((u) =>
         selectedDepartment &&
-        normalizeDepartment(u.department) === selectedDepartment &&
+        isSameDepartment(u.department, selectedDepartment) &&
         ["lead", "manager", "assistant manager"].includes(u.role?.toLowerCase() ?? "")
     );
     const currentSubordinates = allUsers.filter(
-        (u) => u.supervisor_id === Number(selectedLeaderId) && normalizeDepartment(u.department) === selectedDepartment
+        (u) => u.supervisor_id === Number(selectedLeaderId) && isSameDepartment(u.department, selectedDepartment)
     );
     const freeEmployees = allUsers.filter(
         (u) =>
             selectedDepartment &&
-            normalizeDepartment(u.department) === selectedDepartment &&
+            isSameDepartment(u.department, selectedDepartment) &&
             !u.supervisor_id &&
             u.role !== "admin" &&
             (!subSearch || u.full_name.includes(subSearch) || u.employee_code?.includes(subSearch))
@@ -1192,7 +1192,7 @@ export default function OverviewDashboard() {
                                                                 <button
                                                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
                                                                     className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">
-                                                                    เพิ่มวันลา
+                                                                    กำหนดวันลา
                                                                 </button>
                                                                 <button
                                                                     onClick={() => openResetPasswordModal(emp)}

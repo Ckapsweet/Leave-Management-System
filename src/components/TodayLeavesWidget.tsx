@@ -1,20 +1,30 @@
 import { useState, useEffect } from "react";
 import { getThisWeekLeaves, getTodayLeaves } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
-import { normalizeDepartment } from "../services/leaveFilters";
+import { isSameDepartment } from "../services/leaveFilters";
 
 interface TodayLeavesWidgetProps {
     departmentScope?: string | null;
+    supervisorScopeId?: number | string | null;
 }
 
-function filterByDepartment(leaves: LeaveRequest[], departmentScope?: string | null) {
-    if (!departmentScope) return leaves;
+function isSameId(a: number | string | null | undefined, b: number | string | null | undefined) {
+    return a != null && b != null && String(a) === String(b);
+}
+
+function filterByScope(
+    leaves: LeaveRequest[],
+    departmentScope?: string | null,
+    supervisorScopeId?: number | string | null
+) {
     return leaves.filter(
-        (leave) => normalizeDepartment(leave.user?.department) === normalizeDepartment(departmentScope)
+        (leave) =>
+            (!departmentScope || isSameDepartment(leave.user?.department, departmentScope)) &&
+            (!supervisorScopeId || isSameId(leave.user?.supervisor_id, supervisorScopeId))
     );
 }
 
-export function TodayLeavesWidget({ departmentScope = null }: TodayLeavesWidgetProps) {
+export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = null }: TodayLeavesWidgetProps) {
     const [todayLeaves, setTodayLeaves] = useState<LeaveRequest[]>([]);
     const [weekLeaves, setWeekLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -22,12 +32,12 @@ export function TodayLeavesWidget({ departmentScope = null }: TodayLeavesWidgetP
     useEffect(() => {
         Promise.all([getTodayLeaves(), getThisWeekLeaves()])
             .then(([today, week]) => {
-                setTodayLeaves(filterByDepartment(today, departmentScope));
-                setWeekLeaves(filterByDepartment(week, departmentScope));
+                setTodayLeaves(filterByScope(today, departmentScope, supervisorScopeId));
+                setWeekLeaves(filterByScope(week, departmentScope, supervisorScopeId));
             })
             .catch((err) => console.error("Failed to load department leaves", err))
             .finally(() => setLoading(false));
-    }, [departmentScope]);
+    }, [departmentScope, supervisorScopeId]);
 
     const renderLeaves = (leaves: LeaveRequest[], emptyText: string) => {
         if (loading) {

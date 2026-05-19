@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countLeaveRequestsByStatus, filterLeaveRequests, normalizeDepartment, uniqueLeaveRequestsById } from "../leaveFilters";
+import { countLeaveRequestsByStatus, filterLeaveRequests, isSameDepartment, normalizeDepartment, uniqueLeaveRequestsById } from "../leaveFilters";
 import type { LeaveRequest } from "../leaveService";
 
 function request(overrides: Partial<LeaveRequest>): LeaveRequest {
@@ -85,5 +85,10 @@ describe("leaveFilters", () => {
   it("normalizes blank department values", () => {
     expect(normalizeDepartment(" HR ")).toBe("HR");
     expect(normalizeDepartment(null)).toBe("");
+  });
+
+  it("matches departments case-insensitively after trimming", () => {
+    expect(isSameDepartment(" Test ", "test")).toBe(true);
+    expect(isSameDepartment("ทดสอบ", "test")).toBe(false);
   });
 });

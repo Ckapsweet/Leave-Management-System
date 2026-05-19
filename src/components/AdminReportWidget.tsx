@@ -158,7 +158,7 @@ export function AdminReportWidget({
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-red-600 to-rose-600 rounded-2xl p-6 text-white shadow-lg">
-        <h2 className="text-2xl font-bold mb-2">ภาพรวมทีม - ปี {currentYear}</h2>
+        <h2 className="text-2xl font-bold mb-2">ภาพรวมทีม</h2>
         <p className="text-red-100 text-sm">สรุปอนุมัติและภาพรวมการลาของทีม</p>
       </div>
 
