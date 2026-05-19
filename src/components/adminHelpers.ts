@@ -19,6 +19,17 @@ export interface EmployeeWithBalance extends Employee {
   pool: LeavePool | null;
 }
 
+export interface BalanceEditorUser {
+  id: number;
+  role?: string | null;
+  department?: string | null;
+}
+
+export interface BalanceEditableEmployee {
+  id: number;
+  supervisor_id?: number | string | null;
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 export const STATUS_META: Record<
@@ -69,4 +80,12 @@ export function avatarColor(dept = "") {
     hash = dept.charCodeAt(i) + ((hash << 5) - hash);
   }
   return COLORS_PALETTE[Math.abs(hash) % COLORS_PALETTE.length];
+}
+
+export function canEditEmployeeBalance(
+  currentUser: BalanceEditorUser | null | undefined,
+  _employee?: BalanceEditableEmployee | null,
+  _userById?: Map<string, Employee>
+) {
+  return currentUser?.role === "admin";
 }

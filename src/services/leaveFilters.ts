@@ -75,3 +75,7 @@ export function countLeaveRequestsByStatus(requests: LeaveRequest[]): LeaveReque
 export function normalizeDepartment(value?: string | null) {
   return (value ?? "").trim();
 }
+
+export function isSameDepartment(a?: string | null, b?: string | null) {
+  return normalizeDepartment(a).toLocaleLowerCase() === normalizeDepartment(b).toLocaleLowerCase();
+}

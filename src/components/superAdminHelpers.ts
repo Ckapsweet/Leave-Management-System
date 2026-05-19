@@ -8,7 +8,7 @@ export const ACTION_META: Record<string, { label: string; color: string; bg: str
   "leave.reject": { label: "ปฏิเสธลา", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: "✗" },
   "leave.create": { label: "ยื่นคำขอลา", color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: "+" },
   "leave.cancel": { label: "ยกเลิกคำขอ", color: "text-orange-700", bg: "bg-orange-50 border-orange-200", icon: "×" },
-  "balance.update": { label: "แก้ไขวันลา", color: "text-violet-700", bg: "bg-violet-50 border-violet-200", icon: "✎" },
+  "balance.update": { label: "กำหนดวันลา", color: "text-violet-700", bg: "bg-violet-50 border-violet-200", icon: "✎" },
   "user.create": { label: "สร้าง user", color: "text-teal-700", bg: "bg-teal-50 border-teal-200", icon: "👤" },
   "user.delete": { label: "ลบ user", color: "text-red-700", bg: "bg-red-50 border-red-200", icon: "🗑" },
   "user.role_change": { label: "เปลี่ยน role", color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: "⚑" },
