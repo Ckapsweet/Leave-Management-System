@@ -1,0 +1,120 @@
+import api from "./api";
+import type { Employee } from "../components/adminHelpers";
+
+export interface EventParticipant extends Employee {
+  selected_by_lead_id?: number | null;
+  selected_by_lead_name?: string | null;
+  selected_at?: string | null;
+}
+
+export interface EventTeamMember extends Employee {
+  lead_id?: number;
+  lead_name?: string;
+}
+
+export interface WorkEvent {
+  id: number;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  created_by: number;
+  creator_name?: string | null;
+  creator_role?: string | null;
+  lead_id: number;
+  lead_ids?: number[];
+  leads?: Employee[];
+  lead_name?: string | null;
+  lead_employee_code?: string | null;
+  department: string | null;
+  created_at: string;
+  participants: EventParticipant[];
+  attendance?: EventAttendance | null;
+  attendance_days?: EventAttendance[];
+}
+
+export interface EventAttendance {
+  id?: number;
+  event_id: number;
+  user_id?: number;
+  event_date: string;
+  check_in_time?: string | null;
+  check_out_time?: string | null;
+  check_in_at: string | null;
+  check_out_at: string | null;
+  status?: "draft" | "pending" | "approved" | "rejected";
+  approval_comment?: string | null;
+  full_name?: string;
+  employee_code?: string;
+  department?: string;
+  approver_name?: string | null;
+  attachments?: { id: number; evidence_type?: "check_in" | "check_out"; original_name: string; mime_type: string; size: number; url: string }[];
+}
+
+export interface CreateEventPayload {
+  title: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  lead_ids: number[];
+}
+
+export async function getEvents(): Promise<WorkEvent[]> {
+  const res = await api.get("/api/events");
+  return res.data;
+}
+
+export async function getEventLeads(): Promise<Employee[]> {
+  const res = await api.get("/api/events/leads");
+  return res.data;
+}
+
+export async function getLeadTeam(eventId: number): Promise<EventTeamMember[]> {
+  const res = await api.get(`/api/events/${eventId}/team`);
+  return res.data;
+}
+
+export async function createEvent(payload: CreateEventPayload): Promise<WorkEvent> {
+  const res = await api.post("/api/events", payload);
+  return res.data;
+}
+
+export async function updateEventParticipants(eventId: number, participantIds: number[]): Promise<WorkEvent> {
+  const res = await api.patch(`/api/events/${eventId}/participants`, {
+    participant_ids: participantIds,
+  });
+  return res.data;
+}
+
+export async function getMyEvents(): Promise<WorkEvent[]> {
+  const res = await api.get("/api/events/my");
+  return res.data;
+}
+
+export async function submitEventAttendance(payload: {
+  eventId: number;
+  eventDate: string;
+  checkInTime: string;
+  checkOutTime: string;
+  checkInEvidence: File;
+  checkOutEvidence: File;
+}): Promise<EventAttendance> {
+  const formData = new FormData();
+  formData.append("event_date", payload.eventDate);
+  formData.append("check_in_time", payload.checkInTime);
+  formData.append("check_out_time", payload.checkOutTime);
+  formData.append("check_in_evidence", payload.checkInEvidence);
+  formData.append("check_out_evidence", payload.checkOutEvidence);
+  const res = await api.post(`/api/events/${payload.eventId}/attendance`, formData);
+  return res.data;
+}
+
+export async function getEventAttendance(eventId: number): Promise<EventAttendance[]> {
+  const res = await api.get(`/api/events/${eventId}/attendance`);
+  return res.data;
+}
+
+export async function reviewEventAttendance(logId: number, action: "approve" | "reject", comment?: string): Promise<EventAttendance> {
+  const res = await api.patch(`/api/events/attendance/${logId}/${action}`, { comment });
+  return res.data;
+}

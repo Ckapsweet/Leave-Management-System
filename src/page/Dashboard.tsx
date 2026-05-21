@@ -16,6 +16,7 @@ import { LeaveBalanceCard } from "../components/LeaveBalanceCard";
 import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
+import { getMyEvents, submitEventAttendance, type EventAttendance, type WorkEvent } from "../services/eventService";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -311,6 +312,8 @@ export default function UserLeaveDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [myEvents, setMyEvents] = useState<WorkEvent[]>([]);
+  const [eventActionLoading, setEventActionLoading] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -334,14 +337,16 @@ export default function UserLeaveDashboard() {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [types, poolRes, reqRes] = await Promise.all([
+      const [types, poolRes, reqRes, eventRes] = await Promise.all([
         getLeaveTypes(),
         getLeavePool(year),
         getMyLeaveRequests(),
+        getMyEvents(),
       ]);
       setLeaveTypes(types);
       setLeavePool(poolRes);
       setRequests(reqRes);
+      setMyEvents(eventRes);
 
       setUser(readStoredUser());
     } catch (err: any) {
@@ -382,6 +387,37 @@ export default function UserLeaveDashboard() {
       toast.error(err?.response?.data?.message || "ยกเลิกคำขอไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const updateEventAttendance = (eventId: number, attendance: EventAttendance) => {
+    setMyEvents((prev) =>
+      prev.map((event) =>
+        event.id === eventId
+          ? {
+              ...event,
+              attendance_days: (event.attendance_days ?? []).map((day) =>
+                day.event_date === attendance.event_date ? { ...day, ...attendance } : day
+              ),
+            }
+          : event
+      )
+    );
+  };
+
+  const handleEventSubmit = async (eventId: number, eventDate: string, checkInTime: string, checkOutTime: string, checkInEvidence: File | null, checkOutEvidence: File | null) => {
+    try {
+      if (!checkInEvidence || !checkOutEvidence) {
+        toast.error("กรุณาแนบหลักฐานตอนเข้าและออกงาน");
+        return;
+      }
+      setEventActionLoading(`${eventId}:${eventDate}`);
+      updateEventAttendance(eventId, await submitEventAttendance({ eventId, eventDate, checkInTime, checkOutTime, checkInEvidence, checkOutEvidence }));
+      toast.success("ส่งเวลาพร้อมหลักฐานเรียบร้อย รอผู้เกี่ยวข้องยืนยัน");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "ส่งเวลาไม่สำเร็จ");
+    } finally {
+      setEventActionLoading(null);
     }
   };
 
@@ -542,6 +578,25 @@ export default function UserLeaveDashboard() {
         {/* ── Today's Leaves Component ── */}
         <TodayLeavesWidget />
 
+        {myEvents.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3 px-1">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Event ของฉัน</h3>
+              <span className="text-xs text-gray-400">{myEvents.length} รายการ</span>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              {myEvents.map((event) => (
+                <EventWorkCard
+                  key={event.id}
+                  event={event}
+                  loadingKey={eventActionLoading}
+                  onSubmitTime={handleEventSubmit}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Leave balances by type */}
         <div>
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 px-1">วันลาคงเหลือแต่ละประเภท</h3>
@@ -633,6 +688,99 @@ export default function UserLeaveDashboard() {
         </div>
       </main>
       <Footer />
+    </div>
+  );
+}
+
+function EventWorkCard({
+  event,
+  loadingKey,
+  onSubmitTime,
+}: {
+  event: WorkEvent;
+  loadingKey: string | null;
+  onSubmitTime: (eventId: number, eventDate: string, checkInTime: string, checkOutTime: string, checkInEvidence: File | null, checkOutEvidence: File | null) => void;
+}) {
+  const [forms, setForms] = useState<Record<string, { in: string; out: string; checkInFile: File | null; checkOutFile: File | null }>>({});
+  const days = event.attendance_days ?? [];
+  const completedDays = days.filter((day) => day.status === "approved").length;
+  const setDayForm = (date: string, patch: Partial<{ in: string; out: string; checkInFile: File | null; checkOutFile: File | null }>) => {
+    setForms((prev) => {
+      const current = prev[date] ?? { in: "", out: "", checkInFile: null, checkOutFile: null };
+      return { ...prev, [date]: { ...current, ...patch } };
+    });
+  };
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900">{event.title}</h4>
+          <p className="text-xs text-gray-400 mt-1">{fmtDate(event.start_date)} - {fmtDate(event.end_date)}</p>
+          {event.description && <p className="text-sm text-gray-500 mt-2">{event.description}</p>}
+        </div>
+        <span className="px-2.5 py-1 rounded-full text-xs font-medium w-fit bg-indigo-50 text-indigo-700">
+          {completedDays}/{days.length} วัน
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {days.map((day) => {
+          const key = `${event.id}:${day.event_date}`;
+          const loading = loadingKey === key;
+          const form = forms[day.event_date] ?? { in: day.check_in_time?.slice(0, 5) ?? "", out: day.check_out_time?.slice(0, 5) ?? "", checkInFile: null, checkOutFile: null };
+          const locked = day.status === "pending" || day.status === "approved";
+          return (
+            <div key={day.event_date} className="border border-gray-100 rounded-xl p-3 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{fmtDate(day.event_date)}</p>
+                  <p className="text-xs text-gray-400">
+                    เวลา: {day.check_in_time?.slice(0, 5) ?? "-"} - {day.check_out_time?.slice(0, 5) ?? "-"}
+                    {day.approver_name ? ` / ยืนยันโดย ${day.approver_name}` : ""}
+                  </p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${
+                  day.status === "approved" ? "bg-emerald-50 text-emerald-700" : day.status === "pending" ? "bg-amber-50 text-amber-700" : day.status === "rejected" ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"
+                }`}>
+                  {day.status === "approved" ? "ยืนยันแล้ว" : day.status === "pending" ? "รอยืนยัน" : day.status === "rejected" ? "ถูกปฏิเสธ" : "ยังไม่ส่ง"}
+                </span>
+              </div>
+              {day.approval_comment && <p className="text-xs text-red-500">หมายเหตุ: {day.approval_comment}</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1.2fr_1.2fr_auto] gap-2 items-center">
+                <input type="time" value={form.in} disabled={locked || loading} onChange={(e) => setDayForm(day.event_date, { in: e.target.value })} className="border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+                <input type="time" value={form.out} disabled={locked || loading} onChange={(e) => setDayForm(day.event_date, { out: e.target.value })} className="border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+                <label className={`border border-dashed border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-500 bg-gray-50 ${locked ? "opacity-50" : "cursor-pointer hover:bg-gray-100"}`}>
+                  {form.checkInFile ? `เข้า: ${form.checkInFile.name}` : "หลักฐานเข้างาน"}
+                  <input
+                    type="file"
+                    disabled={locked || loading}
+                    accept="image/*,.pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => setDayForm(day.event_date, { checkInFile: e.target.files?.[0] ?? null })}
+                  />
+                </label>
+                <label className={`border border-dashed border-gray-300 rounded-xl px-3 py-2 text-xs text-gray-500 bg-gray-50 ${locked ? "opacity-50" : "cursor-pointer hover:bg-gray-100"}`}>
+                  {form.checkOutFile ? `ออก: ${form.checkOutFile.name}` : "หลักฐานออกงาน"}
+                  <input
+                    type="file"
+                    disabled={locked || loading}
+                    accept="image/*,.pdf,application/pdf"
+                    className="hidden"
+                    onChange={(e) => setDayForm(day.event_date, { checkOutFile: e.target.files?.[0] ?? null })}
+                  />
+                </label>
+                <button
+                  onClick={() => onSubmitTime(event.id, day.event_date, form.in, form.out, form.checkInFile, form.checkOutFile)}
+                  disabled={loading || locked}
+                  className="px-4 py-2 text-sm rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ส่งยืนยัน
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
