@@ -8,6 +8,7 @@ import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { EditProfileModal } from "../../components/EditProfileModal";
 import { DashboardHeader } from "../../components/admin/DashboardHeader";
+import { EventPanel } from "../../components/EventPanel";
 import {
   STATUS_META, TYPE_COLORS, avatarColor, canEditEmployeeBalance, fmtDate,
 } from "../../components/adminHelpers";
@@ -31,7 +32,7 @@ interface SubordinateUser {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"requests" | "employees">("requests");
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "events">("requests");
   const [approvalUsers, setApprovalUsers] = useState<SubordinateUser[]>([]);
   const year = new Date().getFullYear();
 
@@ -218,6 +219,7 @@ export default function AdminDashboard() {
         tabs={[
           { key: "requests", label: "คำขอลา", badge: pending },
           { key: "employees", label: "พนักงาน" },
+          { key: "events", label: "Event" },
         ]}
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
@@ -234,6 +236,8 @@ export default function AdminDashboard() {
           departmentScope={departmentScope}
           supervisorScopeId={user?.role === "lead" ? user.id : null}
         />
+
+        {activeTab === "events" && <EventPanel user={user} />}
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (

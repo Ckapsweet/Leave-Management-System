@@ -15,6 +15,7 @@ import type { Employee } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
+import { EventPanel } from "../../components/EventPanel";
 import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
 import {
   useAdminAuthUser,
@@ -26,7 +27,7 @@ import { normalizeDepartment } from "../../services/leaveFilters";
 
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "reports">(() => {
+  const [activeTab, setActiveTab] = useState<"requests" | "employees" | "reports" | "events">(() => {
     const stored = localStorage.getItem("user");
     if (!stored) return "requests";
     try {
@@ -224,6 +225,7 @@ export default function AdminDashboard() {
         tabs={[
           { key: "requests", label: "คำขอลา", badge: pending },
           { key: "employees", label: "พนักงาน" },
+          { key: "events", label: "Event" },
           ...(user?.role === "admin" || user?.role === "manager"
             ? [{ key: "reports", label: "ภาพรวม (Report)", icon: "reports" as const }]
             : []),
@@ -251,6 +253,8 @@ export default function AdminDashboard() {
             teamLoading={reportTeamLoading || empLoading}
           />
         )}
+
+        {activeTab === "events" && <EventPanel user={user} />}
 
         {/* ── Requests Tab ──────────────────────────────────────────────────── */}
         {activeTab === "requests" && (
