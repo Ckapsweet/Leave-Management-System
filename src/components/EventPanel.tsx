@@ -35,15 +35,14 @@ function eventAttendanceStatusLabel(status?: string) {
 
 function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
   const rows = attendance.map((item, index) => `
-    <tr>
+    <tr title="${eventAttendanceStatusLabel(item.status)}">
       <td>${index + 1}</td>
       <td>${item.full_name ?? "-"}</td>
       <td>${item.department ?? "-"}</td>
       <td>${item.event_date ? fmtDate(item.event_date) : "-"}</td>
       <td>${item.check_in_time?.slice(0, 5) ?? "-"}</td>
       <td>${item.check_out_time?.slice(0, 5) ?? "-"}</td>
-      <td>${eventAttendanceStatusLabel(item.status)}</td>
-      <td>${item.approver_name ?? "-"}</td>
+      <td class="attendance-signature"><span></span></td>
     </tr>
   `).join("");
   const printWindow = window.open("", "_blank", "width=1024,height=768");
@@ -63,14 +62,20 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
           .report-page { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(297mm - 48px); padding: 24px; }
           h1 { font-size: 20px; margin: 0 0 6px; }
           .meta { color: #6b7280; font-size: 12px; margin-bottom: 18px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+          th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: middle; }
           th { background: #f3f4f6; font-weight: 700; }
-          .summary { display: flex; gap: 16px; margin: 14px 0 18px; font-size: 12px; }
-          .summary div { border: 1px solid #e5e7eb; padding: 8px 10px; border-radius: 8px; }
+          .col-index { width: 30px; }
+          .col-name { width: 28%; }
+          .col-department { width: 13%; }
+          .col-date { width: 18%; }
+          .col-time { width: 12%; }
+          .col-signature { width: 22%; }
+          .attendance-signature { height: 34px; padding: 8px 12px; }
+          .attendance-signature span { display: block; width: 100%; height: 18px; border-bottom: 1px solid #6b7280; }
           .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: auto; padding-top: 64px; font-size: 13px; }
           .signature-box { text-align: center; }
-          .signature-line { border-bottom: 1px solid #111827; height: 44px; margin-bottom: 10px; }
+          .signature-line { height: 44px; margin-bottom: 10px; display: flex; align-items: flex-end; justify-content: center; }
           .signature-title { font-weight: 700; }
           @media print { .report-page { min-height: calc(297mm - 32mm); padding: 0; } }
         </style>
@@ -80,15 +85,17 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <h1>รายงานเวลา Event: ${event.title}</h1>
         <div class="meta">
           ช่วงเวลา ${fmtDate(event.start_date)} - ${fmtDate(event.end_date)}
-          ${event.lead_name ? ` / Lead: ${event.lead_name}` : ""}
-        </div>
-        <div class="summary">
-          <div>ทั้งหมด: ${attendance.length} รายการ</div>
-          <div>ยืนยันแล้ว: ${attendance.filter((item) => item.status === "approved").length}</div>
-          <div>รอยืนยัน: ${attendance.filter((item) => item.status === "pending").length}</div>
-          <div>ปฏิเสธ: ${attendance.filter((item) => item.status === "rejected").length}</div>
         </div>
         <table>
+          <colgroup>
+            <col class="col-index" />
+            <col class="col-name" />
+            <col class="col-department" />
+            <col class="col-date" />
+            <col class="col-time" />
+            <col class="col-time" />
+            <col class="col-signature" />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
@@ -97,19 +104,18 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
               <th>วันที่</th>
               <th>เวลาเข้า</th>
               <th>เวลาออก</th>
-              <th>สถานะ</th>
-              <th>ผู้ยืนยัน</th>
+              <th>ลงชื่อ</th>
             </tr>
           </thead>
           <tbody>${rows || `<tr><td colspan="9">ยังไม่มีข้อมูลลงเวลา</td></tr>`}</tbody>
         </table>
         <div class="signatures">
           <div class="signature-box">
-            <div class="signature-line"></div>
-            <div class="signature-title">ผจก.การตลาด</div>
+            <div class="signature-line">ลงชื่อ ...............................................................</div>
+            <div class="signature-title">ผจก.การตลาดและชาย</div>
           </div>
           <div class="signature-box">
-            <div class="signature-line"></div>
+            <div class="signature-line">ลงชื่อ ...............................................................</div>
             <div class="signature-title">ผจก.ฝ่ายทั่วไป</div>
           </div>
         </div>
