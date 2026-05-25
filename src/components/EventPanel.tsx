@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AuthUser } from "../services/authService";
 import type { Employee } from "./adminHelpers";
 import { avatarColor, fmtDate } from "./adminHelpers";
@@ -6,7 +6,10 @@ import { toast } from "./Toast";
 import { getErrorMessage } from "../services/errors";
 import api from "../services/api";
 import {
+  createManualEventAttendance,
   createEvent,
+  deleteEvent,
+  deleteEventAttendance,
   getEventAttendance,
   getEventLeads,
   getEvents,
@@ -27,6 +30,7 @@ type EventAttachment = NonNullable<EventAttendance["attachments"]>[number];
 
 const canCreateEvent = (role?: string | null) => role === "manager" || role === "assistant manager" || role === "admin";
 const canPrintEventReport = (role?: string | null) => role === "manager" || role === "assistant manager" || role === "admin";
+const canInputEventAttendance = (role?: string | null) => role === "manager" || role === "assistant manager" || role === "admin";
 
 function eventAttendanceStatusLabel(status?: string) {
   if (status === "approved") return "ยืนยันแล้ว";
@@ -114,7 +118,7 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <div class="signatures">
           <div class="signature-box">
             <div class="signature-line">ลงชื่อ ...............................................................</div>
-            <div class="signature-title">ผจก.การตลาดและชาย</div>
+            <div class="signature-title">ผจก.การตลาดและขาย</div>
           </div>
           <div class="signature-box">
             <div class="signature-line">ลงชื่อ ...............................................................</div>
@@ -134,6 +138,16 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeTimeInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function isValidTime24(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
 function isImageAttachment(file: EventAttachment) {
   return file.mime_type.startsWith("image/");
 }
@@ -151,6 +165,9 @@ function EventModal({
   onCreate,
   onSaveParticipants,
   onOpenParticipants,
+  onCreateManualAttendance,
+  onDeleteAttendance,
+  onDeleteEvent,
   onReviewAttendance,
 }: {
   mode: EventModalMode;
@@ -165,6 +182,9 @@ function EventModal({
   onCreate: (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[] }) => void;
   onSaveParticipants: (ids: number[]) => void;
   onOpenParticipants: (event: WorkEvent) => void;
+  onCreateManualAttendance: (payload: { userId: number; eventDate: string; checkInTime: string; checkOutTime: string }) => void;
+  onDeleteAttendance: (logId: number) => Promise<void>;
+  onDeleteEvent: (eventId: number) => Promise<void>;
   onReviewAttendance: (logId: number, action: "approve" | "reject") => void;
 }) {
   const [title, setTitle] = useState("");
@@ -177,10 +197,24 @@ function EventModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EventAttendance | null>(null);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<WorkEvent | null>(null);
+  const [manualUserId, setManualUserId] = useState("");
+  const [manualDate, setManualDate] = useState(todayIso());
+  const [manualCheckInTime, setManualCheckInTime] = useState("");
+  const [manualCheckOutTime, setManualCheckOutTime] = useState("");
 
   useEffect(() => {
     if (mode !== "participants" || !event) return;
     setSelectedIds(new Set(event.participants.map((participant) => participant.id)));
+  }, [event, mode]);
+
+  useEffect(() => {
+    if (mode !== "detail" || !event) return;
+    setManualDate(event.start_date);
+    setManualUserId(event.participants[0]?.id ? String(event.participants[0].id) : "");
+    setManualCheckInTime("");
+    setManualCheckOutTime("");
   }, [event, mode]);
 
   useEffect(() => {
@@ -219,11 +253,12 @@ function EventModal({
   const isCreate = mode === "create";
   const isDetail = mode === "detail";
   const titleText = isCreate ? "สร้าง Event" : isDetail ? "รายละเอียด Event" : "เลือกสมาชิกเข้าร่วม Event";
+  const showManualAttendanceForm = isDetail && event && canInputEventAttendance(user?.role);
 
   const submit = () => {
     if (isCreate) {
       if (!title.trim()) return toast.error("กรุณาระบุชื่อ Event");
-      if (leadIds.size === 0) return toast.error("กรุณาเลือก Lead อย่างน้อย 1 คน");
+      if (leadIds.size === 0) return toast.error("กรุณาเลือกผู้รับผิดชอบอย่างน้อย 1 คน");
       if (endDate < startDate) return toast.error("วันที่สิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น");
       onCreate({
         title: title.trim(),
@@ -237,6 +272,39 @@ function EventModal({
     onSaveParticipants(Array.from(selectedIds));
   };
 
+  const submitManualAttendance = () => {
+    if (!manualUserId) return toast.error("กรุณาเลือกผู้เข้าร่วม");
+    if (!manualDate) return toast.error("กรุณาระบุวันที่");
+    if (event && (manualDate < event.start_date || manualDate > event.end_date)) {
+      return toast.error("วันที่ต้องอยู่ในช่วง Event");
+    }
+    if (!manualCheckInTime) return toast.error("กรุณาระบุเวลาเข้า");
+    if (!manualCheckOutTime) return toast.error("กรุณาระบุเวลาออก");
+    if (!isValidTime24(manualCheckInTime) || !isValidTime24(manualCheckOutTime)) {
+      return toast.error("กรุณาระบุเวลาเป็นรูปแบบ 24 ชั่วโมง เช่น 08:00 หรือ 17:30");
+    }
+    if (manualCheckOutTime <= manualCheckInTime) return toast.error("เวลาออกต้องมากกว่าเวลาเข้า");
+
+    onCreateManualAttendance({
+      userId: Number(manualUserId),
+      eventDate: manualDate,
+      checkInTime: manualCheckInTime,
+      checkOutTime: manualCheckOutTime,
+    });
+  };
+
+  const confirmDeleteAttendance = async () => {
+    if (!deleteTarget?.id) return;
+    await onDeleteAttendance(deleteTarget.id);
+    setDeleteTarget(null);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteEventTarget) return;
+    await onDeleteEvent(deleteEventTarget.id);
+    setDeleteEventTarget(null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
@@ -245,7 +313,7 @@ function EventModal({
           <div>
             <h3 className="font-semibold text-gray-900">{titleText}</h3>
             <p className="text-xs text-gray-400 mt-1">
-              {isCreate ? "Manager หรือรอง Manager เลือกระยะเวลาและ Lead" : event?.title}
+              {isCreate ? "Manager หรือรอง Manager เลือกระยะเวลาและผู้รับผิดชอบ" : event?.title}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">x</button>
@@ -288,10 +356,10 @@ function EventModal({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Lead ผู้รับผิดชอบ</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">ผู้รับผิดชอบ</label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2">
                   {leads.length === 0 ? (
-                    <p className="text-sm text-gray-400 p-2">ไม่พบ Lead ที่เลือกได้</p>
+                    <p className="text-sm text-gray-400 p-2">ไม่พบผู้รับผิดชอบที่เลือกได้</p>
                   ) : leads.map((lead) => {
                     const checked = leadIds.has(lead.id);
                     return (
@@ -319,7 +387,7 @@ function EventModal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{lead.full_name}</p>
-                          <p className="text-xs text-gray-400 truncate">{lead.employee_code}</p>
+                          <p className="text-xs text-gray-400 truncate">{lead.department} / {lead.employee_code}</p>
                         </div>
                       </label>
                     );
@@ -433,6 +501,79 @@ function EventModal({
                     </button>
                   )}
                 </div>
+                {showManualAttendanceForm && (
+                  <div className="border border-gray-100 rounded-xl p-3 mb-3 space-y-3 bg-slate-50/60">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">ผู้เข้าร่วม</label>
+                        <select
+                          value={manualUserId}
+                          onChange={(e) => setManualUserId(e.target.value)}
+                          disabled={saving || (event?.participants.length ?? 0) === 0}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                        >
+                          {(event?.participants.length ?? 0) === 0 ? (
+                            <option value="">ยังไม่มีผู้เข้าร่วม</option>
+                          ) : (
+                            event?.participants.map((participant) => (
+                              <option key={participant.id} value={participant.id}>
+                                {participant.full_name} / {participant.employee_code}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">วันที่</label>
+                        <input
+                          type="date"
+                          value={manualDate}
+                          min={event?.start_date}
+                          max={event?.end_date}
+                          onChange={(e) => setManualDate(e.target.value)}
+                          disabled={saving}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">เวลาเข้า</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="08:00"
+                          maxLength={5}
+                          value={manualCheckInTime}
+                          onChange={(e) => setManualCheckInTime(normalizeTimeInput(e.target.value))}
+                          disabled={saving}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">เวลาออก</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="17:00"
+                          maxLength={5}
+                          value={manualCheckOutTime}
+                          onChange={(e) => setManualCheckOutTime(normalizeTimeInput(e.target.value))}
+                          disabled={saving}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={submitManualAttendance}
+                        disabled={saving || (event?.participants.length ?? 0) === 0}
+                        className="px-4 py-2 text-sm rounded-xl bg-slate-800 text-white font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        บันทึกเวลา
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {attendance.length === 0 ? (
                   <div className="py-8 text-center text-sm text-gray-400 border border-gray-100 rounded-xl">ยังไม่มีการส่งเวลา</div>
                 ) : (
@@ -474,6 +615,18 @@ function EventModal({
                           <div className="flex justify-end gap-2">
                             <button onClick={() => onReviewAttendance(item.id!, "reject")} className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50">ปฏิเสธ</button>
                             <button onClick={() => onReviewAttendance(item.id!, "approve")} className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">ยืนยัน</button>
+                          </div>
+                        )}
+                        {item.id && canInputEventAttendance(user?.role) && (
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(item)}
+                              disabled={saving}
+                              className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              ลบ
+                            </button>
                           </div>
                         )}
                         {item.status === "pending" && item.user_id === user?.id && (
@@ -553,28 +706,105 @@ function EventModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
-          <button onClick={onClose} disabled={saving} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">
-            ยกเลิก
-          </button>
-          {isDetail && event ? (
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {isDetail && event && canCreateEvent(user?.role) ? (
             <button
-              onClick={() => onOpenParticipants(event)}
-              className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700"
+              type="button"
+              onClick={() => setDeleteEventTarget(event)}
+              disabled={saving}
+              className="px-4 py-2.5 text-sm text-red-600 border border-red-200 rounded-xl hover:bg-red-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              เลือกคนเข้า Event
+              ลบ Event
             </button>
-          ) : (
-            <button
-              onClick={submit}
-              disabled={saving || (!isCreate && teamLoading) || (!isCreate && user?.role === "lead" && !(event?.lead_ids ?? [event?.lead_id]).includes(user.id))}
-              className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {saving ? "กำลังบันทึก..." : isCreate ? "สร้าง Event" : "บันทึกรายชื่อ"}
+          ) : <span />}
+          <div className="flex justify-end gap-3">
+            <button onClick={onClose} disabled={saving} className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium">
+              ยกเลิก
             </button>
-          )}
+            {isDetail && event ? (
+              <button
+                onClick={() => onOpenParticipants(event)}
+                disabled={saving}
+                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                เลือกคนเข้า Event
+              </button>
+            ) : (
+              <button
+                onClick={submit}
+                disabled={saving || (!isCreate && teamLoading) || (!isCreate && user?.role === "lead" && !(event?.lead_ids ?? [event?.lead_id]).includes(user.id))}
+                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {saving ? "กำลังบันทึก..." : isCreate ? "สร้าง Event" : "บันทึกรายชื่อ"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+      {deleteEventTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={() => !saving && setDeleteEventTarget(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">
+                  !
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">ลบ Event</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">ข้อมูล Event และรีพอร์ตเวลาที่เกี่ยวข้องจะถูกลบ</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                ต้องการลบ <span className="font-semibold text-gray-900">{deleteEventTarget.title}</span> ใช่หรือไม่?
+              </p>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-sm space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">ช่วงเวลา</span>
+                  <span className="font-medium text-gray-900">
+                    {fmtDate(deleteEventTarget.start_date)} - {fmtDate(deleteEventTarget.end_date)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">ผู้เข้าร่วม</span>
+                  <span className="font-medium text-gray-900">{deleteEventTarget.participants.length} คน</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">รีพอร์ตเวลา</span>
+                  <span className="font-medium text-gray-900">{attendance.length} รายการ</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteEventTarget(null)}
+                disabled={saving}
+                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteEvent}
+                disabled={saving}
+                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    กำลังลบ...
+                  </>
+                ) : "ลบ Event"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {previewFile && (
         <div
           className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -611,6 +841,66 @@ function EventModal({
           </div>
         </div>
       )}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={() => !saving && setDeleteTarget(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">
+                  !
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">ลบบันทึกเวลา Event</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">รายการนี้จะถูกลบออกจากรีพอร์ตเวลา</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                ต้องการลบบันทึกเวลาของ <span className="font-semibold text-gray-900">{deleteTarget.full_name ?? "-"}</span> ใช่หรือไม่?
+              </p>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-sm space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">วันที่</span>
+                  <span className="font-medium text-gray-900">{fmtDate(deleteTarget.event_date)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">เวลา</span>
+                  <span className="font-medium text-gray-900">
+                    {deleteTarget.check_in_time?.slice(0, 5) ?? "-"} - {deleteTarget.check_out_time?.slice(0, 5) ?? "-"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={saving}
+                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAttendance}
+                disabled={saving}
+                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    กำลังลบ...
+                  </>
+                ) : "ลบบันทึก"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -625,11 +915,7 @@ export function EventPanel({ user }: EventPanelProps) {
   const [saving, setSaving] = useState(false);
   const [modalMode, setModalMode] = useState<EventModalMode | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<WorkEvent | null>(null);
-
-  const leadChoices = useMemo(() => {
-    if (!user || user.role !== "assistant manager") return leads;
-    return leads.filter((lead) => lead.supervisor_id === user.id);
-  }, [leads, user]);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<WorkEvent | null>(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -681,6 +967,63 @@ export function EventPanel({ user }: EventPanelProps) {
     }
   };
 
+  const handleCreateManualAttendance = async (payload: { userId: number; eventDate: string; checkInTime: string; checkOutTime: string }) => {
+    if (!selectedEvent) return;
+    try {
+      setSaving(true);
+      const created = await createManualEventAttendance({
+        eventId: selectedEvent.id,
+        ...payload,
+      });
+      setAttendance((prev) => {
+        const matchedIndex = prev.findIndex((item) =>
+          (created.id && item.id === created.id) ||
+          (item.user_id === created.user_id && item.event_date === created.event_date)
+        );
+        if (matchedIndex === -1) return [created, ...prev];
+        return prev.map((item, index) => index === matchedIndex ? { ...item, ...created } : item);
+      });
+      toast.success("บันทึกเวลา Event เรียบร้อย");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "บันทึกเวลา Event ไม่สำเร็จ"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAttendance = async (logId: number) => {
+    try {
+      setSaving(true);
+      await deleteEventAttendance(logId);
+      setAttendance((prev) => prev.filter((item) => item.id !== logId));
+      toast.success("ลบบันทึกเวลา Event เรียบร้อย");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "ลบบันทึกเวลา Event ไม่สำเร็จ"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      setSaving(true);
+      await deleteEvent(eventId);
+      setEvents((prev) => prev.filter((event) => event.id !== eventId));
+      toast.success("ลบ Event เรียบร้อย");
+      setDeleteEventTarget(null);
+      closeModal(true);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "ลบ Event ไม่สำเร็จ"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!deleteEventTarget) return;
+    await handleDeleteEvent(deleteEventTarget.id);
+  };
+
   const closeModal = (force = false) => {
     if (saving && !force) return;
     setModalMode(null);
@@ -723,7 +1066,7 @@ export function EventPanel({ user }: EventPanelProps) {
         <div>
           <h2 className="text-sm font-semibold text-gray-800">Event</h2>
           <p className="text-xs text-gray-400 mt-1">
-            Manager/Assist Manager สร้าง Event และเลือก Lead จากนั้น Lead เลือกสมาชิกในทีม
+            Manager/Assist Manager สร้าง Event และเลือกผู้รับผิดชอบ จากนั้นเลือกสมาชิกเข้าร่วม
           </p>
         </div>
         {canCreateEvent(user?.role) && (
@@ -789,13 +1132,25 @@ export function EventPanel({ user }: EventPanelProps) {
                         </p>
                       </td>
                       <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => openParticipantModal(event)}
-                          disabled={!canEditParticipants}
-                          className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-                        >
-                          เลือกคนเข้า Event
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          {canCreateEvent(user?.role) && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteEventTarget(event)}
+                              disabled={saving}
+                              className="px-3 py-1.5 text-xs border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              ลบ
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openParticipantModal(event)}
+                            disabled={!canEditParticipants || saving}
+                            className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                          >
+                            เลือกคนเข้า Event
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -811,7 +1166,7 @@ export function EventPanel({ user }: EventPanelProps) {
           mode={modalMode}
           user={user}
           event={selectedEvent}
-          leads={leadChoices}
+          leads={leads}
           team={team}
           attendance={attendance}
           teamLoading={teamLoading}
@@ -820,8 +1175,71 @@ export function EventPanel({ user }: EventPanelProps) {
           onCreate={handleCreate}
           onSaveParticipants={handleSaveParticipants}
           onOpenParticipants={openParticipantModal}
+          onCreateManualAttendance={handleCreateManualAttendance}
+          onDeleteAttendance={handleDeleteAttendance}
+          onDeleteEvent={handleDeleteEvent}
           onReviewAttendance={handleReviewAttendance}
         />
+      )}
+      {deleteEventTarget && !modalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={() => !saving && setDeleteEventTarget(null)} />
+          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center text-xl font-bold">
+                  !
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">ลบ Event</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">ข้อมูล Event และรีพอร์ตเวลาที่เกี่ยวข้องจะถูกลบ</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                ต้องการลบ <span className="font-semibold text-gray-900">{deleteEventTarget.title}</span> ใช่หรือไม่?
+              </p>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4 text-sm space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">ช่วงเวลา</span>
+                  <span className="font-medium text-gray-900">
+                    {fmtDate(deleteEventTarget.start_date)} - {fmtDate(deleteEventTarget.end_date)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-500">ผู้เข้าร่วม</span>
+                  <span className="font-medium text-gray-900">{deleteEventTarget.participants.length} คน</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteEventTarget(null)}
+                disabled={saving}
+                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteEvent}
+                disabled={saving}
+                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    กำลังลบ...
+                  </>
+                ) : "ลบ Event"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
