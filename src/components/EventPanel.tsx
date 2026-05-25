@@ -4,6 +4,7 @@ import type { Employee } from "./adminHelpers";
 import { avatarColor, fmtDate } from "./adminHelpers";
 import { toast } from "./Toast";
 import { getErrorMessage } from "../services/errors";
+import api from "../services/api";
 import {
   createEvent,
   getEventAttendance,
@@ -22,6 +23,7 @@ interface EventPanelProps {
 
 type EventModalMode = "create" | "participants" | "detail";
 type EventTeamMember = Employee & { lead_id?: number; lead_name?: string };
+type EventAttachment = NonNullable<EventAttendance["attachments"]>[number];
 
 const canCreateEvent = (role?: string | null) => role === "manager" || role === "assistant manager" || role === "admin";
 const canPrintEventReport = (role?: string | null) => role === "manager" || role === "assistant manager" || role === "admin";
@@ -132,6 +134,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isImageAttachment(file: EventAttachment) {
+  return file.mime_type.startsWith("image/");
+}
+
 function EventModal({
   mode,
   user,
@@ -167,11 +173,48 @@ function EventModal({
   const [endDate, setEndDate] = useState(todayIso());
   const [leadIds, setLeadIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [previewFile, setPreviewFile] = useState<EventAttachment | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode !== "participants" || !event) return;
     setSelectedIds(new Set(event.participants.map((participant) => participant.id)));
   }, [event, mode]);
+
+  useEffect(() => {
+    if (!previewFile) {
+      setPreviewUrl(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewUrl(null);
+
+    api.get(previewFile.url, { responseType: "blob" })
+      .then((res) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(res.data);
+        setPreviewUrl(objectUrl);
+      })
+      .catch((err) => {
+        if (!cancelled) setPreviewError(getErrorMessage(err, "โหลดรูปไม่สำเร็จ"));
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewFile]);
 
   const isCreate = mode === "create";
   const isDetail = mode === "detail";
@@ -403,9 +446,20 @@ function EventModal({
                             {!!item.attachments?.length && (
                               <div className="flex flex-wrap gap-2 mt-1">
                                 {item.attachments.map((file) => (
-                                  <a key={file.id} href={file.url} target="_blank" className="text-xs text-indigo-600 hover:text-indigo-800" rel="noreferrer">
-                                    {file.original_name}
-                                  </a>
+                                  isImageAttachment(file) ? (
+                                    <button
+                                      key={file.id}
+                                      type="button"
+                                      onClick={() => setPreviewFile(file)}
+                                      className="text-xs text-indigo-600 hover:text-indigo-800 underline-offset-2 hover:underline"
+                                    >
+                                      {file.original_name}
+                                    </button>
+                                  ) : (
+                                    <a key={file.id} href={file.url} target="_blank" className="text-xs text-indigo-600 hover:text-indigo-800" rel="noreferrer">
+                                      {file.original_name}
+                                    </a>
+                                  )
                                 ))}
                               </div>
                             )}
@@ -521,6 +575,42 @@ function EventModal({
           )}
         </div>
       </div>
+      {previewFile && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewFile(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-gray-100">
+              <p className="text-sm font-semibold text-gray-800 truncate">{previewFile.original_name}</p>
+              <button
+                type="button"
+                onClick={() => setPreviewFile(null)}
+                className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 flex items-center justify-center"
+                aria-label="ปิด"
+              >
+                x
+              </button>
+            </div>
+            <div className="bg-gray-50 p-4 overflow-auto flex-1 flex items-center justify-center">
+              {previewLoading ? (
+                <div className="text-sm text-gray-400 py-20">กำลังโหลดรูป...</div>
+              ) : previewError ? (
+                <div className="text-sm text-red-500 py-20">{previewError}</div>
+              ) : previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt={previewFile.original_name}
+                  className="max-w-full max-h-[72vh] object-contain rounded-lg shadow-sm"
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
