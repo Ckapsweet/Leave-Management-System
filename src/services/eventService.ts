@@ -86,6 +86,11 @@ export async function updateEventParticipants(eventId: number, participantIds: n
   return res.data;
 }
 
+export async function deleteEvent(eventId: number): Promise<{ id: number }> {
+  const res = await api.delete(`/api/events/${eventId}`);
+  return res.data;
+}
+
 export async function getMyEvents(): Promise<WorkEvent[]> {
   const res = await api.get("/api/events/my");
   return res.data;
@@ -111,6 +116,27 @@ export async function submitEventAttendance(payload: {
 
 export async function getEventAttendance(eventId: number): Promise<EventAttendance[]> {
   const res = await api.get(`/api/events/${eventId}/attendance`);
+  return res.data;
+}
+
+export async function createManualEventAttendance(payload: {
+  eventId: number;
+  userId: number;
+  eventDate: string;
+  checkInTime: string;
+  checkOutTime: string;
+}): Promise<EventAttendance> {
+  const res = await api.post(`/api/events/${payload.eventId}/attendance/manual`, {
+    user_id: payload.userId,
+    event_date: payload.eventDate,
+    check_in_time: payload.checkInTime,
+    check_out_time: payload.checkOutTime,
+  });
+  return res.data;
+}
+
+export async function deleteEventAttendance(logId: number): Promise<{ id: number }> {
+  const res = await api.delete(`/api/events/attendance/${logId}`);
   return res.data;
 }
 
