@@ -87,5 +87,5 @@ export function canEditEmployeeBalance(
   _employee?: BalanceEditableEmployee | null,
   _userById?: Map<string, Employee>
 ) {
-  return currentUser?.role === "admin";
+  return currentUser?.role === "admin" || currentUser?.role === "hr";
 }

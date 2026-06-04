@@ -57,6 +57,7 @@ export interface CreateEventPayload {
   start_date: string;
   end_date: string;
   lead_ids: number[];
+  participant_ids?: number[];
 }
 
 export async function getEvents(): Promise<WorkEvent[]> {
