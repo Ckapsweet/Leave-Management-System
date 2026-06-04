@@ -234,7 +234,6 @@ export default function AdminDashboard() {
         onTabChange={(tab) => setActiveTab(tab as typeof activeTab)}
         onEditProfile={() => setShowEditProfile(true)}
         onMyLeave={() => navigate("/dashboard")}
-        onSelectSystem={() => navigate("/select-system")}
         onLogout={handleLogout}
       />
 
