@@ -39,18 +39,92 @@ function eventAttendanceStatusLabel(status?: string) {
   return "ยังไม่ส่ง";
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function dateOnly(value?: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function eventDateRange(start: string, end: string) {
+  const dates: string[] = [];
+  const startDate = new Date(dateOnly(start));
+  const endDate = new Date(dateOnly(end || start));
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return dates;
+
+  for (let current = startDate; current <= endDate; current = addDays(current, 1)) {
+    dates.push(current.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+function shortPrintDate(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function weekdayLabel(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", { weekday: "short" });
+}
+
 function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
-  const rows = attendance.map((item, index) => `
-    <tr title="${eventAttendanceStatusLabel(item.status)}">
-      <td>${index + 1}</td>
-      <td>${item.full_name ?? "-"}</td>
-      <td>${item.department ?? "-"}</td>
-      <td>${item.event_date ? fmtDate(item.event_date) : "-"}</td>
-      <td>${item.check_in_time?.slice(0, 5) ?? "-"}</td>
-      <td>${item.check_out_time?.slice(0, 5) ?? "-"}</td>
-      <td class="attendance-signature"><span></span></td>
-    </tr>
-  `).join("");
+  const dates = eventDateRange(event.start_date, event.end_date);
+  const participants = [
+    ...(event.participants ?? []),
+    ...attendance.map((item) => ({
+      id: item.user_id ?? 0,
+      full_name: item.full_name ?? "",
+      employee_code: item.employee_code ?? "",
+      department: item.department ?? "",
+      role: "user",
+    })),
+  ].reduce<typeof event.participants>((unique, participant) => {
+    if (!participant.id || unique.some((item) => item.id === participant.id)) return unique;
+    return [...unique, participant];
+  }, []);
+  const attendanceByUserAndDate = new Map<string, EventAttendance>();
+  attendance.forEach((item) => {
+    if (!item.user_id || !item.event_date) return;
+    attendanceByUserAndDate.set(`${item.user_id}:${dateOnly(item.event_date)}`, item);
+  });
+  const rows = participants.map((participant, index) => {
+    const dayCells = dates.map((date) => {
+      const item = attendanceByUserAndDate.get(`${participant.id}:${date}`);
+      const checkIn = item?.check_in_time?.slice(0, 5) ?? "";
+      const checkOut = item?.check_out_time?.slice(0, 5) ?? "";
+      const statusTitle = item ? eventAttendanceStatusLabel(item.status) : "ยังไม่ส่ง";
+      return `
+        <td title="${escapeHtml(statusTitle)}">${escapeHtml(checkIn || "-")}</td>
+        <td title="${escapeHtml(statusTitle)}">${escapeHtml(checkOut || "-")}</td>
+      `;
+    }).join("");
+    return `
+      <tr>
+        <td class="col-no">${index + 1}</td>
+        <td class="employee-name">
+          <div>${escapeHtml(participant.full_name || "-")}</div>
+          <small>${escapeHtml(participant.employee_code || participant.department || "")}</small>
+        </td>
+        ${dayCells}
+        <td class="signature-cell"><span></span></td>
+      </tr>
+    `;
+  }).join("");
+  const emptyColspan = Math.max(3, dates.length * 2 + 3);
   const printWindow = window.open("", "_blank", "width=1024,height=768");
   if (!printWindow) {
     toast.error("ไม่สามารถเปิดหน้าพิมพ์ได้ กรุณาอนุญาต popup");
@@ -63,66 +137,65 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <meta charset="utf-8" />
         <title>Event Report - ${event.title}</title>
         <style>
-          @page { size: A4 portrait; margin: 16mm; }
+          @page { size: A4 landscape; margin: 8mm; }
           body { font-family: Arial, "Noto Sans Thai", sans-serif; color: #111827; margin: 0; }
-          .report-page { box-sizing: border-box; display: flex; flex-direction: column; min-height: calc(297mm - 48px); padding: 24px; }
-          h1 { font-size: 20px; margin: 0 0 6px; }
-          .meta { color: #6b7280; font-size: 12px; margin-bottom: 18px; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-          th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: middle; }
-          th { background: #f3f4f6; font-weight: 700; }
-          .col-index { width: 30px; }
-          .col-name { width: 28%; }
-          .col-department { width: 13%; }
-          .col-date { width: 18%; }
-          .col-time { width: 12%; }
-          .col-signature { width: 22%; }
-          .attendance-signature { height: 34px; padding: 8px 12px; }
-          .attendance-signature span { display: block; width: 100%; height: 18px; border-bottom: 1px solid #6b7280; }
-          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: auto; padding-top: 64px; font-size: 13px; }
-          .signature-box { text-align: center; }
-          .signature-line { height: 44px; margin-bottom: 10px; display: flex; align-items: flex-end; justify-content: center; }
-          .signature-title { font-weight: 700; }
-          @media print { .report-page { min-height: calc(297mm - 32mm); padding: 0; } }
+          .report-page { box-sizing: border-box; width: 100%; padding: 0; }
+          .report-title { text-align: center; font-size: 14px; font-weight: 700; margin: 0 0 3px; }
+          .report-subtitle { text-align: center; font-size: 11px; font-weight: 700; margin: 0 0 8px; }
+          table { width: 100%; border-collapse: collapse; font-size: 9px; table-layout: fixed; }
+          th, td { border: 1px solid #6b7280; padding: 3px 4px; text-align: center; vertical-align: middle; height: 24px; line-height: 1.2; }
+          th { background: #e5e7eb; font-weight: 700; }
+          .col-no { width: 26px; }
+          .employee-name { width: 150px; text-align: left; font-weight: 700; }
+          .employee-name small { display: block; color: #6b7280; font-weight: 400; margin-top: 2px; }
+          .date-head { background: #dbeafe; }
+          .time-head { background: #eef2ff; font-size: 8px; }
+          .signature-head, .signature-cell { width: 58px; background: #eef2f7; font-weight: 700; }
+          .signature-cell span { display: block; height: 18px; border-bottom: 1px solid #111827; }
+          .manager-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 28px; font-size: 11px; }
+          .manager-signature { text-align: center; }
+          .manager-signature-line { height: 34px; display: flex; align-items: flex-end; justify-content: center; margin-bottom: 8px; }
+          .manager-signature-title { font-weight: 700; }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .report-page { page-break-after: avoid; }
+          }
         </style>
       </head>
       <body>
         <div class="report-page">
-        <h1>รายงานเวลา Event: ${event.title}</h1>
-        <div class="meta">
-          ช่วงเวลา ${fmtDate(event.start_date)} - ${fmtDate(event.end_date)}
-        </div>
+        <h1 class="report-title">รายงาน ${escapeHtml(event.title)}</h1>
+        <div class="report-subtitle">(${escapeHtml(fmtDate(event.start_date))} - ${escapeHtml(fmtDate(event.end_date))})</div>
         <table>
           <colgroup>
-            <col class="col-index" />
-            <col class="col-name" />
-            <col class="col-department" />
-            <col class="col-date" />
-            <col class="col-time" />
-            <col class="col-time" />
-            <col class="col-signature" />
+            <col class="col-no" />
+            <col class="employee-name" />
+            ${dates.map(() => `<col /><col />`).join("")}
+            <col class="signature-head" />
           </colgroup>
           <thead>
             <tr>
-              <th>#</th>
-              <th>พนักงาน</th>
-              <th>แผนก</th>
-              <th>วันที่</th>
-              <th>เวลาเข้า</th>
-              <th>เวลาออก</th>
-              <th>ลงชื่อ</th>
+              <th rowspan="2">#</th>
+              <th rowspan="2">รายชื่อ</th>
+              ${dates.map((date) => `<th colspan="2" class="date-head">${escapeHtml(weekdayLabel(date))}<br>${escapeHtml(shortPrintDate(date))}</th>`).join("")}
+              <th rowspan="2" class="signature-head">ลงชื่อ</th>
+            </tr>
+            <tr>
+              ${dates.map(() => `<th class="time-head">Check In</th><th class="time-head">Check Out</th>`).join("")}
             </tr>
           </thead>
-          <tbody>${rows || `<tr><td colspan="9">ยังไม่มีข้อมูลลงเวลา</td></tr>`}</tbody>
+          <tbody>
+            ${rows || `<tr><td colspan="${emptyColspan}">ยังไม่มีข้อมูลลงเวลา</td></tr>`}
+          </tbody>
         </table>
-        <div class="signatures">
-          <div class="signature-box">
-            <div class="signature-line">ลงชื่อ ...............................................................</div>
-            <div class="signature-title">ผจก.การตลาดและขาย</div>
+        <div class="manager-signatures">
+          <div class="manager-signature">
+            <div class="manager-signature-line">ลงชื่อ ...............................................................</div>
+            <div class="manager-signature-title">ผจก.การตลาดและขาย</div>
           </div>
-          <div class="signature-box">
-            <div class="signature-line">ลงชื่อ ...............................................................</div>
-            <div class="signature-title">ผจก.ฝ่ายทั่วไป</div>
+          <div class="manager-signature">
+            <div class="manager-signature-line">ลงชื่อ ...............................................................</div>
+            <div class="manager-signature-title">ผจก.ฝ่ายทั่วไป</div>
           </div>
         </div>
         </div>
