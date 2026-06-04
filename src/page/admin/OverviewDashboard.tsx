@@ -21,6 +21,7 @@ import { DetailDrawer } from "../../components/DetailDrawer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { CreateUserModal } from "../../components/CreateUserModal";
 import { LogDrawer } from "../../components/LogDrawer";
+import { EventPanel } from "../../components/EventPanel";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
@@ -48,7 +49,7 @@ export default function OverviewDashboard() {
     const year = new Date().getFullYear();
 
     // ---- Tab State (เพิ่ม "teams" และ "departments") ----
-    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "teams" | "departments" | "logs">("requests");
+    const [activeTab, setActiveTab] = useState<"requests" | "reports" | "employees" | "events" | "teams" | "departments" | "logs">("requests");
 
     // ---- Requests State ----
     const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -715,6 +716,10 @@ export default function OverviewDashboard() {
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "employees" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                         พนักงานทั้งหมด
                     </button>
+                    <button onClick={() => setActiveTab("events")}
+                        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "events" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                        Event
+                    </button>
                     {/* NEW TAB */}
                     <button onClick={() => setActiveTab("teams")}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "teams" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
@@ -911,6 +916,9 @@ export default function OverviewDashboard() {
                         <p className="text-xs text-gray-400 text-right px-1">คลิกแถวเพื่อดูรายละเอียด</p>
                     </div>
                 )}
+
+                {/* ===== TAB: EVENTS ===== */}
+                {activeTab === "events" && <EventPanel user={user} />}
 
                 {/* ===== TAB: REPORTS ===== */}
                 {activeTab === "reports" && (
