@@ -138,6 +138,10 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toDateInputValue(value?: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
 function normalizeTimeInput(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 4);
   if (digits.length <= 2) return digits;
@@ -215,7 +219,7 @@ function EventModal({
 
   useEffect(() => {
     if (mode !== "detail" || !event) return;
-    setManualDate(event.start_date);
+    setManualDate(toDateInputValue(event.start_date));
     setManualUserId(event.participants[0]?.id ? String(event.participants[0].id) : "");
     setManualCheckInTime("");
     setManualCheckOutTime("");
@@ -281,7 +285,7 @@ function EventModal({
   const submitManualAttendance = () => {
     if (!manualUserId) return toast.error("กรุณาเลือกผู้เข้าร่วม");
     if (!manualDate) return toast.error("กรุณาระบุวันที่");
-    if (event && (manualDate < event.start_date || manualDate > event.end_date)) {
+    if (event && (manualDate < toDateInputValue(event.start_date) || manualDate > toDateInputValue(event.end_date))) {
       return toast.error("วันที่ต้องอยู่ในช่วง Event");
     }
     if (!manualCheckInTime) return toast.error("กรุณาระบุเวลาเข้า");
@@ -537,8 +541,8 @@ function EventModal({
                         <input
                           type="date"
                           value={manualDate}
-                          min={event?.start_date}
-                          max={event?.end_date}
+                          min={toDateInputValue(event?.start_date)}
+                          max={toDateInputValue(event?.end_date)}
                           onChange={(e) => setManualDate(e.target.value)}
                           disabled={saving}
                           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
