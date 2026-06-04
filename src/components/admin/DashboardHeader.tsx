@@ -14,7 +14,6 @@ interface DashboardHeaderProps {
   onTabChange: (tab: string) => void;
   onEditProfile: () => void;
   onMyLeave: () => void;
-  onSelectSystem: () => void;
   onLogout: () => void;
 }
 
@@ -44,7 +43,6 @@ export function DashboardHeader({
   onTabChange,
   onEditProfile,
   onMyLeave,
-  onSelectSystem,
   onLogout,
 }: DashboardHeaderProps) {
   return (
