@@ -7,6 +7,7 @@ import SystemSelectionPage from "./page/SystemSelectionPage";
 import ManagerDashboard from "./page/admin/ManagerDashboard";
 import ProtectedRoute from "./ProtectedRoute";
 import OverviewDashboard from "./page/admin/OverviewDashboard";
+import HrDashboard from "./page/admin/HrDashboard";
 
 
 export default function App() {
@@ -20,7 +21,7 @@ export default function App() {
         <Route
           path="/select-system"
           element={
-            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "admin"]}>
+            <ProtectedRoute requiredRole={["user", "lead", "assistant manager", "manager", "hr", "admin"]}>
               <SystemSelectionPage />
             </ProtectedRoute>
           }
@@ -51,6 +52,15 @@ export default function App() {
           element={
             <ProtectedRoute requiredRole={["manager", "assistant manager"]}>
               <ManagerDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/hr"
+          element={
+            <ProtectedRoute requiredRole={["hr"]}>
+              <HrDashboard />
             </ProtectedRoute>
           }
         />

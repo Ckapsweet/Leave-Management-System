@@ -179,7 +179,7 @@ function EventModal({
   teamLoading: boolean;
   saving: boolean;
   onClose: () => void;
-  onCreate: (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[] }) => void;
+  onCreate: (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[] }) => void;
   onSaveParticipants: (ids: number[]) => void;
   onOpenParticipants: (event: WorkEvent) => void;
   onCreateManualAttendance: (payload: { userId: number; eventDate: string; checkInTime: string; checkOutTime: string }) => void;
@@ -191,7 +191,6 @@ function EventModal({
   const [description, setDescription] = useState("");
   const [startDate, setStartDate] = useState(todayIso());
   const [endDate, setEndDate] = useState(todayIso());
-  const [leadIds, setLeadIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [previewFile, setPreviewFile] = useState<EventAttachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -203,6 +202,11 @@ function EventModal({
   const [manualDate, setManualDate] = useState(todayIso());
   const [manualCheckInTime, setManualCheckInTime] = useState("");
   const [manualCheckOutTime, setManualCheckOutTime] = useState("");
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    setSelectedIds(new Set());
+  }, [mode]);
 
   useEffect(() => {
     if (mode !== "participants" || !event) return;
@@ -258,14 +262,16 @@ function EventModal({
   const submit = () => {
     if (isCreate) {
       if (!title.trim()) return toast.error("กรุณาระบุชื่อ Event");
-      if (leadIds.size === 0) return toast.error("กรุณาเลือกผู้รับผิดชอบอย่างน้อย 1 คน");
+      if (selectedIds.size === 0) return toast.error("กรุณาเลือกผู้เข้าร่วม Event อย่างน้อย 1 คน");
       if (endDate < startDate) return toast.error("วันที่สิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น");
+      const participantIds = Array.from(selectedIds);
       onCreate({
         title: title.trim(),
         description: description.trim(),
         start_date: startDate,
         end_date: endDate,
-        lead_ids: Array.from(leadIds),
+        lead_ids: participantIds,
+        participant_ids: participantIds,
       });
       return;
     }
@@ -313,7 +319,7 @@ function EventModal({
           <div>
             <h3 className="font-semibold text-gray-900">{titleText}</h3>
             <p className="text-xs text-gray-400 mt-1">
-              {isCreate ? "Manager หรือรอง Manager เลือกระยะเวลาและผู้รับผิดชอบ" : event?.title}
+              {isCreate ? "เลือกช่วงเวลาและผู้เข้าร่วม Event" : event?.title}
             </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">x</button>
@@ -356,12 +362,15 @@ function EventModal({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">ผู้รับผิดชอบ</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium text-gray-500">ผู้เข้าร่วม Event</label>
+                  <span className="text-xs text-gray-400">{selectedIds.size} คน</span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto border border-gray-100 rounded-xl p-2">
                   {leads.length === 0 ? (
-                    <p className="text-sm text-gray-400 p-2">ไม่พบผู้รับผิดชอบที่เลือกได้</p>
+                    <p className="text-sm text-gray-400 p-2">ไม่พบพนักงานที่เลือกได้</p>
                   ) : leads.map((lead) => {
-                    const checked = leadIds.has(lead.id);
+                    const checked = selectedIds.has(lead.id);
                     return (
                       <label
                         key={lead.id}
@@ -374,7 +383,7 @@ function EventModal({
                           className="w-4 h-4 accent-slate-800"
                           checked={checked}
                           onChange={(e) => {
-                            setLeadIds((prev) => {
+                            setSelectedIds((prev) => {
                               const next = new Set(prev);
                               if (e.target.checked) next.add(lead.id);
                               else next.delete(lead.id);
@@ -1031,11 +1040,12 @@ export function EventPanel({ user }: EventPanelProps) {
     setTeam([]);
   };
 
-  const handleCreate = async (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[] }) => {
+  const handleCreate = async (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[] }) => {
     try {
       setSaving(true);
       const created = await createEvent(payload);
-      setEvents((prev) => [created, ...prev]);
+      const saved = await updateEventParticipants(created.id, payload.participant_ids);
+      setEvents((prev) => [saved, ...prev]);
       toast.success("สร้าง Event เรียบร้อย");
       closeModal(true);
     } catch (err) {
@@ -1066,7 +1076,7 @@ export function EventPanel({ user }: EventPanelProps) {
         <div>
           <h2 className="text-sm font-semibold text-gray-800">Event</h2>
           <p className="text-xs text-gray-400 mt-1">
-            Manager/Assist Manager สร้าง Event และเลือกผู้รับผิดชอบ จากนั้นเลือกสมาชิกเข้าร่วม
+            Manager/Assist Manager สร้าง Event และเลือกผู้เข้าร่วมได้ทันที
           </p>
         </div>
         {canCreateEvent(user?.role) && (

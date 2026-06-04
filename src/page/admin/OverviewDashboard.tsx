@@ -350,7 +350,7 @@ export default function OverviewDashboard() {
     };
 
     // NEW: Update employee role
-    const ROLE_OPTIONS = ["user", "lead", "assistant manager", "manager"] as const;
+    const ROLE_OPTIONS = ["user", "lead", "assistant manager", "manager", "hr"] as const;
     type RoleOption = typeof ROLE_OPTIONS[number];
 
     const ROLE_META: Record<RoleOption, { label: string; bg: string; color: string }> = {
@@ -358,6 +358,7 @@ export default function OverviewDashboard() {
         lead: { label: "Lead", bg: "bg-blue-100", color: "text-blue-700" },
         "assistant manager": { label: "Asst. Manager", bg: "bg-purple-100", color: "text-purple-700" },
         manager: { label: "Manager", bg: "bg-amber-100", color: "text-amber-700" },
+        hr: { label: "HR", bg: "bg-violet-100", color: "text-violet-700" },
     };
 
     const handleUpdateRole = async (empId: number, newRole: RoleOption) => {
