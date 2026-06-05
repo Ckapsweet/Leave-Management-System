@@ -191,7 +191,7 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <div class="manager-signatures">
           <div class="manager-signature">
             <div class="manager-signature-line">ลงชื่อ ...............................................................</div>
-            <div class="manager-signature-title">ผจก.การตลาดและขาย</div>
+            <div class="manager-signature-title">ผจก.ฝ่ายการตลาดและขาย</div>
           </div>
           <div class="manager-signature">
             <div class="manager-signature-line">ลงชื่อ ...............................................................</div>
