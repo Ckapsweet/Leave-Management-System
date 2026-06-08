@@ -84,26 +84,37 @@ function weekdayLabel(value: string) {
 function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
   const dates = eventDateRange(event.start_date, event.end_date);
   const participants = [
-    ...(event.participants ?? []),
+    ...(event.participants ?? []).map((participant) => ({
+      key: `user:${participant.id}`,
+      full_name: participant.full_name,
+      employee_code: participant.employee_code,
+      department: participant.department,
+    })),
+    ...(event.external_participants ?? []).map((participant) => ({
+      key: `external:${participant.id}`,
+      full_name: participant.full_name,
+      employee_code: "",
+      department: participant.department || "บุคคลอื่นๆ",
+    })),
     ...attendance.map((item) => ({
-      id: item.user_id ?? 0,
+      key: item.external_participant_id ? `external:${item.external_participant_id}` : `user:${item.user_id ?? 0}`,
       full_name: item.full_name ?? "",
       employee_code: item.employee_code ?? "",
       department: item.department ?? "",
-      role: "user",
     })),
-  ].reduce<typeof event.participants>((unique, participant) => {
-    if (!participant.id || unique.some((item) => item.id === participant.id)) return unique;
+  ].reduce<{ key: string; full_name: string; employee_code?: string | null; department?: string | null }[]>((unique, participant) => {
+    if (!participant.key || participant.key.endsWith(":0") || unique.some((item) => item.key === participant.key)) return unique;
     return [...unique, participant];
   }, []);
-  const attendanceByUserAndDate = new Map<string, EventAttendance>();
+  const attendanceByParticipantAndDate = new Map<string, EventAttendance>();
   attendance.forEach((item) => {
-    if (!item.user_id || !item.event_date) return;
-    attendanceByUserAndDate.set(`${item.user_id}:${dateOnly(item.event_date)}`, item);
+    const participantKey = item.external_participant_id ? `external:${item.external_participant_id}` : item.user_id ? `user:${item.user_id}` : "";
+    if (!participantKey || !item.event_date) return;
+    attendanceByParticipantAndDate.set(`${participantKey}:${dateOnly(item.event_date)}`, item);
   });
   const rows = participants.map((participant, index) => {
     const dayCells = dates.map((date) => {
-      const item = attendanceByUserAndDate.get(`${participant.id}:${date}`);
+      const item = attendanceByParticipantAndDate.get(`${participant.key}:${date}`);
       const checkIn = item?.check_in_time?.slice(0, 5) ?? "";
       const checkOut = item?.check_out_time?.slice(0, 5) ?? "";
       const statusTitle = item ? eventAttendanceStatusLabel(item.status) : "ยังไม่ส่ง";
@@ -117,7 +128,6 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <td class="col-no">${index + 1}</td>
         <td class="employee-name">
           <div>${escapeHtml(participant.full_name || "-")}</div>
-          <small>${escapeHtml(participant.employee_code || participant.department || "")}</small>
         </td>
         ${dayCells}
         <td class="signature-cell"><span></span></td>
@@ -229,6 +239,31 @@ function isImageAttachment(file: EventAttachment) {
   return file.mime_type.startsWith("image/");
 }
 
+function externalParticipantName(participant: NonNullable<WorkEvent["external_participants"]>[number]) {
+  return participant.full_name.trim();
+}
+
+function normalizeExternalParticipantNames(names: string[]) {
+  return Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
+}
+
+function eventParticipantCount(event?: WorkEvent | null) {
+  return (event?.participants.length ?? 0) + (event?.external_participants?.length ?? 0);
+}
+
+function eventParticipantOptions(event?: WorkEvent | null) {
+  return [
+    ...(event?.participants ?? []).map((participant) => ({
+      key: `user:${participant.id}`,
+      label: `${participant.full_name} / ${participant.employee_code}`,
+    })),
+    ...(event?.external_participants ?? []).map((participant) => ({
+      key: `external:${participant.id}`,
+      label: `${participant.full_name} / ${participant.department || "บุคคลอื่นๆ"}`,
+    })),
+  ];
+}
+
 function EventModal({
   mode,
   user,
@@ -245,6 +280,7 @@ function EventModal({
   onCreateManualAttendance,
   onDeleteAttendance,
   onDeleteEvent,
+  onRefreshParticipants,
   onReviewAttendance,
 }: {
   mode: EventModalMode;
@@ -256,12 +292,13 @@ function EventModal({
   teamLoading: boolean;
   saving: boolean;
   onClose: () => void;
-  onCreate: (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[] }) => void;
-  onSaveParticipants: (ids: number[]) => void;
+  onCreate: (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[]; external_participant_names: string[] }) => void;
+  onSaveParticipants: (ids: number[], externalParticipantNames: string[]) => void;
   onOpenParticipants: (event: WorkEvent) => void;
-  onCreateManualAttendance: (payload: { userId: number; eventDate: string; checkInTime: string; checkOutTime: string }) => void;
+  onCreateManualAttendance: (payload: { userId?: number; externalParticipantId?: number; eventDate: string; checkInTime: string; checkOutTime: string }) => void;
   onDeleteAttendance: (logId: number) => Promise<void>;
   onDeleteEvent: (eventId: number) => Promise<void>;
+  onRefreshParticipants: () => Promise<void>;
   onReviewAttendance: (logId: number, action: "approve" | "reject") => void;
 }) {
   const [title, setTitle] = useState("");
@@ -269,13 +306,15 @@ function EventModal({
   const [startDate, setStartDate] = useState(todayIso());
   const [endDate, setEndDate] = useState(todayIso());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [externalParticipantNames, setExternalParticipantNames] = useState<string[]>([]);
+  const [externalParticipantInput, setExternalParticipantInput] = useState("");
   const [previewFile, setPreviewFile] = useState<EventAttachment | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EventAttendance | null>(null);
   const [deleteEventTarget, setDeleteEventTarget] = useState<WorkEvent | null>(null);
-  const [manualUserId, setManualUserId] = useState("");
+  const [manualParticipantKey, setManualParticipantKey] = useState("");
   const [manualDate, setManualDate] = useState(todayIso());
   const [manualCheckInTime, setManualCheckInTime] = useState("");
   const [manualCheckOutTime, setManualCheckOutTime] = useState("");
@@ -283,17 +322,21 @@ function EventModal({
   useEffect(() => {
     if (mode !== "create") return;
     setSelectedIds(new Set());
+    setExternalParticipantNames([]);
+    setExternalParticipantInput("");
   }, [mode]);
 
   useEffect(() => {
     if (mode !== "participants" || !event) return;
     setSelectedIds(new Set(event.participants.map((participant) => participant.id)));
+    setExternalParticipantNames(normalizeExternalParticipantNames((event.external_participants ?? []).map(externalParticipantName)));
+    setExternalParticipantInput("");
   }, [event, mode]);
 
   useEffect(() => {
     if (mode !== "detail" || !event) return;
     setManualDate(toDateInputValue(event.start_date));
-    setManualUserId(event.participants[0]?.id ? String(event.participants[0].id) : "");
+    setManualParticipantKey(eventParticipantOptions(event)[0]?.key ?? "");
     setManualCheckInTime("");
     setManualCheckOutTime("");
   }, [event, mode]);
@@ -335,11 +378,21 @@ function EventModal({
   const isDetail = mode === "detail";
   const titleText = isCreate ? "สร้าง Event" : isDetail ? "รายละเอียด Event" : "เลือกสมาชิกเข้าร่วม Event";
   const showManualAttendanceForm = isDetail && event && canInputEventAttendance(user?.role);
+  const externalCount = isDetail ? (event?.external_participants?.length ?? 0) : externalParticipantNames.length;
+  const totalParticipantCount = isDetail ? eventParticipantCount(event) : selectedIds.size + externalParticipantNames.length;
+  const manualParticipantOptions = eventParticipantOptions(event);
+
+  const addExternalParticipant = () => {
+    const name = externalParticipantInput.trim();
+    if (!name) return toast.error("กรุณากรอกชื่อ-นามสกุลบุคคลอื่น");
+    setExternalParticipantNames((prev) => normalizeExternalParticipantNames([...prev, name]));
+    setExternalParticipantInput("");
+  };
 
   const submit = () => {
     if (isCreate) {
       if (!title.trim()) return toast.error("กรุณาระบุชื่อ Event");
-      if (selectedIds.size === 0) return toast.error("กรุณาเลือกผู้เข้าร่วม Event อย่างน้อย 1 คน");
+      if (selectedIds.size === 0 && externalParticipantNames.length === 0) return toast.error("กรุณาเลือกหรือเพิ่มผู้เข้าร่วม Event อย่างน้อย 1 คน");
       if (endDate < startDate) return toast.error("วันที่สิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น");
       const participantIds = Array.from(selectedIds);
       onCreate({
@@ -349,14 +402,15 @@ function EventModal({
         end_date: endDate,
         lead_ids: participantIds,
         participant_ids: participantIds,
+        external_participant_names: externalParticipantNames,
       });
       return;
     }
-    onSaveParticipants(Array.from(selectedIds));
+    onSaveParticipants(Array.from(selectedIds), externalParticipantNames);
   };
 
   const submitManualAttendance = () => {
-    if (!manualUserId) return toast.error("กรุณาเลือกผู้เข้าร่วม");
+    if (!manualParticipantKey) return toast.error("กรุณาเลือกผู้เข้าร่วม");
     if (!manualDate) return toast.error("กรุณาระบุวันที่");
     if (event && (manualDate < toDateInputValue(event.start_date) || manualDate > toDateInputValue(event.end_date))) {
       return toast.error("วันที่ต้องอยู่ในช่วง Event");
@@ -368,8 +422,13 @@ function EventModal({
     }
     if (manualCheckOutTime <= manualCheckInTime) return toast.error("เวลาออกต้องมากกว่าเวลาเข้า");
 
+    const [participantType, participantIdValue] = manualParticipantKey.split(":");
+    const participantId = Number(participantIdValue);
+    if (!Number.isInteger(participantId) || participantId <= 0) return toast.error("ผู้เข้าร่วมไม่ถูกต้อง");
+
     onCreateManualAttendance({
-      userId: Number(manualUserId),
+      userId: participantType === "user" ? participantId : undefined,
+      externalParticipantId: participantType === "external" ? participantId : undefined,
       eventDate: manualDate,
       checkInTime: manualCheckInTime,
       checkOutTime: manualCheckOutTime,
@@ -517,39 +576,16 @@ function EventModal({
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">
                   <p className="text-xs text-gray-400">ผู้เข้าร่วม</p>
-                  <p className="text-sm font-medium text-gray-800">{event?.participants.length ?? 0} คน</p>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-medium text-gray-500">Lead</p>
-                  <span className="text-xs text-gray-400">{event?.leads?.length ?? event?.lead_ids?.length ?? 1} คน</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {(event?.leads?.length ? event.leads : []).map((lead) => (
-                    <div key={lead.id} className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor(lead.department)}`}>
-                        {lead.full_name.slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{lead.full_name}</p>
-                        <p className="text-xs text-gray-400 truncate">{lead.department} / {lead.employee_code}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {!event?.leads?.length && (
-                    <div className="text-sm text-gray-400 border border-gray-100 rounded-xl p-3">{event?.lead_name ?? "-"}</div>
-                  )}
+                  <p className="text-sm font-medium text-gray-800">{totalParticipantCount} คน</p>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-medium text-gray-500">รายชื่อผู้เข้าร่วม</p>
-                  <span className="text-xs text-gray-400">{event?.participants.length ?? 0} คน</span>
+                  <span className="text-xs text-gray-400">{totalParticipantCount} คน</span>
                 </div>
-                {(event?.participants.length ?? 0) === 0 ? (
+                {totalParticipantCount === 0 ? (
                   <div className="py-8 text-center text-sm text-gray-400 border border-gray-100 rounded-xl">ยังไม่ได้เลือกผู้เข้าร่วม</div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -564,6 +600,17 @@ function EventModal({
                             {participant.department} / {participant.employee_code}
                             {participant.selected_by_lead_name ? ` / Lead: ${participant.selected_by_lead_name}` : ""}
                           </p>
+                        </div>
+                      </div>
+                    ))}
+                    {event?.external_participants?.map((participant, index) => (
+                      <div key={`${participant.id ?? "external"}-${index}-${participant.full_name}`} className="flex items-center gap-3 border border-gray-100 rounded-xl p-3">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold bg-sky-50 text-sky-700">
+                          {participant.full_name.slice(0, 2)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{participant.full_name}</p>
+                          <p className="text-xs text-gray-400 truncate">{participant.department || "บุคคลอื่นๆ"}</p>
                         </div>
                       </div>
                     ))}
@@ -593,17 +640,17 @@ function EventModal({
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">ผู้เข้าร่วม</label>
                         <select
-                          value={manualUserId}
-                          onChange={(e) => setManualUserId(e.target.value)}
-                          disabled={saving || (event?.participants.length ?? 0) === 0}
+                          value={manualParticipantKey}
+                          onChange={(e) => setManualParticipantKey(e.target.value)}
+                          disabled={saving || manualParticipantOptions.length === 0}
                           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
                         >
-                          {(event?.participants.length ?? 0) === 0 ? (
+                          {manualParticipantOptions.length === 0 ? (
                             <option value="">ยังไม่มีผู้เข้าร่วม</option>
                           ) : (
-                            event?.participants.map((participant) => (
-                              <option key={participant.id} value={participant.id}>
-                                {participant.full_name} / {participant.employee_code}
+                            manualParticipantOptions.map((participant) => (
+                              <option key={participant.key} value={participant.key}>
+                                {participant.label}
                               </option>
                             ))
                           )}
@@ -652,7 +699,7 @@ function EventModal({
                       <button
                         type="button"
                         onClick={submitManualAttendance}
-                        disabled={saving || (event?.participants.length ?? 0) === 0}
+                        disabled={saving || manualParticipantOptions.length === 0}
                         className="px-4 py-2 text-sm rounded-xl bg-slate-800 text-white font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         บันทึกเวลา
@@ -737,8 +784,19 @@ function EventModal({
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">เลือกแล้ว</p>
-                  <p className="font-medium text-gray-800">{selectedIds.size} คน</p>
+                  <p className="font-medium text-gray-800">{totalParticipantCount} คน</p>
                 </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-gray-400">รีเฟรชเพื่อดึงรายชื่อพนักงานที่เพิ่มใหม่ล่าสุด</p>
+                <button
+                  type="button"
+                  onClick={onRefreshParticipants}
+                  disabled={saving || teamLoading}
+                  className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  {teamLoading ? "กำลังรีเฟรช..." : "รีเฟรชรายชื่อ"}
+                </button>
               </div>
               {teamLoading ? (
                 <div className="py-12 flex justify-center">
@@ -785,6 +843,55 @@ function EventModal({
                   })}
                 </div>
               )}
+              <div className="border border-gray-100 rounded-xl p-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">บุคคลอื่นๆ</p>
+                    <p className="text-xs text-gray-400 mt-0.5">กรอกชื่อ-นามสกุลจากแผนกอื่น</p>
+                  </div>
+                  <span className="text-xs text-gray-400">{externalCount} คน</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    value={externalParticipantInput}
+                    onChange={(e) => setExternalParticipantInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addExternalParticipant();
+                      }
+                    }}
+                    disabled={saving}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                    placeholder="ชื่อ-นามสกุล"
+                  />
+                  <button
+                    type="button"
+                    onClick={addExternalParticipant}
+                    disabled={saving}
+                    className="px-4 py-2 text-sm border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    เพิ่มบุคคลอื่นๆ
+                  </button>
+                </div>
+                {externalParticipantNames.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {externalParticipantNames.map((name) => (
+                      <div key={name} className="flex items-center justify-between gap-3 bg-slate-50 rounded-xl px-3 py-2">
+                        <span className="text-sm text-gray-800 truncate">{name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setExternalParticipantNames((prev) => prev.filter((item) => item !== name))}
+                          disabled={saving}
+                          className="text-xs text-red-500 hover:text-red-600 disabled:opacity-40"
+                        >
+                          ลบ
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               {user?.role === "lead" && !(event?.lead_ids ?? [event?.lead_id]).includes(user.id) && (
                 <p className="text-xs text-amber-600">Event นี้ไม่ได้ assign ให้ Lead คนนี้ จึงไม่สามารถแก้ไขรายชื่อได้</p>
               )}
@@ -808,13 +915,23 @@ function EventModal({
               ยกเลิก
             </button>
             {isDetail && event ? (
-              <button
-                onClick={() => onOpenParticipants(event)}
-                disabled={saving}
-                className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                เลือกคนเข้า Event
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => onOpenParticipants(event)}
+                  disabled={saving}
+                  className="px-4 py-2.5 text-sm text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  เพิ่มบุคคลอื่นๆ
+                </button>
+                <button
+                  onClick={() => onOpenParticipants(event)}
+                  disabled={saving}
+                  className="px-5 py-2.5 text-sm text-white rounded-xl font-medium bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  เลือกคนเข้า Event
+                </button>
+              </>
             ) : (
               <button
                 onClick={submit}
@@ -856,7 +973,7 @@ function EventModal({
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">ผู้เข้าร่วม</span>
-                  <span className="font-medium text-gray-900">{deleteEventTarget.participants.length} คน</span>
+                  <span className="font-medium text-gray-900">{eventParticipantCount(deleteEventTarget)} คน</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">รีพอร์ตเวลา</span>
@@ -1024,7 +1141,8 @@ export function EventPanel({ user }: EventPanelProps) {
   }, [fetchEvents]);
 
   const openParticipantModal = async (event: WorkEvent) => {
-    setSelectedEvent(event);
+    const currentEvent = events.find((item) => item.id === event.id) ?? event;
+    setSelectedEvent(currentEvent);
     setModalMode("participants");
     setTeam([]);
     setTeamLoading(true);
@@ -1032,6 +1150,19 @@ export function EventPanel({ user }: EventPanelProps) {
       setTeam(await getLeadTeam(event.id));
     } catch (err) {
       toast.error(getErrorMessage(err, "โหลดทีมของ Lead ไม่สำเร็จ"));
+    } finally {
+      setTeamLoading(false);
+    }
+  };
+
+  const refreshParticipantList = async () => {
+    if (!selectedEvent) return;
+    setTeamLoading(true);
+    try {
+      setTeam(await getLeadTeam(selectedEvent.id));
+      toast.success("รีเฟรชรายชื่อเรียบร้อย");
+    } catch (err) {
+      toast.error(getErrorMessage(err, "รีเฟรชรายชื่อไม่สำเร็จ"));
     } finally {
       setTeamLoading(false);
     }
@@ -1053,7 +1184,7 @@ export function EventPanel({ user }: EventPanelProps) {
     }
   };
 
-  const handleCreateManualAttendance = async (payload: { userId: number; eventDate: string; checkInTime: string; checkOutTime: string }) => {
+  const handleCreateManualAttendance = async (payload: { userId?: number; externalParticipantId?: number; eventDate: string; checkInTime: string; checkOutTime: string }) => {
     if (!selectedEvent) return;
     try {
       setSaving(true);
@@ -1064,7 +1195,8 @@ export function EventPanel({ user }: EventPanelProps) {
       setAttendance((prev) => {
         const matchedIndex = prev.findIndex((item) =>
           (created.id && item.id === created.id) ||
-          (item.user_id === created.user_id && item.event_date === created.event_date)
+          (!!created.user_id && item.user_id === created.user_id && item.event_date === created.event_date) ||
+          (!!created.external_participant_id && item.external_participant_id === created.external_participant_id && item.event_date === created.event_date)
         );
         if (matchedIndex === -1) return [created, ...prev];
         return prev.map((item, index) => index === matchedIndex ? { ...item, ...created } : item);
@@ -1117,12 +1249,13 @@ export function EventPanel({ user }: EventPanelProps) {
     setTeam([]);
   };
 
-  const handleCreate = async (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[] }) => {
+  const handleCreate = async (payload: { title: string; description: string; start_date: string; end_date: string; lead_ids: number[]; participant_ids: number[]; external_participant_names: string[] }) => {
     try {
       setSaving(true);
       const created = await createEvent(payload);
-      const saved = await updateEventParticipants(created.id, payload.participant_ids);
+      const saved = await updateEventParticipants(created.id, payload.participant_ids, payload.external_participant_names);
       setEvents((prev) => [saved, ...prev]);
+      setSelectedEvent(saved);
       toast.success("สร้าง Event เรียบร้อย");
       closeModal(true);
     } catch (err) {
@@ -1132,12 +1265,13 @@ export function EventPanel({ user }: EventPanelProps) {
     }
   };
 
-  const handleSaveParticipants = async (ids: number[]) => {
+  const handleSaveParticipants = async (ids: number[], externalParticipantNames: string[]) => {
     if (!selectedEvent) return;
     try {
       setSaving(true);
-      const updated = await updateEventParticipants(selectedEvent.id, ids);
+      const updated = await updateEventParticipants(selectedEvent.id, ids, externalParticipantNames);
       setEvents((prev) => prev.map((event) => event.id === updated.id ? updated : event));
+      setSelectedEvent(updated);
       toast.success("บันทึกรายชื่อผู้เข้าร่วมเรียบร้อย");
       closeModal(true);
     } catch (err) {
@@ -1192,6 +1326,8 @@ export function EventPanel({ user }: EventPanelProps) {
                 {events.map((event) => {
                   const eventLeadIds = event.lead_ids ?? event.leads?.map((lead) => lead.id) ?? [event.lead_id];
                   const canEditParticipants = user?.role === "admin" || user?.role === "manager" || user?.role === "assistant manager" || (user?.role === "lead" && eventLeadIds.includes(user.id));
+                  const externalNames = (event.external_participants ?? []).map(externalParticipantName);
+                  const participantNames = [...event.participants.map((participant) => participant.full_name), ...externalNames];
                   return (
                     <tr
                       key={event.id}
@@ -1211,11 +1347,11 @@ export function EventPanel({ user }: EventPanelProps) {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800">{event.participants.length}</span>
+                          <span className="text-sm font-semibold text-gray-800">{eventParticipantCount(event)}</span>
                           <span className="text-xs text-gray-400">คน</span>
                         </div>
                         <p className="text-xs text-gray-400 max-w-[220px] truncate">
-                          {event.participants.map((participant) => participant.full_name).join(", ") || "ยังไม่ได้เลือก"}
+                          {participantNames.join(", ") || "ยังไม่ได้เลือก"}
                         </p>
                       </td>
                       <td className="px-5 py-4 text-right" onClick={(e) => e.stopPropagation()}>
@@ -1265,6 +1401,7 @@ export function EventPanel({ user }: EventPanelProps) {
           onCreateManualAttendance={handleCreateManualAttendance}
           onDeleteAttendance={handleDeleteAttendance}
           onDeleteEvent={handleDeleteEvent}
+          onRefreshParticipants={refreshParticipantList}
           onReviewAttendance={handleReviewAttendance}
         />
       )}
@@ -1297,7 +1434,7 @@ export function EventPanel({ user }: EventPanelProps) {
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-500">ผู้เข้าร่วม</span>
-                  <span className="font-medium text-gray-900">{deleteEventTarget.participants.length} คน</span>
+                  <span className="font-medium text-gray-900">{eventParticipantCount(deleteEventTarget)} คน</span>
                 </div>
               </div>
             </div>
