@@ -10,6 +10,8 @@ const {
   getMyLeaveRequests,
   createLeaveRequest,
   cancelLeaveRequest,
+  getMyEvents,
+  submitEventAttendance,
   toastSuccess,
   toastError,
 } = vi.hoisted(() => ({
@@ -18,6 +20,8 @@ const {
   getMyLeaveRequests: vi.fn(),
   createLeaveRequest: vi.fn(),
   cancelLeaveRequest: vi.fn(),
+  getMyEvents: vi.fn(),
+  submitEventAttendance: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -32,6 +36,11 @@ vi.mock("../../services/leaveService", () => ({
   getMyLeaveRequests,
   createLeaveRequest,
   cancelLeaveRequest,
+}));
+
+vi.mock("../../services/eventService", () => ({
+  getMyEvents,
+  submitEventAttendance,
 }));
 
 vi.mock("../../services/authSession", () => ({
@@ -166,6 +175,7 @@ describe("UserLeaveDashboard create leave flow", () => {
     getLeaveTypes.mockResolvedValue(leaveTypes);
     getLeavePool.mockResolvedValue(leavePool);
     getMyLeaveRequests.mockResolvedValue([makeRequest()]);
+    getMyEvents.mockResolvedValue([]);
     createLeaveRequest.mockResolvedValue(makeRequest({ id: 100, reason: "New request reason", request_type: undefined }));
     cancelLeaveRequest.mockResolvedValue(undefined);
   });

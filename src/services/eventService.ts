@@ -7,6 +7,13 @@ export interface EventParticipant extends Employee {
   selected_at?: string | null;
 }
 
+export interface ExternalEventParticipant {
+  id?: number;
+  full_name: string;
+  department?: string | null;
+  created_at?: string | null;
+}
+
 export interface EventTeamMember extends Employee {
   lead_id?: number;
   lead_name?: string;
@@ -29,6 +36,7 @@ export interface WorkEvent {
   department: string | null;
   created_at: string;
   participants: EventParticipant[];
+  external_participants?: ExternalEventParticipant[];
   attendance?: EventAttendance | null;
   attendance_days?: EventAttendance[];
 }
@@ -37,6 +45,7 @@ export interface EventAttendance {
   id?: number;
   event_id: number;
   user_id?: number;
+  external_participant_id?: number | null;
   event_date: string;
   check_in_time?: string | null;
   check_out_time?: string | null;
@@ -58,6 +67,7 @@ export interface CreateEventPayload {
   end_date: string;
   lead_ids: number[];
   participant_ids?: number[];
+  external_participant_names?: string[];
 }
 
 export async function getEvents(): Promise<WorkEvent[]> {
@@ -80,9 +90,10 @@ export async function createEvent(payload: CreateEventPayload): Promise<WorkEven
   return res.data;
 }
 
-export async function updateEventParticipants(eventId: number, participantIds: number[]): Promise<WorkEvent> {
+export async function updateEventParticipants(eventId: number, participantIds: number[], externalParticipantNames: string[] = []): Promise<WorkEvent> {
   const res = await api.patch(`/api/events/${eventId}/participants`, {
     participant_ids: participantIds,
+    external_participant_names: externalParticipantNames,
   });
   return res.data;
 }
@@ -122,13 +133,15 @@ export async function getEventAttendance(eventId: number): Promise<EventAttendan
 
 export async function createManualEventAttendance(payload: {
   eventId: number;
-  userId: number;
+  userId?: number;
+  externalParticipantId?: number;
   eventDate: string;
   checkInTime: string;
   checkOutTime: string;
 }): Promise<EventAttendance> {
   const res = await api.post(`/api/events/${payload.eventId}/attendance/manual`, {
     user_id: payload.userId,
+    external_participant_id: payload.externalParticipantId,
     event_date: payload.eventDate,
     check_in_time: payload.checkInTime,
     check_out_time: payload.checkOutTime,
