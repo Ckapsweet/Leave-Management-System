@@ -12,14 +12,16 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { AuthUser } from "../../services/authService";
 import { EditProfileModal } from "../../components/EditProfileModal";
 import { ToastContainer, toast } from "../../components/Toast";
-import { getAdminLeaveRequests, getAdminUserPool, updateLeavePool, approveLeaveRequest, rejectLeaveRequest } from "../../services/leaveService";
-import type { LeaveRequest, LeavePool, LeaveStatus } from "../../services/leaveService";
+import { getAdminLeaveRequests, getAdminUserPool, updateLeavePool, approveLeaveRequest, rejectLeaveRequest, getLeaveTypes, createAdminHistoricalLeaveRequest } from "../../services/leaveService";
+import type { LeaveRequest, LeavePool, LeaveStatus, LeaveType } from "../../services/leaveService";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { CreateUserModal } from "../../components/CreateUserModal";
+import { HistoricalLeaveModal } from "../../components/HistoricalLeaveModal";
+import type { HistoricalLeaveForm } from "../../components/HistoricalLeaveModal";
 import { LogDrawer } from "../../components/LogDrawer";
 import { EventPanel } from "../../components/EventPanel";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
@@ -84,6 +86,9 @@ export default function OverviewDashboard() {
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
+    const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+    const [historicalLoading, setHistoricalLoading] = useState(false);
+    const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
 
     // ---- Team Management State (NEW) ----
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -198,6 +203,15 @@ export default function OverviewDashboard() {
             toast.error("โหลดข้อมูลแผนกไม่สำเร็จ");
         } finally {
             setDeptLoading(false);
+        }
+    }, []);
+
+    const fetchLeaveTypes = useCallback(async () => {
+        try {
+            const types = await getLeaveTypes();
+            setLeaveTypes(types);
+        } catch {
+            toast.error("โหลดประเภทการลาไม่สำเร็จ");
         }
     }, []);
 
@@ -322,6 +336,39 @@ export default function OverviewDashboard() {
             toast.error(err.response?.data?.message || "ดำเนินการไม่สำเร็จ");
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const openHistoricalModal = async () => {
+        if (employees.length === 0) await fetchEmployees();
+        if (leaveTypes.length === 0) await fetchLeaveTypes();
+        setShowHistoricalModal(true);
+    };
+
+    const handleCreateHistoricalLeave = async (form: HistoricalLeaveForm) => {
+        try {
+            setHistoricalLoading(true);
+            await createAdminHistoricalLeaveRequest({
+                user_id: form.user_id,
+                leave_type_id: form.leave_type_id,
+                leave_unit: form.leave_unit,
+                request_type: form.request_type,
+                start_date: form.start_date,
+                end_date: form.leave_unit === "hour" ? form.start_date : form.end_date,
+                start_time: form.start_time,
+                end_time: form.end_time,
+                reason: form.reason,
+                status: "approved",
+            });
+            toast.success("บันทึกประวัติย้อนหลังเรียบร้อย");
+            setShowHistoricalModal(false);
+            await fetchRequests();
+            await fetchEmployees();
+            fetchDashboardData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "บันทึกประวัติย้อนหลังไม่สำเร็จ");
+        } finally {
+            setHistoricalLoading(false);
         }
     };
 
@@ -587,6 +634,15 @@ export default function OverviewDashboard() {
                     loading={createLoading}
                 />
             )}
+            {showHistoricalModal && (
+                <HistoricalLeaveModal
+                    employees={employees}
+                    leaveTypes={leaveTypes}
+                    loading={historicalLoading}
+                    onSubmit={handleCreateHistoricalLeave}
+                    onClose={() => setShowHistoricalModal(false)}
+                />
+            )}
             {selectedLog && (
                 <LogDrawer
                     log={selectedLog}
@@ -778,6 +834,18 @@ export default function OverviewDashboard() {
                                     <p className="text-xs text-gray-500 mt-1">{label}</p>
                                 </button>
                             ))}
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={openHistoricalModal}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm hover:bg-slate-700 font-medium whitespace-nowrap"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                                เพิ่มประวัติย้อนหลัง
+                            </button>
                         </div>
 
                         {/* Filters */}

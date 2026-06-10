@@ -100,6 +100,11 @@ export interface LeaveRequestPayload {
   attachments?:   File[];
 }
 
+export interface AdminHistoricalLeaveRequestPayload extends LeaveRequestPayload {
+  user_id: number;
+  status?: LeaveStatus;
+}
+
 // ── Leave Types ───────────────────────────────────────────────
 
 export async function getLeaveTypes(): Promise<LeaveType[]> {
@@ -180,6 +185,58 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
     : body;
 
   const res = await api.post("/api/leave-requests", requestBody);
+  return res.data;
+}
+
+export async function createAdminHistoricalLeaveRequest(
+  payload: AdminHistoricalLeaveRequestPayload
+): Promise<LeaveRequest> {
+  const isHour = payload.leave_unit === "hour";
+  const request_type = payload.request_type ?? "leave";
+  const hasAttachments = (payload.attachments?.length ?? 0) > 0;
+
+  const total_hours = isHour && payload.start_time && payload.end_time
+    ? request_type === "late"
+      ? calculateLateLeaveHours(payload.start_time, payload.end_time)
+      : calculateLeaveHours(payload.start_time, payload.end_time)
+    : null;
+
+  const total_days = isHour
+    ? 0
+    : (() => {
+        const from = new Date(payload.start_date).getTime();
+        const to = new Date(payload.end_date).getTime();
+        return Math.max(1, Math.ceil((to - from) / 86_400_000) + 1);
+      })();
+
+  const body: Record<string, unknown> = {
+    user_id: payload.user_id,
+    leave_type_id: payload.leave_type_id,
+    start_date: payload.start_date,
+    end_date: isHour ? payload.start_date : payload.end_date,
+    reason: payload.reason,
+    total_days,
+    request_type,
+    start_time: isHour && payload.start_time?.isValid() ? payload.start_time.format("HH:mm") : null,
+    end_time: isHour && payload.end_time?.isValid() ? payload.end_time.format("HH:mm") : null,
+    total_hours: isHour ? total_hours : null,
+    status: payload.status ?? "approved",
+    historical: true,
+  };
+
+  const requestBody = hasAttachments
+    ? (() => {
+        const formData = new FormData();
+        Object.entries(body).forEach(([key, value]) => {
+          if (value === null || value === undefined) return;
+          formData.append(key, String(value));
+        });
+        payload.attachments?.forEach((file) => formData.append("attachments", file));
+        return formData;
+      })()
+    : body;
+
+  const res = await api.post("/api/admin/leave-requests", requestBody);
   return res.data;
 }
 
