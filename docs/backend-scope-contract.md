@@ -5,6 +5,7 @@ Frontend filtering is kept as a display safeguard, but backend APIs must enforce
 ## Role scopes
 
 - `admin`: can read and update every non-admin employee, including leave entitlement balances.
+- `hr`: can access HR dashboard features and manage leave history / balances according to HR UI permissions.
 - `lead`: can read and update only users where:
   - `user.department` matches the lead department after trimming and case-folding.
   - `user.supervisor_id` equals the authenticated lead id.
@@ -36,6 +37,21 @@ Frontend filtering is kept as a display safeguard, but backend APIs must enforce
 - `PATCH /api/admin/users/:userId/assign-subordinate`
   - Only `admin` can assign or unassign team relationships.
   - Leads and managers must receive `403`.
+
+## User role values
+
+The backend database and API validation must accept these exact lowercase role values:
+
+```txt
+user
+lead
+assistant manager
+manager
+hr
+admin
+```
+
+If MySQL/MariaDB stores `users.role` as an `ENUM`, apply `docs/sql/add-hr-role-to-users.sql`.
 
 ## Department matching
 

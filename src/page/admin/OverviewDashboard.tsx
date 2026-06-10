@@ -29,7 +29,7 @@ import { EventPanel } from "../../components/EventPanel";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
 import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
-import { getAuditActions, getAuditLogs, type AuditLog } from "../../services/superAdminService";
+import { getAuditActions, getAuditLogs, normalizeUserRole, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
 import { countLeaveRequestsByStatus, filterLeaveRequests, isSameDepartment, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
 import { logoutAndRedirect, readStoredUser } from "../../services/authSession";
@@ -412,11 +412,12 @@ export default function OverviewDashboard() {
     };
 
     const handleUpdateRole = async (empId: number, newRole: RoleOption | ManageableRole) => {
+        const role = normalizeUserRole(newRole) as RoleOption;
         setRoleUpdatingId(empId);
         try {
-            await api.patch(`/api/super-admin/users/${empId}/role`, { role: newRole });
+            await api.patch(`/api/super-admin/users/${empId}/role`, { role });
             setEmployees((prev) =>
-                prev.map((e) => e.id === empId ? { ...e, role: newRole } : e)
+                prev.map((e) => e.id === empId ? { ...e, role } : e)
             );
             toast.success("อัปเดต Role เรียบร้อย");
         } catch (err: any) {
@@ -430,7 +431,10 @@ export default function OverviewDashboard() {
     const handleCreateUser = async (data: RoleCreateForm | any) => {
         try {
             setCreateLoading(true);
-            await api.post("/api/super-admin/users", data);
+            await api.post("/api/super-admin/users", {
+                ...data,
+                role: normalizeUserRole(data.role),
+            });
             toast.success("สร้างพนักงานเรียบร้อย");
             setShowCreateModal(false);
             fetchEmployees();
