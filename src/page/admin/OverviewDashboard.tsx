@@ -22,6 +22,8 @@ import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { CreateUserModal } from "../../components/CreateUserModal";
 import { HistoricalLeaveModal } from "../../components/HistoricalLeaveModal";
 import type { HistoricalLeaveForm } from "../../components/HistoricalLeaveModal";
+import { RoleManagementModal } from "../../components/RoleManagementModal";
+import type { ManageableRole, RoleCreateForm } from "../../components/RoleManagementModal";
 import { LogDrawer } from "../../components/LogDrawer";
 import { EventPanel } from "../../components/EventPanel";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
@@ -89,6 +91,7 @@ export default function OverviewDashboard() {
     const [showHistoricalModal, setShowHistoricalModal] = useState(false);
     const [historicalLoading, setHistoricalLoading] = useState(false);
     const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+    const [showRoleModal, setShowRoleModal] = useState(false);
 
     // ---- Team Management State (NEW) ----
     const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -408,7 +411,7 @@ export default function OverviewDashboard() {
         hr: { label: "HR", bg: "bg-violet-100", color: "text-violet-700" },
     };
 
-    const handleUpdateRole = async (empId: number, newRole: RoleOption) => {
+    const handleUpdateRole = async (empId: number, newRole: RoleOption | ManageableRole) => {
         setRoleUpdatingId(empId);
         try {
             await api.patch(`/api/super-admin/users/${empId}/role`, { role: newRole });
@@ -424,7 +427,7 @@ export default function OverviewDashboard() {
     };
 
     // NEW: Create User
-    const handleCreateUser = async (data: any) => {
+    const handleCreateUser = async (data: RoleCreateForm | any) => {
         try {
             setCreateLoading(true);
             await api.post("/api/super-admin/users", data);
@@ -641,6 +644,17 @@ export default function OverviewDashboard() {
                     loading={historicalLoading}
                     onSubmit={handleCreateHistoricalLeave}
                     onClose={() => setShowHistoricalModal(false)}
+                />
+            )}
+            {showRoleModal && (
+                <RoleManagementModal
+                    employees={employees}
+                    loading={createLoading}
+                    updatingId={roleUpdatingId}
+                    onCreate={handleCreateUser}
+                    onUpdateRole={handleUpdateRole}
+                    onDelete={handleDeleteUser}
+                    onClose={() => setShowRoleModal(false)}
                 />
             )}
             {selectedLog && (
@@ -1175,6 +1189,13 @@ export default function OverviewDashboard() {
                                 <button onClick={fetchEmployees} className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
                                     รีเฟรช
+                                </button>
+                                <button onClick={() => setShowRoleModal(true)} className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-sm hover:bg-slate-700 font-medium whitespace-nowrap">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6l7-4Z" />
+                                        <path d="M9 12l2 2 4-4" />
+                                    </svg>
+                                    จัดการ Role
                                 </button>
                                 <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm hover:bg-indigo-700 font-medium whitespace-nowrap">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg>
