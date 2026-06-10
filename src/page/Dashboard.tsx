@@ -422,6 +422,9 @@ export default function UserLeaveDashboard() {
   };
 
   // ── Logout ──────────────────────────────────────────────────
+  void eventActionLoading;
+  void handleEventSubmit;
+
   const handleLogout = async () => {
     await logoutAndRedirect(navigate);
   };
@@ -582,11 +585,9 @@ export default function UserLeaveDashboard() {
             </div>
             <div className="grid grid-cols-1 gap-4">
               {myEvents.map((event) => (
-                <EventWorkCard
+                <EventWorkCardReadonly
                   key={event.id}
                   event={event}
-                  loadingKey={eventActionLoading}
-                  onSubmitTime={handleEventSubmit}
                 />
               ))}
             </div>
@@ -687,6 +688,68 @@ export default function UserLeaveDashboard() {
     </div>
   );
 }
+
+function EventWorkCardReadonly({ event }: { event: WorkEvent }) {
+  const days = event.attendance_days ?? [];
+  const completedDays = days.filter((day) => day.check_in_time || day.check_out_time).length;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div>
+          <h4 className="text-sm font-semibold text-gray-900">{event.title}</h4>
+          <p className="text-xs text-gray-400 mt-1">{fmtDate(event.start_date)} - {fmtDate(event.end_date)}</p>
+          {event.description && <p className="text-sm text-gray-500 mt-2">{event.description}</p>}
+          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            เข้าร่วม Event
+          </div>
+        </div>
+        <span className="px-2.5 py-1 rounded-full text-xs font-medium w-fit bg-indigo-50 text-indigo-700">
+          {completedDays}/{days.length} วัน
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {days.length === 0 ? (
+          <div className="rounded-xl border border-gray-100 bg-slate-50 px-4 py-5 text-center text-sm text-gray-400">
+            ยังไม่มีเวลาที่กำหนด
+          </div>
+        ) : (
+          days.map((day) => {
+            const checkIn = day.check_in_time?.slice(0, 5) ?? "-";
+            const checkOut = day.check_out_time?.slice(0, 5) ?? "-";
+            return (
+              <div key={day.event_date} className="border border-gray-100 rounded-xl p-4 space-y-3 bg-slate-50/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{fmtDate(day.event_date)}</p>
+                    <p className="text-xs text-gray-400">เวลาที่ Manager กำหนด</p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium w-fit bg-emerald-50 text-emerald-700">
+                    เข้าร่วม
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-gray-100 bg-white px-4 py-3">
+                    <p className="text-xs text-gray-400">เวลาเข้างาน</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{checkIn}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 bg-white px-4 py-3">
+                    <p className="text-xs text-gray-400">เวลาออกงาน</p>
+                    <p className="mt-1 text-lg font-semibold text-gray-900">{checkOut}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+void EventWorkCard;
 
 function EventWorkCard({
   event,
