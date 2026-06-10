@@ -40,6 +40,12 @@ export interface AuditLogPagination {
 
 export type UserRole = "user" | "lead" | "assistant manager" | "manager" | "hr" | "admin";
 
+export function normalizeUserRole(role: string): UserRole {
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "hr") return "hr";
+  return normalized as UserRole;
+}
+
 export interface SuperAdminUser {
   id: number;
   employee_code: string;
@@ -88,12 +94,15 @@ export async function createUser(payload: {
   full_name: string;
   department?: string;
   password: string;
-  role: UserRole;
+  role: UserRole | string;
 }): Promise<SuperAdminUser> {
-  const res = await api.post("/api/super-admin/users", payload);
+  const res = await api.post("/api/super-admin/users", {
+    ...payload,
+    role: normalizeUserRole(payload.role),
+  });
   return res.data;
-}export async function changeUserRole(id: number, role: UserRole): Promise<void> {
-  await api.patch(`/api/super-admin/users/${id}/role`, { role });
+}export async function changeUserRole(id: number, role: UserRole | string): Promise<void> {
+  await api.patch(`/api/super-admin/users/${id}/role`, { role: normalizeUserRole(role) });
 }
 
 export async function changeUserSupervisor(id: number, supervisor_id: number | null): Promise<void> {

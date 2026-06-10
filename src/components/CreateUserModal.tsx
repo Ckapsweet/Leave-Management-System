@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { UserRole } from "../services/superAdminService";
+import { normalizeUserRole, type UserRole } from "../services/superAdminService";
 import { ROLE_META } from "./superAdminHelpers";
 import api from "../services/api";
 
@@ -87,7 +87,7 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
           </div>
           <div className="text-[#000]">
             <label className="block text-xs font-medium text-gray-500 mb-1.5">Role *</label>
-            <select className={INPUT} value={form.role} onChange={(e) => set("role", e.target.value)}>
+            <select className={INPUT} value={form.role} onChange={(e) => set("role", normalizeUserRole(e.target.value))}>
               {(["user", "lead", "manager", "hr"] as UserRole[]).map((r) => (
                 <option key={r} value={r}>{ROLE_META[r].label}</option>
               ))}
@@ -105,7 +105,7 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
             ยกเลิก
           </button>
           <button
-            onClick={() => onSubmit(form)}
+            onClick={() => onSubmit({ ...form, role: normalizeUserRole(form.role) })}
             disabled={loading || !form.employee_code || !form.full_name || !form.password}
             className="px-5 py-2.5 text-sm bg-rose-600 text-white rounded-xl hover:bg-rose-700 font-medium flex items-center gap-2 disabled:opacity-50"
           >

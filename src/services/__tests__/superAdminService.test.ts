@@ -24,6 +24,7 @@ import {
   getAuditActions,
   getAuditLogs,
   getSuperAdminUsers,
+  normalizeUserRole,
 } from "../superAdminService";
 
 describe("superAdminService", () => {
@@ -61,6 +62,27 @@ describe("superAdminService", () => {
       params: { role: "lead", department: "IT", search: "EMP100" },
     });
     expect(mockPost).toHaveBeenCalledWith("/api/super-admin/users", payload);
+  });
+
+  it("normalizes display HR role to database hr before sending", async () => {
+    const payload = {
+      employee_code: "HR001",
+      full_name: "HR User",
+      department: "HR",
+      password: "secret",
+      role: "HR",
+    };
+
+    expect(normalizeUserRole("HR")).toBe("hr");
+
+    await createUser(payload);
+    await changeUserRole(5, "HR");
+
+    expect(mockPost).toHaveBeenCalledWith("/api/super-admin/users", {
+      ...payload,
+      role: "hr",
+    });
+    expect(mockPatch).toHaveBeenCalledWith("/api/super-admin/users/5/role", { role: "hr" });
   });
 
   it("updates role, supervisor, and deletes users through the expected endpoints", async () => {
