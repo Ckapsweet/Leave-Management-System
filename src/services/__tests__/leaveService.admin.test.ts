@@ -20,6 +20,7 @@ import dayjs from "dayjs";
 import {
   approveLeaveRequest,
   cancelLeaveRequest,
+  createAdminHistoricalLeaveRequest,
   createLeaveRequest,
   getAdminLeaveRequests,
   getAdminUserPool,
@@ -101,6 +102,32 @@ describe("leaveService admin and payload edges", () => {
     expect(mockPatch).toHaveBeenCalledWith("/api/admin/leave-requests/10/approve", { comment: "ok" });
     expect(mockPatch).toHaveBeenCalledWith("/api/admin/leave-requests/11/reject", { comment: "not enough info" });
     expect(mockDelete).toHaveBeenCalledWith("/api/leave-requests/12");
+  });
+
+  it("creates admin historical leave requests as approved history", async () => {
+    await createAdminHistoricalLeaveRequest({
+      user_id: 7,
+      leave_type_id: 1,
+      leave_unit: "day",
+      start_date: "2026-01-05",
+      end_date: "2026-01-06",
+      start_time: null,
+      end_time: null,
+      reason: "Backfilled sick leave",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/admin/leave-requests",
+      expect.objectContaining({
+        user_id: 7,
+        leave_type_id: 1,
+        start_date: "2026-01-05",
+        end_date: "2026-01-06",
+        total_days: 2,
+        status: "approved",
+        historical: true,
+      })
+    );
   });
 
   it("calls admin leave pool endpoints with the selected year", async () => {

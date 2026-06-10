@@ -20,6 +20,12 @@ Frontend filtering is kept as a display safeguard, but backend APIs must enforce
 - `GET /api/admin/leave-requests`
   - Must return only leave requests belonging to visible users.
   - For lead, this means same-department direct reports only.
+- `POST /api/admin/leave-requests`
+  - Only `admin` can create historical leave records for non-admin employees.
+  - Must reject with `403` when `user_id` is outside the authenticated admin scope.
+  - Treat requests with `historical: true` as direct history entries, not approval workflow submissions.
+  - Should accept the same calculated fields as `POST /api/leave-requests`, plus `user_id` and `status`.
+  - For historical entries from the admin UI, `status` is sent as `approved`.
 - `GET /api/admin/leave-pool/:userId`
   - Must reject with `403` when `userId` is outside the authenticated user's scope.
   - Should always return `balances` for every leave type, even when the employee has no saved balance yet.
