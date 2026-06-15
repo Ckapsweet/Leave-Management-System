@@ -1,6 +1,6 @@
 import type { LeaveBalance } from "../services/leaveService";
-import { formatLeaveDays } from "../services/leaveTime";
-export { formatLeaveDays } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
+export { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
 
 const TYPE_COLORS: Record<number, string> = {
   1: "bg-sky-100 text-sky-700",
@@ -50,7 +50,7 @@ export function LeaveBalanceCard({ balance }: { balance: LeaveBalance }) {
         </div>
         <div>
           <p className="text-xs text-gray-400">ใช้ไปแล้ว</p>
-          <p className="text-sm font-bold text-gray-800">{formatLeaveDays(used)}</p>
+          <p className="text-sm font-bold text-gray-800">{formatLeaveUsage(used, balance.used_day_units, balance.used_hours)}</p>
         </div>
       </div>
     </div>

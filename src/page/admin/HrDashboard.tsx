@@ -16,7 +16,7 @@ import {
   canEditEmployeeBalance,
   fmtDate,
 } from "../../components/adminHelpers";
-import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveUsage } from "../../services/leaveTime";
 import {
   useAdminAuthUser,
   useAdminEmployees,
@@ -348,7 +348,7 @@ export default function HrDashboard() {
                               {pool ? formatLeaveDays(pool.total_days) : "-"}
                             </td>
                             <td className="px-5 py-4 text-sm font-semibold text-gray-700 whitespace-nowrap">
-                              {pool ? formatLeaveDays(pool.used_days) : "-"}
+                              {pool ? formatLeaveUsage(pool.used_days, pool.used_day_units, pool.used_hours) : "-"}
                             </td>
                             <td className="px-5 py-4 whitespace-nowrap">
                               <span className={`text-sm font-bold ${balanceColor(remaining)}`}>

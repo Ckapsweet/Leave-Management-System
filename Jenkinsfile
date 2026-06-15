@@ -16,6 +16,7 @@ pipeline {
         stage('Check Branch') {
             steps {
                 script {
+                    
                     def branch = env.GIT_BRANCH?.replaceAll('origin/', '')
                     if (branch != 'main') {
                         currentBuild.result = 'ABORTED'
