@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import type { LeaveType, LeaveUnit, RequestKind } from "../services/leaveService";
 import type { EmployeeWithBalance } from "./adminHelpers";
-import { formatLeaveDays } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
 
 export interface HistoricalLeaveForm {
   user_id: number;
@@ -20,6 +20,8 @@ interface HistoricalLeaveModalProps {
   employees: EmployeeWithBalance[];
   leaveTypes: LeaveType[];
   loading: boolean;
+  initialForm?: HistoricalLeaveForm;
+  mode?: "create" | "edit";
   onSubmit: (form: HistoricalLeaveForm) => Promise<void>;
   onClose: () => void;
 }
@@ -27,24 +29,28 @@ interface HistoricalLeaveModalProps {
 const INPUT =
   "w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white";
 const LABEL = "block text-xs font-medium text-gray-500 mb-1.5";
+const HOURS_24 = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, minute) => String(minute).padStart(2, "0"));
 
 export function HistoricalLeaveModal({
   employees,
   leaveTypes,
   loading,
+  initialForm,
+  mode = "create",
   onSubmit,
   onClose,
 }: HistoricalLeaveModalProps) {
   const [form, setForm] = useState<HistoricalLeaveForm>({
-    user_id: employees[0]?.id ?? 0,
-    leave_type_id: leaveTypes[0]?.id ?? 0,
-    leave_unit: "day",
-    request_type: "leave",
-    start_date: "",
-    end_date: "",
-    start_time: null,
-    end_time: null,
-    reason: "",
+    user_id: initialForm?.user_id ?? employees[0]?.id ?? 0,
+    leave_type_id: initialForm?.leave_type_id ?? leaveTypes[0]?.id ?? 0,
+    leave_unit: initialForm?.leave_unit ?? "day",
+    request_type: initialForm?.request_type ?? "leave",
+    start_date: initialForm?.start_date ?? "",
+    end_date: initialForm?.end_date ?? "",
+    start_time: initialForm?.start_time ?? null,
+    end_time: initialForm?.end_time ?? null,
+    reason: initialForm?.reason ?? "",
   });
   const [submitted, setSubmitted] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
@@ -94,9 +100,9 @@ export function HistoricalLeaveModal({
       ...current,
       request_type: requestType,
       leave_unit: unit,
-      end_date: unit === "hour" ? current.start_date : current.end_date,
-      start_time: unit === "day" ? null : current.start_time,
-      end_time: unit === "day" ? null : current.end_time,
+      end_date: unit === "hour" || unit === "half_day" ? current.start_date : current.end_date,
+      start_time: unit === "day" || unit === "half_day" ? null : current.start_time,
+      end_time: unit === "day" || unit === "half_day" ? null : current.end_time,
     }));
   };
 
@@ -119,8 +125,8 @@ export function HistoricalLeaveModal({
             </svg>
           </div>
           <div>
-            <h2 className="text-base font-semibold text-gray-900">เพิ่มประวัติการลาย้อนหลัง</h2>
-            <p className="text-xs text-gray-400">บันทึกรายการลาในอดีตให้พนักงานโดยตรง</p>
+            <h2 className="text-base font-semibold text-gray-900">{mode === "edit" ? "แก้ไขรายการลา" : "เพิ่มประวัติการลาย้อนหลัง"}</h2>
+            <p className="text-xs text-gray-400">{mode === "edit" ? "แก้ไขรายละเอียดรายการลาและปรับยอดวันลาให้อัตโนมัติ" : "บันทึกรายการลาในอดีตให้พนักงานโดยตรง"}</p>
           </div>
           <button
             onClick={onClose}
@@ -157,16 +163,17 @@ export function HistoricalLeaveModal({
           {selectedEmployee?.pool && (
             <div className="grid grid-cols-3 gap-3 rounded-xl border border-gray-100 bg-slate-50 p-3">
               <BalanceStat label="สิทธิ์รวม" value={formatLeaveDays(selectedEmployee.pool.total_days)} />
-              <BalanceStat label="ใช้ไปแล้ว" value={formatLeaveDays(selectedEmployee.pool.used_days)} />
+              <BalanceStat label="ใช้ไปแล้ว" value={formatLeaveUsage(selectedEmployee.pool.used_days, selectedEmployee.pool.used_day_units, selectedEmployee.pool.used_hours)} />
               <BalanceStat label="คงเหลือ" value={formatLeaveDays(Math.max(0, selectedEmployee.pool.total_days - selectedEmployee.pool.used_days))} />
             </div>
           )}
 
           <div>
             <label className={LABEL}>รูปแบบรายการ</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {[
                 { label: "ลาเป็นวัน", requestType: "leave" as const, unit: "day" as const },
+                { label: "ลาครึ่งวัน", requestType: "leave" as const, unit: "half_day" as const },
                 { label: "ลาเป็นชั่วโมง", requestType: "leave" as const, unit: "hour" as const },
                 { label: "มาสาย", requestType: "late" as const, unit: "hour" as const },
               ].map((option) => {
@@ -210,6 +217,8 @@ export function HistoricalLeaveModal({
               <DateInput label="วันที่เริ่มลา" value={form.start_date} error={submitted ? errors.start_date : undefined} onChange={(value) => set("start_date", value)} />
               <DateInput label="วันที่สิ้นสุด" value={form.end_date} min={form.start_date} error={submitted ? errors.end_date : undefined} onChange={(value) => set("end_date", value)} />
             </div>
+          ) : form.leave_unit === "half_day" ? (
+            <DateInput label="วันที่ลา" value={form.start_date} error={submitted ? errors.start_date : undefined} onChange={(value) => set("start_date", value)} />
           ) : (
             <div className="space-y-4">
               <DateInput label={form.request_type === "late" ? "วันที่มาสาย" : "วันที่ลา"} value={form.start_date} error={submitted ? errors.start_date : undefined} onChange={(value) => set("start_date", value)} />
@@ -257,7 +266,7 @@ export function HistoricalLeaveModal({
             className="px-5 py-2.5 text-sm bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium flex items-center gap-2 disabled:opacity-50"
           >
             {loading && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            บันทึกย้อนหลัง
+            {mode === "edit" ? "บันทึกการแก้ไข" : "บันทึกย้อนหลัง"}
           </button>
         </div>
       </div>
@@ -313,15 +322,44 @@ function TimeInput({
   error?: string;
   onChange: (value: string) => void;
 }) {
+  const [hour = "", minute = ""] = value.split(":");
+
+  const updateTime = (nextHour: string, nextMinute: string) => {
+    if (!nextHour && !nextMinute) {
+      onChange("");
+      return;
+    }
+    onChange(`${nextHour || "00"}:${nextMinute || "00"}`);
+  };
+
   return (
     <div>
       <label className={LABEL}>{label} *</label>
-      <input
-        type="time"
-        className={`${INPUT} ${error ? "border-red-300" : ""}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
+      <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-xl border bg-white px-3 py-2 ${error ? "border-red-300" : "border-gray-200"} focus-within:ring-2 focus-within:ring-slate-300`}>
+        <select
+          className="w-full bg-transparent text-sm focus:outline-none"
+          value={hour}
+          onChange={(event) => updateTime(event.target.value, minute)}
+          aria-label={`${label} ชั่วโมง`}
+        >
+          <option value="">--</option>
+          {HOURS_24.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+        <span className="text-sm font-semibold text-gray-400">:</span>
+        <select
+          className="w-full bg-transparent text-sm focus:outline-none"
+          value={minute}
+          onChange={(event) => updateTime(hour, event.target.value)}
+          aria-label={`${label} นาที`}
+        >
+          <option value="">--</option>
+          {MINUTES.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
     </div>
   );

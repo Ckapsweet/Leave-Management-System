@@ -22,10 +22,12 @@ import {
   cancelLeaveRequest,
   createAdminHistoricalLeaveRequest,
   createLeaveRequest,
+  deleteAdminLeaveRequest,
   getAdminLeaveRequests,
   getAdminUserPool,
   getLeavePool,
   rejectLeaveRequest,
+  updateAdminLeaveRequest,
   updateLeavePool,
 } from "../leaveService";
 
@@ -90,11 +92,59 @@ describe("leaveService admin and payload edges", () => {
     );
   });
 
+  it("creates half-day leave requests as 0.5 day on a single date", async () => {
+    await createLeaveRequest({
+      leave_type_id: 1,
+      leave_unit: "half_day",
+      start_date: "2026-05-18",
+      end_date: "2026-05-20",
+      start_time: null,
+      end_time: null,
+      reason: "Half day leave",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/leave-requests",
+      expect.objectContaining({
+        start_date: "2026-05-18",
+        end_date: "2026-05-18",
+        total_days: 0.5,
+        start_time: null,
+        end_time: null,
+      })
+    );
+  });
+
+  it("creates admin historical half-day leave as 0.5 day", async () => {
+    await createAdminHistoricalLeaveRequest({
+      user_id: 7,
+      leave_type_id: 1,
+      leave_unit: "half_day",
+      start_date: "2026-01-05",
+      end_date: "2026-01-06",
+      start_time: null,
+      end_time: null,
+      reason: "Backfilled half-day leave",
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/admin/leave-requests",
+      expect.objectContaining({
+        user_id: 7,
+        start_date: "2026-01-05",
+        end_date: "2026-01-05",
+        total_days: 0.5,
+        historical: true,
+      })
+    );
+  });
+
   it("calls admin leave request endpoints with params and comments", async () => {
     await getAdminLeaveRequests({ status: "pending", user_id: 7, year: 2026 });
     await approveLeaveRequest(10, "ok");
     await rejectLeaveRequest(11, "not enough info");
     await cancelLeaveRequest(12);
+    await deleteAdminLeaveRequest(13);
 
     expect(mockGet).toHaveBeenCalledWith("/api/admin/leave-requests", {
       params: { status: "pending", user_id: 7, year: 2026 },
@@ -102,6 +152,7 @@ describe("leaveService admin and payload edges", () => {
     expect(mockPatch).toHaveBeenCalledWith("/api/admin/leave-requests/10/approve", { comment: "ok" });
     expect(mockPatch).toHaveBeenCalledWith("/api/admin/leave-requests/11/reject", { comment: "not enough info" });
     expect(mockDelete).toHaveBeenCalledWith("/api/leave-requests/12");
+    expect(mockDelete).toHaveBeenCalledWith("/api/admin/leave-requests/13");
   });
 
   it("creates admin historical leave requests as approved history", async () => {
@@ -126,6 +177,36 @@ describe("leaveService admin and payload edges", () => {
         total_days: 2,
         status: "approved",
         historical: true,
+      })
+    );
+  });
+
+  it("updates admin leave requests with formatted hourly values", async () => {
+    await updateAdminLeaveRequest(21, {
+      user_id: 7,
+      leave_type_id: 1,
+      leave_unit: "hour",
+      request_type: "leave",
+      start_date: "2026-01-05",
+      end_date: "2026-01-05",
+      start_time: dayjs("2026-01-05 08:30"),
+      end_time: dayjs("2026-01-05 11:00"),
+      reason: "Updated historical leave",
+      status: "approved",
+    });
+
+    expect(mockPatch).toHaveBeenCalledWith(
+      "/api/admin/leave-requests/21",
+      expect.objectContaining({
+        user_id: 7,
+        leave_type_id: 1,
+        start_date: "2026-01-05",
+        end_date: "2026-01-05",
+        start_time: "08:30",
+        end_time: "11:00",
+        total_hours: 2.5,
+        total_days: 0,
+        status: "approved",
       })
     );
   });

@@ -98,6 +98,7 @@ export function formatLeaveHours(hours: number | string | null | undefined): str
 export function formatLeaveDays(value: number | string | null | undefined): string {
   const parsed = Number(value ?? 0);
   if (!Number.isFinite(parsed) || parsed <= 0) return "0 วัน";
+  if (!Number.isInteger(parsed)) return `${Number(parsed.toFixed(2))} วัน`;
 
   const minutesPerWorkDay = WORK_HOURS_PER_DAY * 60;
   const totalMinutes = Math.round(parsed * minutesPerWorkDay);
@@ -111,6 +112,29 @@ export function formatLeaveDays(value: number | string | null | undefined): stri
   if (hours > 0) parts.push(`${hours} ชม.`);
   if (minutes > 0) parts.push(`${minutes} นาที`);
   return parts.join(" ") || "0 วัน";
+}
+
+export function formatLeaveUsage(
+  totalDays: number | string | null | undefined,
+  dayUnits?: number | string | null,
+  hours?: number | string | null
+): string {
+  const parsedDayUnits = Number(dayUnits ?? NaN);
+  const parsedHours = Number(hours ?? 0);
+
+  if (Number.isFinite(parsedDayUnits) && parsedDayUnits > 0 && parsedHours > 0) {
+    return `${formatLeaveDays(parsedDayUnits)} ${formatLeaveHours(parsedHours)}`;
+  }
+
+  if (Number.isFinite(parsedDayUnits) && parsedDayUnits > 0) {
+    return formatLeaveDays(parsedDayUnits);
+  }
+
+  if (parsedHours > 0) {
+    return formatLeaveHours(parsedHours);
+  }
+
+  return formatLeaveDays(totalDays);
 }
 
 export function leaveHoursToDays(hours: number | string | null | undefined): number {

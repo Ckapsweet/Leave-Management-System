@@ -7,7 +7,7 @@ import { toast } from "./Toast";
 import type { LeavePool } from "../services/leaveService";
 import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 
-type LeaveUnit = "day" | "hour";
+type LeaveUnit = "day" | "half_day" | "hour";
 type RequestKind = "leave" | "late";
 
 interface LeaveType {
@@ -140,12 +140,13 @@ function UnitToggle({
 }) {
   const options = [
     { key: "day", requestType: "leave" as const, unit: "day" as const, label: "ลาเป็นวัน" },
+    { key: "half_day", requestType: "leave" as const, unit: "half_day" as const, label: "ลาครึ่งวัน" },
     { key: "hour", requestType: "leave" as const, unit: "hour" as const, label: "ลาเป็นชั่วโมง" },
     { key: "late", requestType: "late" as const, unit: "hour" as const, label: "ลาสาย" },
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {options.map((option) => {
         const selected = requestType === option.requestType && value === option.unit;
         return (
@@ -159,7 +160,7 @@ function UnitToggle({
                 : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
             }`}
           >
-            {option.unit === "day" ? <CalendarIcon /> : <ClockIcon />}
+            {option.unit === "hour" ? <ClockIcon /> : <CalendarIcon />}
             {option.label}
           </button>
         );
@@ -169,6 +170,16 @@ function UnitToggle({
 }
 
 function SummaryPill({ form }: { form: LeaveRequestForm }) {
+  if (form.leave_unit === "half_day") {
+    if (!form.start_date) return null;
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-xl">
+        <span className="text-xs text-indigo-600 font-medium">รวม</span>
+        <span className="text-sm font-bold text-indigo-700">0.5 วัน</span>
+      </div>
+    );
+  }
+
   if (form.leave_unit === "day") {
     const days = calcDays(form.start_date, form.end_date);
     if (!days) return null;
@@ -206,8 +217,8 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    if (form.leave_unit === "hour" && form.start_date) setForm((f) => ({ ...f, end_date: f.start_date }));
-    if (form.leave_unit === "day") setForm((f) => ({ ...f, request_type: "leave", start_time: null, end_time: null }));
+    if ((form.leave_unit === "hour" || form.leave_unit === "half_day") && form.start_date) setForm((f) => ({ ...f, end_date: f.start_date }));
+    if (form.leave_unit === "day" || form.leave_unit === "half_day") setForm((f) => ({ ...f, request_type: "leave", start_time: null, end_time: null }));
   }, [form.leave_unit, form.start_date]);
 
   const set = <K extends keyof LeaveRequestForm>(key: K, value: LeaveRequestForm[K]) => {
@@ -337,6 +348,17 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                 />
                 {errors.end_date && <p className={ERROR_CLASS}>{errors.end_date}</p>}
               </div>
+            </div>
+          ) : form.leave_unit === "half_day" ? (
+            <div>
+              <label className={LABEL_CLASS}>วันที่ลา <span className="text-red-400">*</span></label>
+              <input
+                type="date"
+                className={`${INPUT_CLASS} ${errors.start_date ? "border-red-300 focus:ring-red-200" : ""}`}
+                value={form.start_date}
+                onChange={(e) => set("start_date", e.target.value)}
+              />
+              {errors.start_date && <p className={ERROR_CLASS}>{errors.start_date}</p>}
             </div>
           ) : (
             <div className="space-y-4">

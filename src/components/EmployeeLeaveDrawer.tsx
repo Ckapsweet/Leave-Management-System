@@ -1,7 +1,7 @@
 // components/EmployeeLeaveDrawer.tsx
 import { useState } from "react";
 import type { LeaveRequest, LeaveStatus } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveUsage } from "../services/leaveTime";
 import type { EmployeeWithBalance } from "./adminHelpers";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
@@ -69,7 +69,7 @@ export function EmployeeLeaveDrawer({
                   <p className="text-xs text-gray-400 mt-0.5">สิทธิ์รวม</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-3 text-center">
-                  <p className="text-xl font-bold text-amber-600">{formatLeaveDays(pool.used_days)}</p>
+                  <p className="text-xl font-bold text-amber-600">{formatLeaveUsage(pool.used_days, pool.used_day_units, pool.used_hours)}</p>
                   <p className="text-xs text-gray-400 mt-0.5">ใช้ไปแล้ว</p>
                 </div>
                 <div className={`rounded-xl p-3 text-center ${remaining <= 3 ? "bg-red-50" : remaining <= 7 ? "bg-amber-50" : "bg-emerald-50"}`}>

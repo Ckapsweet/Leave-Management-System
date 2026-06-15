@@ -7,7 +7,7 @@ import { calculateLateLeaveHours, calculateLeaveHours } from "./leaveTime";
 // ── Types ─────────────────────────────────────────────────────
 
 export type LeaveStatus = "pending" | "approved" | "rejected";
-export type LeaveUnit   = "day" | "hour";
+export type LeaveUnit   = "day" | "half_day" | "hour";
 export type RequestKind = "leave" | "late";
 
 export interface LeaveType {
@@ -23,6 +23,8 @@ export interface LeaveBalance {
   name:          string;
   total_days:    number;
   used_days:     number;
+  used_day_units?: number;
+  used_hours?:   number;
   remaining:     number;
 }
 
@@ -31,6 +33,8 @@ export interface LeavePool {
   user_id:    number;
   total_days: number;
   used_days:  number;
+  used_day_units?: number;
+  used_hours?: number;
   remaining:  number;
   year:       number;
   balances?:  LeaveBalance[];
@@ -105,6 +109,15 @@ export interface AdminHistoricalLeaveRequestPayload extends LeaveRequestPayload 
   status?: LeaveStatus;
 }
 
+function calculateLeaveRequestDays(payload: LeaveRequestPayload): number {
+  if (payload.leave_unit === "hour") return 0;
+  if (payload.leave_unit === "half_day") return 0.5;
+
+  const from = new Date(payload.start_date).getTime();
+  const to = new Date(payload.end_date).getTime();
+  return Math.max(1, Math.ceil((to - from) / 86_400_000) + 1);
+}
+
 // ── Leave Types ───────────────────────────────────────────────
 
 export async function getLeaveTypes(): Promise<LeaveType[]> {
@@ -141,6 +154,7 @@ export async function getThisWeekLeaves(): Promise<LeaveRequest[]> {
 
 export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
+  const isHalfDay = payload.leave_unit === "half_day";
   const request_type = payload.request_type ?? "leave";
   const hasAttachments = (payload.attachments?.length ?? 0) > 0;
 
@@ -152,18 +166,12 @@ export async function createLeaveRequest(payload: LeaveRequestPayload): Promise<
     : null;
 
   // คำนวณ total_days จาก string start_date/end_date
-  const total_days = isHour
-    ? 0
-    : (() => {
-        const from = new Date(payload.start_date).getTime();
-        const to   = new Date(payload.end_date).getTime();
-        return Math.max(1, Math.ceil((to - from) / 86_400_000) + 1);
-      })();
+  const total_days = calculateLeaveRequestDays(payload);
 
   const body: Record<string, unknown> = {
     leave_type_id: payload.leave_type_id,
     start_date:    payload.start_date,
-    end_date:      isHour ? payload.start_date : payload.end_date,
+    end_date:      isHour || isHalfDay ? payload.start_date : payload.end_date,
     reason:        payload.reason,
     total_days,
     request_type,
@@ -192,6 +200,7 @@ export async function createAdminHistoricalLeaveRequest(
   payload: AdminHistoricalLeaveRequestPayload
 ): Promise<LeaveRequest> {
   const isHour = payload.leave_unit === "hour";
+  const isHalfDay = payload.leave_unit === "half_day";
   const request_type = payload.request_type ?? "leave";
   const hasAttachments = (payload.attachments?.length ?? 0) > 0;
 
@@ -201,19 +210,13 @@ export async function createAdminHistoricalLeaveRequest(
       : calculateLeaveHours(payload.start_time, payload.end_time)
     : null;
 
-  const total_days = isHour
-    ? 0
-    : (() => {
-        const from = new Date(payload.start_date).getTime();
-        const to = new Date(payload.end_date).getTime();
-        return Math.max(1, Math.ceil((to - from) / 86_400_000) + 1);
-      })();
+  const total_days = calculateLeaveRequestDays(payload);
 
   const body: Record<string, unknown> = {
     user_id: payload.user_id,
     leave_type_id: payload.leave_type_id,
     start_date: payload.start_date,
-    end_date: isHour ? payload.start_date : payload.end_date,
+    end_date: isHour || isHalfDay ? payload.start_date : payload.end_date,
     reason: payload.reason,
     total_days,
     request_type,
@@ -240,6 +243,38 @@ export async function createAdminHistoricalLeaveRequest(
   return res.data;
 }
 
+export async function updateAdminLeaveRequest(
+  id: number,
+  payload: AdminHistoricalLeaveRequestPayload
+): Promise<LeaveRequest> {
+  const isHour = payload.leave_unit === "hour";
+  const isHalfDay = payload.leave_unit === "half_day";
+  const request_type = payload.request_type ?? "leave";
+
+  const total_hours = isHour && payload.start_time && payload.end_time
+    ? request_type === "late"
+      ? calculateLateLeaveHours(payload.start_time, payload.end_time)
+      : calculateLeaveHours(payload.start_time, payload.end_time)
+    : null;
+
+  const total_days = calculateLeaveRequestDays(payload);
+
+  const res = await api.patch(`/api/admin/leave-requests/${id}`, {
+    user_id: payload.user_id,
+    leave_type_id: payload.leave_type_id,
+    start_date: payload.start_date,
+    end_date: isHour || isHalfDay ? payload.start_date : payload.end_date,
+    reason: payload.reason,
+    total_days,
+    request_type,
+    start_time: isHour && payload.start_time?.isValid() ? payload.start_time.format("HH:mm") : null,
+    end_time: isHour && payload.end_time?.isValid() ? payload.end_time.format("HH:mm") : null,
+    total_hours: isHour ? total_hours : null,
+    status: payload.status,
+  });
+  return res.data;
+}
+
 export async function cancelLeaveRequest(id: number): Promise<void> {
   await api.delete(`/api/leave-requests/${id}`);
 }
@@ -263,6 +298,10 @@ export async function approveLeaveRequest(id: number, comment?: string): Promise
 export async function rejectLeaveRequest(id: number, comment: string): Promise<{ status: LeaveStatus, current_assignee_id: number | null }> {
   const res = await api.patch(`/api/admin/leave-requests/${id}/reject`, { comment });
   return res.data;
+}
+
+export async function deleteAdminLeaveRequest(id: number): Promise<void> {
+  await api.delete(`/api/admin/leave-requests/${id}`);
 }
 
 // ── Admin Leave Pool ──────────────────────────────────────────

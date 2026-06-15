@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import api from "../../services/api";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -12,7 +13,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import type { AuthUser } from "../../services/authService";
 import { EditProfileModal } from "../../components/EditProfileModal";
 import { ToastContainer, toast } from "../../components/Toast";
-import { getAdminLeaveRequests, getAdminUserPool, updateLeavePool, approveLeaveRequest, rejectLeaveRequest, getLeaveTypes, createAdminHistoricalLeaveRequest } from "../../services/leaveService";
+import { getAdminLeaveRequests, getAdminUserPool, updateLeavePool, approveLeaveRequest, rejectLeaveRequest, getLeaveTypes, createAdminHistoricalLeaveRequest, deleteAdminLeaveRequest, updateAdminLeaveRequest } from "../../services/leaveService";
 import type { LeaveRequest, LeavePool, LeaveStatus, LeaveType } from "../../services/leaveService";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
@@ -28,7 +29,7 @@ import { LogDrawer } from "../../components/LogDrawer";
 import { EventPanel } from "../../components/EventPanel";
 import { avatarColor, STATUS_META, TYPE_COLORS, fmtDate, type Employee, type EmployeeWithBalance } from "../../components/adminHelpers";
 import Footer from "../../components/Footer";
-import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveUsage } from "../../services/leaveTime";
 import { getAuditActions, getAuditLogs, normalizeUserRole, type AuditLog } from "../../services/superAdminService";
 import { fmtDatetime as fmtLogDatetime, getActionMeta } from "../../components/superAdminHelpers";
 import { countLeaveRequestsByStatus, filterLeaveRequests, isSameDepartment, normalizeDepartment, uniqueLeaveRequestsById } from "../../services/leaveFilters";
@@ -66,6 +67,8 @@ export default function OverviewDashboard() {
     const [selected, setSelected] = useState<LeaveRequest | null>(null);
     const [confirm, setConfirm] = useState<{ type: "approve" | "reject"; req: LeaveRequest } | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [deleteLoadingId, setDeleteLoadingId] = useState<number | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<LeaveRequest | null>(null);
 
     // ---- Dashboard Stats ----
     const [data, setData] = useState<DashboardData | null>(null);
@@ -90,6 +93,8 @@ export default function OverviewDashboard() {
     const [createLoading, setCreateLoading] = useState(false);
     const [showHistoricalModal, setShowHistoricalModal] = useState(false);
     const [historicalLoading, setHistoricalLoading] = useState(false);
+    const [editTarget, setEditTarget] = useState<LeaveRequest | null>(null);
+    const [editLoading, setEditLoading] = useState(false);
     const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
     const [showRoleModal, setShowRoleModal] = useState(false);
 
@@ -342,10 +347,32 @@ export default function OverviewDashboard() {
         }
     };
 
+    const handleDeleteLeaveRequest = async (request: LeaveRequest) => {
+        try {
+            setDeleteLoadingId(request.id);
+            await deleteAdminLeaveRequest(request.id);
+            setRequests((prev) => prev.filter((item) => item.id !== request.id));
+            if (selected?.id === request.id) setSelected(null);
+            setDeleteTarget(null);
+            toast.success("ลบรายการลาเรียบร้อย");
+            if (activeTab === "reports") fetchDashboardData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "ลบรายการลาไม่สำเร็จ");
+        } finally {
+            setDeleteLoadingId(null);
+        }
+    };
+
     const openHistoricalModal = async () => {
         if (employees.length === 0) await fetchEmployees();
         if (leaveTypes.length === 0) await fetchLeaveTypes();
         setShowHistoricalModal(true);
+    };
+
+    const openEditLeaveModal = async (request: LeaveRequest) => {
+        if (employees.length === 0) await fetchEmployees();
+        if (leaveTypes.length === 0) await fetchLeaveTypes();
+        setEditTarget(request);
     };
 
     const handleCreateHistoricalLeave = async (form: HistoricalLeaveForm) => {
@@ -357,7 +384,7 @@ export default function OverviewDashboard() {
                 leave_unit: form.leave_unit,
                 request_type: form.request_type,
                 start_date: form.start_date,
-                end_date: form.leave_unit === "hour" ? form.start_date : form.end_date,
+                end_date: form.leave_unit === "hour" || form.leave_unit === "half_day" ? form.start_date : form.end_date,
                 start_time: form.start_time,
                 end_time: form.end_time,
                 reason: form.reason,
@@ -372,6 +399,35 @@ export default function OverviewDashboard() {
             toast.error(err.response?.data?.message || "บันทึกประวัติย้อนหลังไม่สำเร็จ");
         } finally {
             setHistoricalLoading(false);
+        }
+    };
+
+    const handleUpdateLeaveRequest = async (form: HistoricalLeaveForm) => {
+        if (!editTarget) return;
+        try {
+            setEditLoading(true);
+            const updated = await updateAdminLeaveRequest(editTarget.id, {
+                user_id: form.user_id,
+                leave_type_id: form.leave_type_id,
+                leave_unit: form.leave_unit,
+                request_type: form.request_type,
+                start_date: form.start_date,
+                end_date: form.leave_unit === "hour" || form.leave_unit === "half_day" ? form.start_date : form.end_date,
+                start_time: form.start_time,
+                end_time: form.end_time,
+                reason: form.reason,
+                status: editTarget.status,
+            });
+            setRequests((prev) => prev.map((request) => request.id === updated.id ? updated : request));
+            if (selected?.id === updated.id) setSelected(updated);
+            toast.success("อัปเดตรายการลาเรียบร้อย");
+            setEditTarget(null);
+            await fetchEmployees();
+            if (activeTab === "reports") fetchDashboardData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "อัปเดตรายการลาไม่สำเร็จ");
+        } finally {
+            setEditLoading(false);
         }
     };
 
@@ -593,6 +649,14 @@ export default function OverviewDashboard() {
                     onClose={() => setConfirm(null)}
                 />
             )}
+            {deleteTarget && (
+                <DeleteLeaveConfirmModal
+                    request={deleteTarget}
+                    loading={deleteLoadingId === deleteTarget.id}
+                    onConfirm={() => handleDeleteLeaveRequest(deleteTarget)}
+                    onClose={() => setDeleteTarget(null)}
+                />
+            )}
             {selected && !confirm && (
                 <DetailDrawer
                     request={selected}
@@ -648,6 +712,17 @@ export default function OverviewDashboard() {
                     loading={historicalLoading}
                     onSubmit={handleCreateHistoricalLeave}
                     onClose={() => setShowHistoricalModal(false)}
+                />
+            )}
+            {editTarget && (
+                <HistoricalLeaveModal
+                    mode="edit"
+                    employees={employees}
+                    leaveTypes={leaveTypes}
+                    loading={editLoading}
+                    initialForm={leaveRequestToHistoricalForm(editTarget)}
+                    onSubmit={handleUpdateLeaveRequest}
+                    onClose={() => setEditTarget(null)}
                 />
             )}
             {showRoleModal && (
@@ -987,7 +1062,46 @@ export default function OverviewDashboard() {
                                                                 {meta.label}
                                                             </div>
                                                         </td>
-                                                        <td className="px-5 py-4" />
+                                                        <td className="px-5 py-4 text-right">
+                                                            <div className="inline-flex items-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        openEditLeaveModal(r);
+                                                                    }}
+                                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                                                    title="แก้ไขรายการ"
+                                                                    aria-label="แก้ไขรายการลา"
+                                                                >
+                                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <path d="M12 20h9" />
+                                                                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                                                    </svg>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => {
+                                                                        event.stopPropagation();
+                                                                        setDeleteTarget(r);
+                                                                    }}
+                                                                    disabled={deleteLoadingId === r.id}
+                                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                                    title="ลบรายการ"
+                                                                    aria-label="ลบรายการลา"
+                                                                >
+                                                                    {deleteLoadingId === r.id ? (
+                                                                        <span className="h-4 w-4 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+                                                                    ) : (
+                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                            <path d="M3 6h18" />
+                                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                                                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                                        </svg>
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
@@ -1272,7 +1386,7 @@ export default function OverviewDashboard() {
                                                         <td className="px-5 py-4 text-center">
                                                             {pool ? (
                                                                 <div className="space-y-1">
-                                                                    <span className="text-sm font-semibold text-gray-700">{formatLeaveDays(pool.used_days)}</span>
+                                                                    <span className="text-sm font-semibold text-gray-700">{formatLeaveUsage(pool.used_days, pool.used_day_units, pool.used_hours)}</span>
                                                                     <div className="w-16 mx-auto h-1 bg-gray-100 rounded-full overflow-hidden">
                                                                         <div className={`h-full rounded-full ${pct > 80 ? "bg-red-400" : pct > 50 ? "bg-amber-400" : "bg-emerald-400"}`}
                                                                             style={{ width: `${pct}%` }} />
@@ -1666,4 +1780,123 @@ export default function OverviewDashboard() {
             <Footer />
         </div>
     );
+}
+
+function DeleteLeaveConfirmModal({
+    request,
+    loading,
+    onConfirm,
+    onClose,
+}: {
+    request: LeaveRequest;
+    loading: boolean;
+    onConfirm: () => void;
+    onClose: () => void;
+}) {
+    const isHourly = request.leave_unit === "hour";
+    const amount = isHourly ? formatLeaveHours(request.total_hours) : formatLeaveDays(request.total_days);
+    const dateLabel = request.start_date === request.end_date
+        ? fmtDate(request.start_date)
+        : `${fmtDate(request.start_date)} - ${fmtDate(request.end_date)}`;
+    const timeLabel = isHourly && request.start_time
+        ? `${request.start_time} - ${request.end_time} น.`
+        : null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]" onClick={loading ? undefined : onClose} />
+            <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-red-100 overflow-hidden">
+                <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+                    <div className="flex items-start gap-3">
+                        <div className="h-11 w-11 rounded-xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18" />
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                        </div>
+                        <div className="min-w-0">
+                            <h3 className="text-base font-semibold text-gray-900">ยืนยันการลบรายการลา</h3>
+                            <p className="mt-1 text-sm text-gray-500">
+                                รายการนี้จะถูกลบออกจากระบบ และถ้าอนุมัติแล้วระบบจะคืนยอดวันลาให้พนักงาน
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={loading}
+                            className="ml-auto h-8 w-8 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+                            aria-label="ปิด"
+                        >
+                            x
+                        </button>
+                    </div>
+                </div>
+
+                <div className="px-6 py-5 space-y-4">
+                    <div className="rounded-xl border border-gray-100 bg-slate-50 p-4 space-y-3">
+                        <div>
+                            <p className="text-xs text-gray-400">พนักงาน</p>
+                            <p className="text-sm font-semibold text-gray-900">{request.user?.full_name ?? "-"}</p>
+                            <p className="text-xs text-gray-500">{request.user?.department ?? "-"}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <p className="text-xs text-gray-400">ประเภท</p>
+                                <p className="font-medium text-gray-800">{request.leave_type.name}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400">จำนวน</p>
+                                <p className="font-medium text-gray-800">{amount}</p>
+                            </div>
+                            <div className="col-span-2">
+                                <p className="text-xs text-gray-400">วันที่ / เวลา</p>
+                                <p className="font-medium text-gray-800">{dateLabel}</p>
+                                {timeLabel && <p className="text-xs text-gray-500">{timeLabel}</p>}
+                            </div>
+                        </div>
+                    </div>
+                    <p className="text-xs text-red-500">
+                        การลบนี้ไม่สามารถย้อนกลับจากหน้าระบบได้
+                    </p>
+                </div>
+
+                <div className="px-6 pb-6 flex justify-end gap-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={loading}
+                        className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+                    >
+                        ยกเลิก
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={loading}
+                        className="px-5 py-2.5 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {loading && <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />}
+                        ลบรายการ
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function leaveRequestToHistoricalForm(request: LeaveRequest): HistoricalLeaveForm {
+    const isHourly = request.leave_unit === "hour";
+    const leaveUnit = !isHourly && Number(request.total_days) === 0.5 ? "half_day" : request.leave_unit;
+    return {
+        user_id: request.user_id,
+        leave_type_id: request.leave_type_id,
+        leave_unit: leaveUnit,
+        request_type: request.request_type ?? "leave",
+        start_date: request.start_date,
+        end_date: isHourly || leaveUnit === "half_day" ? request.start_date : request.end_date,
+        start_time: isHourly && request.start_time ? dayjs(`${request.start_date} ${request.start_time}`) : null,
+        end_time: isHourly && request.end_time ? dayjs(`${request.start_date} ${request.end_time}`) : null,
+        reason: request.reason,
+    };
 }
