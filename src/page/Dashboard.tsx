@@ -45,6 +45,10 @@ function isLateRequest(req: LeaveRequest) {
   return req.request_type === "late";
 }
 
+function getLeaveTypeDescription(leaveTypes: LeaveType[], leaveTypeId: number) {
+  return leaveTypes.find((type) => type.id === leaveTypeId)?.description ?? "";
+}
+
 // ── DurationBadge ─────────────────────────────────────────────────────────────
 
 function DurationBadge({ req }: { req: LeaveRequest }) {
@@ -601,7 +605,11 @@ export default function UserLeaveDashboard() {
             displayLeavePool.balances && displayLeavePool.balances.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {displayLeavePool.balances.map((balance) => (
-                  <LeaveBalanceCard key={balance.leave_type_id} balance={balance} />
+                  <LeaveBalanceCard
+                    key={balance.leave_type_id}
+                    balance={balance}
+                    subtitle={getLeaveTypeDescription(leaveTypes, balance.leave_type_id)}
+                  />
                 ))}
               </div>
             ) : (
