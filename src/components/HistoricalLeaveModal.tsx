@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import type { LeaveType, LeaveUnit, RequestKind } from "../services/leaveService";
 import type { EmployeeWithBalance } from "./adminHelpers";
-import { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
 
 export interface HistoricalLeaveForm {
   user_id: number;
@@ -164,7 +164,7 @@ export function HistoricalLeaveModal({
             <div className="grid grid-cols-3 gap-3 rounded-xl border border-gray-100 bg-slate-50 p-3">
               <BalanceStat label="สิทธิ์รวม" value={formatLeaveDays(selectedEmployee.pool.total_days)} />
               <BalanceStat label="ใช้ไปแล้ว" value={formatLeaveUsage(selectedEmployee.pool.used_days, selectedEmployee.pool.used_day_units, selectedEmployee.pool.used_hours)} />
-              <BalanceStat label="คงเหลือ" value={formatLeaveDays(Math.max(0, selectedEmployee.pool.total_days - selectedEmployee.pool.used_days))} />
+              <BalanceStat label="คงเหลือ" value={formatLeaveRemaining(Math.max(0, selectedEmployee.pool.total_days - selectedEmployee.pool.used_days))} />
             </div>
           )}
 

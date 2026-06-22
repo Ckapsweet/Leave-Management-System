@@ -1,5 +1,5 @@
 import type { LeaveRequest } from "../services/leaveService";
-import { formatLeaveDays, WORK_HOURS_PER_DAY } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveRemaining, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 import type { Employee, EmployeeWithBalance } from "./adminHelpers";
 
 function toNumber(value: number | string | null | undefined) {
@@ -283,7 +283,7 @@ export function AdminReportWidget({
                     <p className="text-xs text-gray-400">{employee.employee_code} • {balance.name}</p>
                   </div>
                   <span className={`font-semibold px-3 py-1 rounded-full ${remaining <= 0 ? "text-red-700 bg-red-50" : "text-amber-700 bg-amber-50"}`}>
-                    {formatLeaveDays(remaining)}
+                    {formatLeaveRemaining(remaining)}
                   </span>
                 </li>
               ))}

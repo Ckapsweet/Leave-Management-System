@@ -16,7 +16,7 @@ import Footer from "../../components/Footer";
 import { TodayLeavesWidget } from "../../components/TodayLeavesWidget";
 import { AdminReportWidget } from "../../components/AdminReportWidget";
 import { EventPanel } from "../../components/EventPanel";
-import { formatLeaveDays, formatLeaveHours } from "../../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining } from "../../services/leaveTime";
 import {
   useAdminAuthUser,
   useAdminEmployees,
@@ -505,7 +505,7 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-5 py-4 text-center">
                               <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                                {pool ? formatLeaveDays(remaining) : "—"}
+                                {pool ? formatLeaveRemaining(remaining) : "—"}
                               </span>
                             </td>
                             {canEditAnyEmployeeBalance && <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>

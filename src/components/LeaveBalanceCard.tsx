@@ -1,5 +1,5 @@
 import type { LeaveBalance } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
 export { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
 
 const TYPE_COLORS: Record<number, string> = {
@@ -40,7 +40,7 @@ export function LeaveBalanceCard({
         </div>
         <div className="min-w-[5.5rem] text-right">
           <p className={`whitespace-nowrap text-3xl font-bold leading-none ${remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
-            {formatLeaveDays(remaining)}
+            {formatLeaveRemaining(remaining)}
           </p>
           <p className="mt-2 whitespace-nowrap text-xs text-gray-400">วันคงเหลือ</p>
         </div>

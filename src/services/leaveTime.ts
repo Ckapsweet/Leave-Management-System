@@ -1,6 +1,6 @@
 import type { Dayjs } from "dayjs";
 
-export const WORK_HOURS_PER_DAY = 7.5;
+export const WORK_HOURS_PER_DAY = 8;
 
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
@@ -111,6 +111,21 @@ export function formatLeaveDays(value: number | string | null | undefined): stri
   if (days > 0) parts.push(`${days} วัน`);
   if (hours > 0) parts.push(`${hours} ชม.`);
   if (minutes > 0) parts.push(`${minutes} นาที`);
+  return parts.join(" ") || "0 วัน";
+}
+
+export function formatLeaveRemaining(value: number | string | null | undefined): string {
+  const parsed = Number(value ?? 0);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "0 วัน";
+
+  const totalHours = Math.round(parsed * WORK_HOURS_PER_DAY);
+  const days = Math.floor(totalHours / WORK_HOURS_PER_DAY);
+  const hours = totalHours % WORK_HOURS_PER_DAY;
+  const parts: string[] = [];
+
+  if (days > 0) parts.push(`${days} วัน`);
+  if (hours > 0) parts.push(`${hours} ชั่วโมง`);
+
   return parts.join(" ") || "0 วัน";
 }
 
