@@ -158,7 +158,7 @@ export function formatLeaveUsage(
     return formatLeaveHours(parsedHours);
   }
 
-  return formatLeaveDays(totalDays);
+  return formatLeaveRemaining(totalDays);
 }
 
 export function leaveHoursToDays(hours: number | string | null | undefined): number {
