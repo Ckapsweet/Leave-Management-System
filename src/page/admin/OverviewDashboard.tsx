@@ -1339,9 +1339,7 @@ export default function OverviewDashboard() {
                                             <tr className="bg-slate-50 border-b border-gray-100 text-left">
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400">พนักงาน</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400">Role</th>
-                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">สิทธิ์รวม</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">ใช้ไปแล้ว</th>
-                                                <th className="px-5 py-3 text-xs font-semibold text-gray-400 text-center">วันลาคงเหลือ</th>
                                                 <th className="px-5 py-3 text-xs font-semibold text-gray-400"></th>
                                             </tr>
                                         </thead>
@@ -1349,7 +1347,6 @@ export default function OverviewDashboard() {
                                             {filteredEmployees.map((emp) => {
                                                 const ac = avatarColor(emp.department);
                                                 const pool = emp.pool;
-                                                const remaining = pool ? Math.max(0, pool.total_days - pool.used_days) : 0;
                                                 const pct = pool && pool.total_days > 0 ? Math.round((pool.used_days / pool.total_days) * 100) : 0;
                                                 return (
                                                     <tr key={emp.id} className="hover:bg-slate-50/50 cursor-pointer transition-colors" onClick={() => handleEmployeeClick(emp)}>
@@ -1381,9 +1378,6 @@ export default function OverviewDashboard() {
                                                             )}
                                                         </td>
                                                         <td className="px-5 py-4 text-center">
-                                                            <span className="text-sm font-semibold text-gray-700">{pool ? formatLeaveDays(pool.total_days) : "—"}</span>
-                                                        </td>
-                                                        <td className="px-5 py-4 text-center">
                                                             {pool ? (
                                                                 <div className="space-y-1">
                                                                     <span className="text-sm font-semibold text-gray-700">{formatLeaveUsage(pool.used_days, pool.used_day_units, pool.used_hours)}</span>
@@ -1393,11 +1387,6 @@ export default function OverviewDashboard() {
                                                                     </div>
                                                                 </div>
                                                             ) : <span className="text-xs text-gray-300">—</span>}
-                                                        </td>
-                                                        <td className="px-5 py-4 text-center">
-                                                            <span className={`text-sm font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                                                                {pool ? formatLeaveDays(remaining) : "—"}
-                                                            </span>
                                                         </td>
                                                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center gap-2">

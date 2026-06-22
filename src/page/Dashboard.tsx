@@ -435,8 +435,7 @@ export default function UserLeaveDashboard() {
 
   // ── Derived ─────────────────────────────────────────────────
   const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
-  const totalUsed = displayLeavePool?.used_days ?? 0;
-  const totalRemaining = displayLeavePool?.remaining ?? 0;
+  const leaveBalances = displayLeavePool?.balances ?? [];
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) return (
@@ -561,15 +560,17 @@ export default function UserLeaveDashboard() {
               <h2 className="text-lg font-bold text-gray-900">{user?.full_name ?? ""}</h2>
               <p className="text-sm text-gray-500">{user?.department ?? ""} · {user?.employee_code ?? ""}</p>
             </div>
-            <div className="flex gap-6 sm:gap-8">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-indigo-600">{formatLeaveDays(totalRemaining)}</p>
-                <p className="text-xs text-gray-500">วันคงเหลือ</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-gray-700">{formatLeaveDays(totalUsed)}</p>
-                <p className="text-xs text-gray-500">วันที่ใช้ไป</p>
-              </div>
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3 sm:justify-end sm:gap-x-8">
+              {leaveBalances.map((balance) => (
+                <div key={balance.leave_type_id} className="min-w-[4.5rem] text-center">
+                  <p className={`text-2xl font-bold ${balance.remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
+                    {formatLeaveDays(balance.remaining)}
+                  </p>
+                  <p className="max-w-24 truncate text-xs text-gray-500" title={balance.name}>
+                    {balance.name}
+                  </p>
+                </div>
+              ))}
               <div className="text-center">
                 <p className="text-2xl font-bold text-amber-500">{pendingCount}</p>
                 <p className="text-xs text-gray-500">รออนุมัติ</p>
