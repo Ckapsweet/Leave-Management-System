@@ -37,24 +37,30 @@ export function AddLeaveBalanceModal({
   };
 
   const getTotalParts = (totalDays: number) => {
-    const totalHours = Math.round(Math.max(0, totalDays) * WORK_HOURS_PER_DAY);
+    const minutesPerWorkDay = WORK_HOURS_PER_DAY * 60;
+    const totalMinutes = Math.round(Math.max(0, totalDays) * minutesPerWorkDay);
+    const remainingMinutes = totalMinutes % minutesPerWorkDay;
     return {
-      days: Math.floor(totalHours / WORK_HOURS_PER_DAY),
-      hours: totalHours % WORK_HOURS_PER_DAY,
+      days: Math.floor(totalMinutes / minutesPerWorkDay),
+      hours: Math.floor(remainingMinutes / 60),
+      minutes: remainingMinutes % 60,
     };
   };
 
-  const handleUpdatePart = (typeId: number, unit: "day" | "hour", newVal: number) => {
+  const handleUpdatePart = (typeId: number, unit: "day" | "hour" | "minute", newVal: number) => {
     setBalances(prev => prev.map((balance) => {
       if (balance.leave_type_id !== typeId) return balance;
 
       const current = getTotalParts(balance.total_days);
       const value = Math.max(0, Math.floor(Number.isFinite(newVal) ? newVal : 0));
-      const totalHours = unit === "day"
-        ? value * WORK_HOURS_PER_DAY + current.hours
-        : current.days * WORK_HOURS_PER_DAY + value;
+      const minutesPerWorkDay = WORK_HOURS_PER_DAY * 60;
+      const totalMinutes = unit === "day"
+        ? value * minutesPerWorkDay + current.hours * 60 + current.minutes
+        : unit === "hour"
+          ? current.days * minutesPerWorkDay + value * 60 + current.minutes
+          : current.days * minutesPerWorkDay + current.hours * 60 + value;
 
-      return { ...balance, total_days: totalHours / WORK_HOURS_PER_DAY };
+      return { ...balance, total_days: totalMinutes / minutesPerWorkDay };
     }));
     setError("");
   };
@@ -81,7 +87,7 @@ export function AddLeaveBalanceModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
@@ -123,7 +129,7 @@ export function AddLeaveBalanceModal({
                     <p className="text-sm font-semibold text-gray-700">{b.name}</p>
                     <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ {formatLeaveRemaining(remaining)}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
                       <p className="mb-1 text-center text-[10px] font-medium text-gray-400">วัน</p>
                       <div className="flex items-center gap-1">
@@ -163,6 +169,28 @@ export function AddLeaveBalanceModal({
                         />
                         <button type="button" aria-label={`เพิ่มชั่วโมง ${b.name}`}
                           onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days + (1 / WORK_HOURS_PER_DAY))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-center text-[10px] font-medium text-gray-400">นาที</p>
+                      <div className="flex items-center gap-1">
+                        <button type="button" aria-label={`ลดนาที ${b.name}`}
+                          onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days - (1 / (WORK_HOURS_PER_DAY * 60)))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          −
+                        </button>
+                        <input
+                          aria-label={`จำนวนนาที ${b.name}`}
+                          type="number" min={0} step={1}
+                          value={totalParts.minutes}
+                          onChange={(e) => handleUpdatePart(b.leave_type_id, "minute", Number(e.target.value))}
+                          className={INPUT_CLS}
+                        />
+                        <button type="button" aria-label={`เพิ่มนาที ${b.name}`}
+                          onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days + (1 / (WORK_HOURS_PER_DAY * 60)))}
                           className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
                           +
                         </button>

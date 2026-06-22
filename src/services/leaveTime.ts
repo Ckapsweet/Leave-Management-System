@@ -118,13 +118,17 @@ export function formatLeaveRemaining(value: number | string | null | undefined):
   const parsed = Number(value ?? 0);
   if (!Number.isFinite(parsed) || parsed <= 0) return "0 วัน";
 
-  const totalHours = Math.round(parsed * WORK_HOURS_PER_DAY);
-  const days = Math.floor(totalHours / WORK_HOURS_PER_DAY);
-  const hours = totalHours % WORK_HOURS_PER_DAY;
+  const minutesPerWorkDay = WORK_HOURS_PER_DAY * 60;
+  const totalMinutes = Math.round(parsed * minutesPerWorkDay);
+  const days = Math.floor(totalMinutes / minutesPerWorkDay);
+  const remainingMinutes = totalMinutes % minutesPerWorkDay;
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
   const parts: string[] = [];
 
   if (days > 0) parts.push(`${days} วัน`);
   if (hours > 0) parts.push(`${hours} ชั่วโมง`);
+  if (minutes > 0) parts.push(`${minutes} นาที`);
 
   return parts.join(" ") || "0 วัน";
 }
