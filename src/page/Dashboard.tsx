@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
@@ -16,7 +16,7 @@ import { LeaveBalanceCard } from "../components/LeaveBalanceCard";
 import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
-import { getMyEvents, submitEventAttendance, type EventAttendance, type WorkEvent } from "../services/eventService";
+import { getMyEvents, isWorkEventActive, submitEventAttendance, type EventAttendance, type WorkEvent } from "../services/eventService";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -317,6 +317,7 @@ export default function UserLeaveDashboard() {
   const [error, setError] = useState("");
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [myEvents, setMyEvents] = useState<WorkEvent[]>([]);
+  const [eventClock, setEventClock] = useState(() => Date.now());
   const [eventActionLoading, setEventActionLoading] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
@@ -361,6 +362,12 @@ export default function UserLeaveDashboard() {
   }, [year]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  useEffect(() => {
+    if (myEvents.length === 0) return;
+    const timer = window.setInterval(() => setEventClock(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [myEvents.length]);
 
   // ── Submit new leave ────────────────────────────────────────
   const handleAddLeave = async (form: LeaveRequestForm): Promise<void> => {
@@ -436,6 +443,10 @@ export default function UserLeaveDashboard() {
   // ── Derived ─────────────────────────────────────────────────
   const displayLeavePool = deriveLeavePoolFromRequests(leavePool, requests, year);
   const leaveBalances = displayLeavePool?.balances ?? [];
+  const activeMyEvents = useMemo(
+    () => myEvents.filter((event) => isWorkEventActive(event, eventClock)),
+    [myEvents, eventClock]
+  );
 
   // ── Loading / Error ──────────────────────────────────────────
   if (loading) return (
@@ -584,14 +595,14 @@ export default function UserLeaveDashboard() {
         {/* ── Today's Leaves Component ── */}
         <TodayLeavesWidget />
 
-        {myEvents.length > 0 && (
+        {activeMyEvents.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-3 px-1">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Event ของฉัน</h3>
-              <span className="text-xs text-gray-400">{myEvents.length} รายการ</span>
+              <span className="text-xs text-gray-400">{activeMyEvents.length} รายการ</span>
             </div>
             <div className="grid grid-cols-1 gap-4">
-              {myEvents.map((event) => (
+              {activeMyEvents.map((event) => (
                 <EventWorkCardReadonly
                   key={event.id}
                   event={event}

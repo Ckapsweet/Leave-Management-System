@@ -43,12 +43,12 @@ const hourlyRequest: LeaveRequest = {
 };
 
 describe("deriveLeavePoolFromRequests", () => {
-  it("uses exact total_hours for hourly leave instead of rounded stored days", () => {
+  it("keeps the backend balance authoritative so admin and user totals match", () => {
     const result = deriveLeavePoolFromRequests(pool, [hourlyRequest], 2026);
 
-    expect(result?.used_days).toBe(3.5 / 8);
-    expect(result?.remaining).toBe(3 - 3.5 / 8);
-    expect(result?.balances?.[0].used_days).toBe(3.5 / 8);
-    expect(result?.balances?.[0].remaining).toBe(3 - 3.5 / 8);
+    expect(result?.used_days).toBe(0.47);
+    expect(result?.remaining).toBe(2.53);
+    expect(result?.balances?.[0].used_days).toBe(0.47);
+    expect(result?.balances?.[0].remaining).toBe(2.53);
   });
 });

@@ -108,6 +108,18 @@ export async function getMyEvents(): Promise<WorkEvent[]> {
   return res.data;
 }
 
+export function isWorkEventActive(event: WorkEvent, now: Date | number = Date.now()): boolean {
+  const endDate = String(event.end_date ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return true;
+
+  const finalDay = event.attendance_days?.find((day) => String(day.event_date).slice(0, 10) === endDate);
+  const endTime = finalDay?.check_out_time?.slice(0, 8) || "23:59:59";
+  const normalizedTime = /^\d{2}:\d{2}$/.test(endTime) ? `${endTime}:00` : endTime;
+  const expiresAt = Date.parse(`${endDate}T${normalizedTime}+07:00`);
+  const currentTime = now instanceof Date ? now.getTime() : now;
+  return !Number.isFinite(expiresAt) || currentTime <= expiresAt;
+}
+
 export async function submitEventAttendance(payload: {
   eventId: number;
   eventDate: string;
