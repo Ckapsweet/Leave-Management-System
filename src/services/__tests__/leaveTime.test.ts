@@ -25,7 +25,8 @@ describe("leaveTime", () => {
 
   it("formats remaining leave as days and hours using an 8-hour day", () => {
     expect(formatLeaveRemaining(5.875)).toBe("5 วัน 7 ชั่วโมง");
-    expect(formatLeaveRemaining(5.87)).toBe("5 วัน 7 ชั่วโมง");
+    expect(formatLeaveRemaining(5.87)).toBe("5 วัน 6 ชั่วโมง 58 นาที");
     expect(formatLeaveRemaining(0.5)).toBe("4 ชั่วโมง");
+    expect(formatLeaveRemaining(0.0625)).toBe("30 นาที");
   });
 });

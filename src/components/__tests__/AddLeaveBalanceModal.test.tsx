@@ -94,6 +94,21 @@ describe("AddLeaveBalanceModal", () => {
     });
   });
 
+  it("adds minute entitlement using sixty minutes per hour", async () => {
+    const { onSubmit } = renderModal();
+    const minuteInput = screen.getByRole("spinbutton", { name: "จำนวนนาที Annual" });
+
+    await userEvent.clear(minuteInput);
+    await userEvent.type(minuteInput, "30");
+    await userEvent.click(saveButton());
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
+        { leave_type_id: 1, total_days: 10.0625 },
+      ]));
+    });
+  });
+
   it("keeps the modal open and shows the API error when save fails", async () => {
     const onSubmit = vi.fn().mockRejectedValue({ response: { data: { message: "Only admin can update" } } });
     const onClose = vi.fn();
