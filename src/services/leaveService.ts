@@ -313,9 +313,16 @@ export async function getAdminUserPool(userId: number, year?: number): Promise<L
   return res.data;
 }
 
+export interface LeaveBalanceUpdate {
+  leave_type_id: number;
+  remaining_days?: number;
+  used_days?: number;
+  total_days?: number;
+}
+
 export async function updateLeavePool(
   userId: number,
-  balances: { leave_type_id: number; total_days: number }[],
+  balances: LeaveBalanceUpdate[],
   year?: number
 ): Promise<LeavePool> {
   const res = await api.patch(`/api/admin/leave-pool/${userId}`, {

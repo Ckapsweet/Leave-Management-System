@@ -369,7 +369,7 @@ export function useAdminEmployees(options: {
   );
 
   const handleUpdateBalance = useCallback(
-    async (balances: { leave_type_id: number; total_days: number }[]) => {
+    async (balances: import("../../services/leaveService").LeaveBalanceUpdate[]) => {
       if (!balanceModal) return;
       try {
         const updated = await updateLeavePool(balanceModal.user.id, balances, year);

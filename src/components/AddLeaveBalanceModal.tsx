@@ -1,25 +1,31 @@
 // components/AddLeaveBalanceModal.tsx
 import { useState, useEffect } from "react";
-import type { LeavePool, LeaveBalance } from "../services/leaveService";
-import { formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave, WORK_HOURS_PER_DAY } from "../services/leaveTime";
+import type { LeavePool, LeaveBalance, LeaveBalanceUpdate } from "../services/leaveService";
+import { formatLeaveUsage, isUnlimitedSickLeave, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 
 export interface AddLeavePoolModalProps {
   user: { id: number; full_name: string; employee_code: string; department: string };
   pool: LeavePool;
   year: number;
-  onSubmit: (balances: { leave_type_id: number; total_days: number }[]) => Promise<void>;
+  onSubmit: (balances: LeaveBalanceUpdate[]) => Promise<void>;
   onClose: () => void;
 }
 
 export function AddLeaveBalanceModal({
   user, pool, year, onSubmit, onClose,
 }: AddLeavePoolModalProps) {
-  const [balances, setBalances] = useState<LeaveBalance[]>(pool.balances || []);
+  const toEditableBalances = (items: LeaveBalance[]) => items.map((balance) => ({
+    ...balance,
+    total_days: isUnlimitedSickLeave(balance.name)
+      ? Math.max(0, balance.used_days)
+      : Math.max(0, balance.remaining),
+  }));
+  const [balances, setBalances] = useState<LeaveBalance[]>(() => toEditableBalances(pool.balances || []));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    setBalances(pool.balances || []);
+    setBalances(toEditableBalances(pool.balances || []));
     setError("");
   }, [pool]);
 
@@ -69,10 +75,15 @@ export function AddLeaveBalanceModal({
     try {
       setLoading(true);
       setError("");
-      const payload = balances.filter((b) => !isUnlimitedSickLeave(b.name)).map(b => ({
-        leave_type_id: b.leave_type_id,
-        total_days: Number(b.total_days.toFixed(6))
-      }));
+      const payload: LeaveBalanceUpdate[] = balances.map((balance) => isUnlimitedSickLeave(balance.name)
+        ? {
+            leave_type_id: balance.leave_type_id,
+            used_days: Number(balance.total_days.toFixed(6)),
+          }
+        : {
+            leave_type_id: balance.leave_type_id,
+            remaining_days: Number(balance.total_days.toFixed(6)),
+          });
       await onSubmit(payload);
       onClose();
     } catch (err: any) {
@@ -121,7 +132,6 @@ export function AddLeaveBalanceModal({
 
           <div className="space-y-4">
             {balances.map((b) => {
-              const remaining = Math.max(0, b.total_days - b.used_days);
               const totalParts = getTotalParts(b.total_days);
               const isSickLeave = isUnlimitedSickLeave(b.name);
               return (
@@ -130,13 +140,11 @@ export function AddLeaveBalanceModal({
                     <p className="text-sm font-semibold text-gray-700">{b.name}</p>
                     <p className="text-[10px] text-gray-400">
                       {isSickLeave
-                        ? `ลาไปแล้ว ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · ไม่จำกัดสิทธิ์`
-                        : `ใช้ไปแล้ว ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ ${formatLeaveRemaining(remaining)}`}
+                        ? `กำหนดยอดที่ลาไปแล้ว · ปัจจุบัน ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)}`
+                        : `ใช้ไปแล้ว ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · กำหนดยอดคงเหลือโดยตรง`}
                     </p>
                   </div>
-                  {isSickLeave ? (
-                    <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700">ไม่ต้องกำหนดสิทธิ์</span>
-                  ) : <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
                       <p className="mb-1 text-center text-[10px] font-medium text-gray-400">วัน</p>
                       <div className="flex items-center gap-1">
@@ -203,7 +211,7 @@ export function AddLeaveBalanceModal({
                         </button>
                       </div>
                     </div>
-                  </div>}
+                  </div>
                 </div>
               );
             })}
