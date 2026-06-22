@@ -1,7 +1,7 @@
 // components/AddLeaveBalanceModal.tsx
 import { useState, useEffect } from "react";
 import type { LeavePool, LeaveBalance } from "../services/leaveService";
-import { formatLeaveRemaining, formatLeaveUsage, WORK_HOURS_PER_DAY } from "../services/leaveTime";
+import { formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 
 export interface AddLeavePoolModalProps {
   user: { id: number; full_name: string; employee_code: string; department: string };
@@ -69,7 +69,7 @@ export function AddLeaveBalanceModal({
     try {
       setLoading(true);
       setError("");
-      const payload = balances.map(b => ({
+      const payload = balances.filter((b) => !isUnlimitedSickLeave(b.name)).map(b => ({
         leave_type_id: b.leave_type_id,
         total_days: Number(b.total_days.toFixed(6))
       }));
@@ -123,13 +123,20 @@ export function AddLeaveBalanceModal({
             {balances.map((b) => {
               const remaining = Math.max(0, b.total_days - b.used_days);
               const totalParts = getTotalParts(b.total_days);
+              const isSickLeave = isUnlimitedSickLeave(b.name);
               return (
                 <div key={b.leave_type_id} className="flex flex-col gap-3 p-3 border border-gray-100 rounded-xl hover:bg-slate-50/50 transition-colors sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-700">{b.name}</p>
-                    <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ {formatLeaveRemaining(remaining)}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {isSickLeave
+                        ? `ลาไปแล้ว ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · ไม่จำกัดสิทธิ์`
+                        : `ใช้ไปแล้ว ${formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ ${formatLeaveRemaining(remaining)}`}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  {isSickLeave ? (
+                    <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-medium text-sky-700">ไม่ต้องกำหนดสิทธิ์</span>
+                  ) : <div className="grid grid-cols-3 gap-2">
                     <div>
                       <p className="mb-1 text-center text-[10px] font-medium text-gray-400">วัน</p>
                       <div className="flex items-center gap-1">
@@ -196,7 +203,7 @@ export function AddLeaveBalanceModal({
                         </button>
                       </div>
                     </div>
-                  </div>
+                  </div>}
                 </div>
               );
             })}

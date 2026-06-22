@@ -1,5 +1,5 @@
 import type { LeaveRequest } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveRemaining, WORK_HOURS_PER_DAY } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveRemaining, isUnlimitedSickLeave, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 import type { Employee, EmployeeWithBalance } from "./adminHelpers";
 
 function toNumber(value: number | string | null | undefined) {
@@ -139,7 +139,7 @@ export function AdminReportWidget({
 
   const lowBalanceEmployees = employees
     .flatMap((employee) =>
-      (employee.pool?.balances ?? []).map((balance) => ({
+      (employee.pool?.balances ?? []).filter((balance) => !isUnlimitedSickLeave(balance.name)).map((balance) => ({
         employee,
         balance,
         remaining: toNumber(balance.remaining),
