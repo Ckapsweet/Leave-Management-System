@@ -95,7 +95,7 @@ describe("AdminReportWidget", () => {
     );
 
     expect(screen.getByText("2", { selector: ".text-3xl" })).toBeInTheDocument();
-    expect(screen.getAllByText("1 วัน 3 ชม. 45 นาที").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1.47 วัน").length).toBeGreaterThan(0);
     expect(screen.getByText("1 pending")).toBeInTheDocument();
     expect(screen.getAllByText("Leave User").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Annual").length).toBeGreaterThan(0);

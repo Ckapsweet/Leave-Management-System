@@ -13,7 +13,7 @@ import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 import { LeaveBalanceCard } from "../components/LeaveBalanceCard";
-import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining } from "../services/leaveTime";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
 import { getMyEvents, submitEventAttendance, type EventAttendance, type WorkEvent } from "../services/eventService";
@@ -564,7 +564,7 @@ export default function UserLeaveDashboard() {
               {leaveBalances.map((balance) => (
                 <div key={balance.leave_type_id} className="min-w-[4.5rem] text-center">
                   <p className={`text-2xl font-bold ${balance.remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
-                    {formatLeaveDays(balance.remaining)}
+                    {formatLeaveRemaining(balance.remaining)}
                   </p>
                   <p className="max-w-24 truncate text-xs text-gray-500" title={balance.name}>
                     {balance.name}

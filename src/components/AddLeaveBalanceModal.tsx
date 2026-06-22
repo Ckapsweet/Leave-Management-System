@@ -1,7 +1,7 @@
 // components/AddLeaveBalanceModal.tsx
 import { useState, useEffect } from "react";
 import type { LeavePool, LeaveBalance } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
 
 export interface AddLeavePoolModalProps {
   user: { id: number; full_name: string; employee_code: string; department: string };
@@ -97,7 +97,7 @@ export function AddLeaveBalanceModal({
                 <div key={b.leave_type_id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-slate-50/50 transition-colors">
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-gray-700">{b.name}</p>
-                    <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ {formatLeaveDays(remaining)}</p>
+                    <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ {formatLeaveRemaining(remaining)}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button type="button"

@@ -1,7 +1,7 @@
 // components/EmployeeLeaveDrawer.tsx
 import { useState } from "react";
 import type { LeaveRequest, LeaveStatus } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveHours, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
 import type { EmployeeWithBalance } from "./adminHelpers";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
@@ -74,7 +74,7 @@ export function EmployeeLeaveDrawer({
                 </div>
                 <div className={`rounded-xl p-3 text-center ${remaining <= 3 ? "bg-red-50" : remaining <= 7 ? "bg-amber-50" : "bg-emerald-50"}`}>
                   <p className={`text-xl font-bold ${remaining <= 3 ? "text-red-600" : remaining <= 7 ? "text-amber-600" : "text-emerald-600"}`}>
-                    {formatLeaveDays(remaining)}
+                    {formatLeaveRemaining(remaining)}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">คงเหลือ</p>
                 </div>
@@ -92,7 +92,7 @@ export function EmployeeLeaveDrawer({
                   <div key={b.leave_type_id} className="flex items-center justify-between text-xs bg-slate-50/50 px-3 py-2 rounded-lg">
                     <span className="font-medium text-gray-600">{b.name}</span>
                     <span className="text-gray-500">
-                      คงเหลือ <strong className="text-gray-800">{formatLeaveDays(b.remaining)}</strong> / {formatLeaveDays(b.total_days)}
+                      คงเหลือ <strong className="text-gray-800">{formatLeaveRemaining(b.remaining)}</strong> / {formatLeaveDays(b.total_days)}
                     </span>
                   </div>
                 ))}
