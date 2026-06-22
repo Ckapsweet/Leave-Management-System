@@ -5,7 +5,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimeField } from "@mui/x-date-pickers/TimeField";
 import { toast } from "./Toast";
 import type { LeavePool } from "../services/leaveService";
-import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours, formatLeaveRemaining } from "../services/leaveTime";
+import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
 
 type LeaveUnit = "day" | "half_day" | "hour";
 type RequestKind = "leave" | "late";
@@ -301,6 +301,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
               {leaveTypes.map((t) => {
                 const bal = pool?.balances?.find((b) => b.leave_type_id === t.id);
                 const remaining = bal ? bal.remaining : 0;
+                const isSickLeave = isUnlimitedSickLeave(t.name);
                 const isSelected = form.leave_type_id === t.id;
 
                 return (
@@ -316,7 +317,12 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                   >
                     <span className="text-sm mb-1">{t.name}</span>
                     <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
-                      คงเหลือ: <strong className={isSelected ? "text-white" : "text-gray-600"}>{formatLeaveRemaining(remaining)}</strong>
+                      {isSickLeave ? "ลาไปแล้ว: " : "คงเหลือ: "}
+                      <strong className={isSelected ? "text-white" : "text-gray-600"}>
+                        {isSickLeave
+                          ? formatLeaveUsage(bal?.used_days ?? 0, bal?.used_day_units, bal?.used_hours)
+                          : formatLeaveRemaining(remaining)}
+                      </strong>
                     </span>
                   </button>
                 );

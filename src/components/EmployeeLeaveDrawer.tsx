@@ -1,7 +1,7 @@
 // components/EmployeeLeaveDrawer.tsx
 import { useState } from "react";
 import type { LeaveRequest, LeaveStatus } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
 import type { EmployeeWithBalance } from "./adminHelpers";
 import { STATUS_META, TYPE_COLORS, fmtDate, fmtDatetime, avatarColor } from "./adminHelpers";
 
@@ -92,7 +92,11 @@ export function EmployeeLeaveDrawer({
                   <div key={b.leave_type_id} className="flex items-center justify-between text-xs bg-slate-50/50 px-3 py-2 rounded-lg">
                     <span className="font-medium text-gray-600">{b.name}</span>
                     <span className="text-gray-500">
-                      คงเหลือ <strong className="text-gray-800">{formatLeaveRemaining(b.remaining)}</strong> / {formatLeaveDays(b.total_days)}
+                      {isUnlimitedSickLeave(b.name) ? (
+                        <>ลาไปแล้ว <strong className="text-gray-800">{formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)}</strong> · ไม่จำกัดสิทธิ์</>
+                      ) : (
+                        <>คงเหลือ <strong className="text-gray-800">{formatLeaveRemaining(b.remaining)}</strong> / {formatLeaveDays(b.total_days)}</>
+                      )}
                     </span>
                   </div>
                 ))}

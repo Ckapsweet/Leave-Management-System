@@ -213,11 +213,11 @@ describe("leaveService admin and payload edges", () => {
 
   it("calls admin leave pool endpoints with the selected year", async () => {
     await getAdminUserPool(7, 2026);
-    await updateLeavePool(7, [{ leave_type_id: 1, total_days: 12 }], 2026);
+    await updateLeavePool(7, [{ leave_type_id: 1, remaining_days: 12 }], 2026);
 
     expect(mockGet).toHaveBeenCalledWith("/api/admin/leave-pool/7", { params: { year: 2026 } });
     expect(mockPatch).toHaveBeenCalledWith("/api/admin/leave-pool/7", {
-      balances: [{ leave_type_id: 1, total_days: 12 }],
+      balances: [{ leave_type_id: 1, remaining_days: 12 }],
       year: 2026,
     });
   });

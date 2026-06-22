@@ -58,8 +58,8 @@ describe("AddLeaveBalanceModal", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith([
-        { leave_type_id: 1, total_days: 12 },
-        { leave_type_id: 2, total_days: 2 },
+        { leave_type_id: 1, remaining_days: 12 },
+        { leave_type_id: 2, used_days: 0 },
       ]);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -67,19 +67,20 @@ describe("AddLeaveBalanceModal", () => {
 
   it("does not allow total days to go below zero", async () => {
     const { onSubmit } = renderModal();
-    const decreaseSickDays = screen.getByRole("button", { name: "ลดวัน Sick" });
+    const decreaseAnnualDays = screen.getByRole("button", { name: "ลดวัน Annual" });
 
-    await userEvent.click(decreaseSickDays);
-    await userEvent.click(decreaseSickDays);
-    await userEvent.click(decreaseSickDays);
+    for (let i = 0; i < 11; i += 1) await userEvent.click(decreaseAnnualDays);
     await userEvent.click(saveButton());
 
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([{ leave_type_id: 2, total_days: 0 }]));
+      expect(onSubmit).toHaveBeenCalledWith([
+        { leave_type_id: 1, remaining_days: 0 },
+        { leave_type_id: 2, used_days: 0 },
+      ]);
     });
   });
 
-  it("adds hourly entitlement using 7.5 hours per day", async () => {
+  it("adds hourly entitlement using 8 hours per day", async () => {
     const { onSubmit } = renderModal();
 
     await userEvent.click(screen.getByRole("button", { name: "เพิ่มชั่วโมง Annual" }));
@@ -89,7 +90,7 @@ describe("AddLeaveBalanceModal", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
-        { leave_type_id: 1, total_days: 10.4 },
+        { leave_type_id: 1, remaining_days: 8.375 },
       ]));
     });
   });
@@ -104,7 +105,22 @@ describe("AddLeaveBalanceModal", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
-        { leave_type_id: 1, total_days: 10.066667 },
+        { leave_type_id: 1, remaining_days: 8.0625 },
+      ]));
+    });
+  });
+
+  it("updates sick leave as days already taken", async () => {
+    const { onSubmit } = renderModal();
+    const sickDays = screen.getByRole("spinbutton", { name: "จำนวนวัน Sick" });
+
+    await userEvent.clear(sickDays);
+    await userEvent.type(sickDays, "4");
+    await userEvent.click(saveButton());
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
+        { leave_type_id: 2, used_days: 4 },
       ]));
     });
   });
