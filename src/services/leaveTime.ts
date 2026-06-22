@@ -1,6 +1,6 @@
 import type { Dayjs } from "dayjs";
 
-export const WORK_HOURS_PER_DAY = 8;
+export const WORK_HOURS_PER_DAY = 7.5;
 
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
