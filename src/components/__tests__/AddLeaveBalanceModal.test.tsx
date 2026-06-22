@@ -67,15 +67,30 @@ describe("AddLeaveBalanceModal", () => {
 
   it("does not allow total days to go below zero", async () => {
     const { onSubmit } = renderModal();
-    const buttons = screen.getAllByRole("button");
+    const decreaseSickDays = screen.getByRole("button", { name: "ลดวัน Sick" });
 
-    await userEvent.click(buttons[3]);
-    await userEvent.click(buttons[3]);
-    await userEvent.click(buttons[3]);
+    await userEvent.click(decreaseSickDays);
+    await userEvent.click(decreaseSickDays);
+    await userEvent.click(decreaseSickDays);
     await userEvent.click(saveButton());
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([{ leave_type_id: 2, total_days: 0 }]));
+    });
+  });
+
+  it("adds hourly entitlement using eight hours per day", async () => {
+    const { onSubmit } = renderModal();
+
+    await userEvent.click(screen.getByRole("button", { name: "เพิ่มชั่วโมง Annual" }));
+    await userEvent.click(screen.getByRole("button", { name: "เพิ่มชั่วโมง Annual" }));
+    await userEvent.click(screen.getByRole("button", { name: "เพิ่มชั่วโมง Annual" }));
+    await userEvent.click(saveButton());
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
+        { leave_type_id: 1, total_days: 10.375 },
+      ]));
     });
   });
 

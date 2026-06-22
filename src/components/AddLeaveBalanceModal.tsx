@@ -1,7 +1,7 @@
 // components/AddLeaveBalanceModal.tsx
 import { useState, useEffect } from "react";
 import type { LeavePool, LeaveBalance } from "../services/leaveService";
-import { formatLeaveRemaining, formatLeaveUsage } from "../services/leaveTime";
+import { formatLeaveRemaining, formatLeaveUsage, WORK_HOURS_PER_DAY } from "../services/leaveTime";
 
 export interface AddLeavePoolModalProps {
   user: { id: number; full_name: string; employee_code: string; department: string };
@@ -36,6 +36,29 @@ export function AddLeaveBalanceModal({
     setError("");
   };
 
+  const getTotalParts = (totalDays: number) => {
+    const totalHours = Math.round(Math.max(0, totalDays) * WORK_HOURS_PER_DAY);
+    return {
+      days: Math.floor(totalHours / WORK_HOURS_PER_DAY),
+      hours: totalHours % WORK_HOURS_PER_DAY,
+    };
+  };
+
+  const handleUpdatePart = (typeId: number, unit: "day" | "hour", newVal: number) => {
+    setBalances(prev => prev.map((balance) => {
+      if (balance.leave_type_id !== typeId) return balance;
+
+      const current = getTotalParts(balance.total_days);
+      const value = Math.max(0, Math.floor(Number.isFinite(newVal) ? newVal : 0));
+      const totalHours = unit === "day"
+        ? value * WORK_HOURS_PER_DAY + current.hours
+        : current.days * WORK_HOURS_PER_DAY + value;
+
+      return { ...balance, total_days: totalHours / WORK_HOURS_PER_DAY };
+    }));
+    setError("");
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
@@ -53,12 +76,12 @@ export function AddLeaveBalanceModal({
     }
   };
 
-  const INPUT_CLS = "w-20 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-center font-bold text-gray-900";
+  const INPUT_CLS = "w-14 border border-gray-200 rounded-lg px-1 py-1.5 focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-center font-bold text-gray-900";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
@@ -93,29 +116,58 @@ export function AddLeaveBalanceModal({
           <div className="space-y-4">
             {balances.map((b) => {
               const remaining = Math.max(0, b.total_days - b.used_days);
+              const totalParts = getTotalParts(b.total_days);
               return (
-                <div key={b.leave_type_id} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-slate-50/50 transition-colors">
-                  <div className="flex-1">
+                <div key={b.leave_type_id} className="flex flex-col gap-3 p-3 border border-gray-100 rounded-xl hover:bg-slate-50/50 transition-colors sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-700">{b.name}</p>
                     <p className="text-[10px] text-gray-400">ใช้ไปแล้ว {formatLeaveUsage(b.used_days, b.used_day_units, b.used_hours)} · คงเหลือ {formatLeaveRemaining(remaining)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button type="button"
-                      onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days - 1)}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
-                      −
-                    </button>
-                    <input
-                      type="number" min={0}
-                      value={b.total_days}
-                      onChange={(e) => handleUpdateTotal(b.leave_type_id, Number(e.target.value))}
-                      className={INPUT_CLS}
-                    />
-                    <button type="button"
-                      onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days + 1)}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
-                      +
-                    </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="mb-1 text-center text-[10px] font-medium text-gray-400">วัน</p>
+                      <div className="flex items-center gap-1">
+                        <button type="button" aria-label={`ลดวัน ${b.name}`}
+                          onClick={() => handleUpdatePart(b.leave_type_id, "day", totalParts.days - 1)}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          −
+                        </button>
+                        <input
+                          aria-label={`จำนวนวัน ${b.name}`}
+                          type="number" min={0} step={1}
+                          value={totalParts.days}
+                          onChange={(e) => handleUpdatePart(b.leave_type_id, "day", Number(e.target.value))}
+                          className={INPUT_CLS}
+                        />
+                        <button type="button" aria-label={`เพิ่มวัน ${b.name}`}
+                          onClick={() => handleUpdatePart(b.leave_type_id, "day", totalParts.days + 1)}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          +
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1 text-center text-[10px] font-medium text-gray-400">ชั่วโมง</p>
+                      <div className="flex items-center gap-1">
+                        <button type="button" aria-label={`ลดชั่วโมง ${b.name}`}
+                          onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days - (1 / WORK_HOURS_PER_DAY))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          −
+                        </button>
+                        <input
+                          aria-label={`จำนวนชั่วโมง ${b.name}`}
+                          type="number" min={0} step={1}
+                          value={totalParts.hours}
+                          onChange={(e) => handleUpdatePart(b.leave_type_id, "hour", Number(e.target.value))}
+                          className={INPUT_CLS}
+                        />
+                        <button type="button" aria-label={`เพิ่มชั่วโมง ${b.name}`}
+                          onClick={() => handleUpdateTotal(b.leave_type_id, b.total_days + (1 / WORK_HOURS_PER_DAY))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-white transition-colors text-gray-500">
+                          +
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
