@@ -79,7 +79,7 @@ describe("AddLeaveBalanceModal", () => {
     });
   });
 
-  it("adds hourly entitlement using eight hours per day", async () => {
+  it("adds hourly entitlement using 7.5 hours per day", async () => {
     const { onSubmit } = renderModal();
 
     await userEvent.click(screen.getByRole("button", { name: "เพิ่มชั่วโมง Annual" }));
@@ -89,7 +89,7 @@ describe("AddLeaveBalanceModal", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
-        { leave_type_id: 1, total_days: 10.375 },
+        { leave_type_id: 1, total_days: 10.4 },
       ]));
     });
   });
@@ -104,7 +104,7 @@ describe("AddLeaveBalanceModal", () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith(expect.arrayContaining([
-        { leave_type_id: 1, total_days: 10.0625 },
+        { leave_type_id: 1, total_days: 10.066667 },
       ]));
     });
   });

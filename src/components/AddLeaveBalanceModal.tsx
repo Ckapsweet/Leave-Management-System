@@ -71,7 +71,7 @@ export function AddLeaveBalanceModal({
       setError("");
       const payload = balances.map(b => ({
         leave_type_id: b.leave_type_id,
-        total_days: b.total_days
+        total_days: Number(b.total_days.toFixed(6))
       }));
       await onSubmit(payload);
       onClose();

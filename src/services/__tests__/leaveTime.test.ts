@@ -19,14 +19,13 @@ describe("leaveTime", () => {
     expect(formatLeaveHours(2)).toBe("2 ชั่วโมง");
   });
 
-  it("converts hourly leave using 8 work hours per day", () => {
-    expect(leaveHoursToDays(3.5)).toBe(0.44);
+  it("converts hourly leave using 7.5 work hours per day", () => {
+    expect(leaveHoursToDays(3.5)).toBe(0.47);
   });
 
-  it("formats remaining leave as days and hours using an 8-hour day", () => {
-    expect(formatLeaveRemaining(5.875)).toBe("5 วัน 7 ชั่วโมง");
-    expect(formatLeaveRemaining(5.87)).toBe("5 วัน 6 ชั่วโมง 58 นาที");
-    expect(formatLeaveRemaining(0.5)).toBe("4 ชั่วโมง");
-    expect(formatLeaveRemaining(0.0625)).toBe("30 นาที");
+  it("formats remaining leave using a 7.5-hour day", () => {
+    expect(formatLeaveRemaining(5 + (7 / 7.5))).toBe("5 วัน 7 ชั่วโมง");
+    expect(formatLeaveRemaining(0.5)).toBe("3 ชั่วโมง 45 นาที");
+    expect(formatLeaveRemaining(1 / 15)).toBe("30 นาที");
   });
 });
