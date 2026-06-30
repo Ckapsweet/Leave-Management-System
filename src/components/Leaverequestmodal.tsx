@@ -8,7 +8,7 @@ import type { LeavePool } from "../services/leaveService";
 import { calculateLateLeaveHours, calculateLeaveHours, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
 
 type LeaveUnit = "day" | "half_day" | "hour";
-type RequestKind = "leave" | "late";
+type RequestKind = "leave" | "late" | "offsite";
 
 interface LeaveType {
   id: number;
@@ -35,6 +35,7 @@ export interface LeaveRequestModalProps {
   onSubmit: (form: LeaveRequestForm) => Promise<void>;
   onClose: () => void;
   isLoading?: boolean;
+  initialRequestType?: RequestKind;
 }
 
 interface FormErrors {
@@ -76,8 +77,14 @@ function isAllowedAttachment(file: File) {
   return file.type.startsWith("image/") || file.type === "application/pdf";
 }
 
+function isOffsiteType(name: string) {
+  const normalized = name.trim().toLowerCase();
+  return normalized.includes("ทำงานนอกสถานที่") || normalized.includes("offsite") || normalized.includes("work outside");
+}
+
 function validate(form: LeaveRequestForm): FormErrors {
   const errors: FormErrors = {};
+  const isOffsite = form.request_type === "offsite";
 
   if (!form.leave_type_id) errors.leave_type_id = "กรุณาเลือกประเภทการลา";
 
@@ -97,7 +104,7 @@ function validate(form: LeaveRequestForm): FormErrors {
     }
   }
 
-  if (form.leave_unit === "hour") {
+  if (!isOffsite && form.leave_unit === "hour") {
     if (!form.start_time || !form.start_time.isValid()) errors.start_time = "กรุณาระบุเวลาเริ่ม";
     if (!form.end_time || !form.end_time.isValid()) errors.end_time = "กรุณาระบุเวลาสิ้นสุด";
     else if (form.start_time && form.start_time.isValid() && form.end_time.isBefore(form.start_time))
@@ -201,10 +208,11 @@ function SummaryPill({ form }: { form: LeaveRequestForm }) {
   );
 }
 
-export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoading = false }: LeaveRequestModalProps) {
+export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoading = false, initialRequestType = "leave" }: LeaveRequestModalProps) {
+  const offsiteType = leaveTypes.find((type) => isOffsiteType(type.name));
   const [form, setForm] = useState<LeaveRequestForm>({
-    request_type: "leave",
-    leave_type_id: 0,
+    request_type: initialRequestType,
+    leave_type_id: initialRequestType === "offsite" ? offsiteType?.id ?? 0 : 0,
     leave_unit: "day",
     start_date: "",
     end_date: "",
@@ -215,11 +223,16 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+  const isOffsite = form.request_type === "offsite";
 
   useEffect(() => {
+    if (form.request_type === "offsite") {
+      setForm((f) => ({ ...f, leave_unit: "day", leave_type_id: offsiteType?.id ?? f.leave_type_id, start_time: null, end_time: null }));
+      return;
+    }
     if ((form.leave_unit === "hour" || form.leave_unit === "half_day") && form.start_date) setForm((f) => ({ ...f, end_date: f.start_date }));
     if (form.leave_unit === "day" || form.leave_unit === "half_day") setForm((f) => ({ ...f, request_type: "leave", start_time: null, end_time: null }));
-  }, [form.leave_unit, form.start_date]);
+  }, [form.request_type, form.leave_unit, form.start_date, offsiteType?.id]);
 
   const set = <K extends keyof LeaveRequestForm>(key: K, value: LeaveRequestForm[K]) => {
     const updated = { ...form, [key]: value };
@@ -246,7 +259,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
 
     try {
       await onSubmit(form);
-      toast.success(form.request_type === "late" ? "ส่งคำขอลาสายสำเร็จ!" : "ส่งคำขอลาสำเร็จ!");
+      toast.success(form.request_type === "offsite" ? "แจ้งทำงานนอกสถานที่สำเร็จ!" : form.request_type === "late" ? "ส่งคำขอลาสายสำเร็จ!" : "ส่งคำขอลาสำเร็จ!");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
     }
@@ -261,12 +274,17 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
   }, [onClose]);
 
   const isLate = form.request_type === "late";
+  const modalTitle = isOffsite ? "แจ้งทำงานนอกสถานที่" : isLate ? "เธขเธทเนเธเธเธณเธเธญเธฅเธฒเธชเธฒเธข" : "เธขเธทเนเธเธเธณเธเธญเธฅเธฒ";
+  const modalSubtitle = isOffsite ? "กรอกข้อมูลวันทำงานนอกสถานที่ให้ครบถ้วน" : isLate ? "เธเธฃเธญเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเธกเธฒเธชเธฒเธขเนเธซเนเธเธฃเธเธ–เนเธงเธ" : "เธเธฃเธญเธเธเนเธญเธกเธนเธฅเธเธฒเธฃเธฅเธฒเนเธซเนเธเธฃเธเธ–เนเธงเธ";
+  const reasonLabel = isOffsite ? "รายละเอียด/สถานที่ทำงาน" : isLate ? "เน€เธซเธ•เธธเธเธฅเธเธฒเธฃเธฅเธฒเธชเธฒเธข" : "เน€เธซเธ•เธธเธเธฅเธเธฒเธฃเธฅเธฒ";
+  const reasonPlaceholder = isOffsite ? "ระบุสถานที่ รายละเอียดงาน หรือเหตุผล..." : isLate ? "เธฃเธฐเธเธธเน€เธซเธ•เธธเธเธฅเธเธฒเธฃเธฅเธฒเธชเธฒเธข..." : "เธฃเธฐเธเธธเน€เธซเธ•เธธเธเธฅเธเธฒเธฃเธฅเธฒ...";
+  const submitLabel = isOffsite ? "แจ้งทำงานนอกสถานที่" : isLate ? "เธชเนเธเธเธณเธเธญเธฅเธฒเธชเธฒเธข" : "เธชเนเธเธเธณเธเธญเธฅเธฒ";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
 
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" aria-label={modalTitle} data-subtitle={modalSubtitle}>
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
@@ -290,7 +308,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
         <div className="overflow-y-auto px-6 py-5 space-y-5 flex-1">
           <div>
             <label className={LABEL_CLASS}>รูปแบบคำขอ</label>
-            <UnitToggle value={form.leave_unit} requestType={form.request_type} onChange={setRequestMode} />
+            {!isOffsite && <UnitToggle value={form.leave_unit} requestType={form.request_type} onChange={setRequestMode} />}
           </div>
 
           <div>
@@ -298,7 +316,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
               {isLate ? "ประเภทที่ใช้บันทึก" : "ประเภทการลา"} <span className="text-red-400">*</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {leaveTypes.map((t) => {
+              {leaveTypes.filter((t) => isOffsite === isOffsiteType(t.name)).map((t) => {
                 const bal = pool?.balances?.find((b) => b.leave_type_id === t.id);
                 const remaining = bal ? bal.remaining : 0;
                 const isSickLeave = isUnlimitedSickLeave(t.name);
@@ -316,14 +334,14 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
                     }`}
                   >
                     <span className="text-sm mb-1">{t.name}</span>
-                    <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
+                    {!isOffsite && <span className={`text-[10px] font-normal ${isSelected ? "text-indigo-100" : "text-gray-400"}`}>
                       {isSickLeave ? "ลาไปแล้ว: " : "คงเหลือ: "}
                       <strong className={isSelected ? "text-white" : "text-gray-600"}>
                         {isSickLeave
                           ? formatLeaveUsage(bal?.used_days ?? 0, bal?.used_day_units, bal?.used_hours)
                           : formatLeaveRemaining(remaining)}
                       </strong>
-                    </span>
+                    </span>}
                   </button>
                 );
               })}
@@ -443,6 +461,8 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
             <label className={LABEL_CLASS}>{isLate ? "เหตุผลการลาสาย" : "เหตุผลการลา"} <span className="text-red-400">*</span></label>
             <textarea
               className={`${INPUT_CLASS} resize-none`}
+              aria-label={reasonLabel}
+              data-placeholder={reasonPlaceholder}
               rows={3}
               placeholder={isLate ? "ระบุเหตุผลการลาสาย..." : "ระบุเหตุผลการลา..."}
               value={form.reason}
@@ -507,6 +527,7 @@ export function LeaveRequestModal({ leaveTypes, pool, onSubmit, onClose, isLoadi
           <button
             onClick={handleSubmit}
             disabled={isLoading}
+            aria-label={submitLabel}
             className="px-5 py-2.5 text-sm bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-medium transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isLoading ? (

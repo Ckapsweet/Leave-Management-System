@@ -1,5 +1,5 @@
 import type { LeaveBalance } from "../services/leaveService";
-import { formatLeaveDays, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveRemaining, formatLeaveUsage, isOffsiteWorkType, isUnlimitedSickLeave } from "../services/leaveTime";
 export { formatLeaveDays, formatLeaveUsage } from "../services/leaveTime";
 
 const TYPE_COLORS: Record<number, string> = {
@@ -25,8 +25,27 @@ export function LeaveBalanceCard({
   const used = Math.max(0, balance.used_days);
   const usedLabel = formatLeaveUsage(used, balance.used_day_units, balance.used_hours);
   const isSickLeave = isUnlimitedSickLeave(balance.name);
+  const isOffsite = isOffsiteWorkType(balance.name);
   const remainingRatio = total > 0 ? remaining / total : 0;
   const barColor = remainingRatio < 0.2 ? "bg-red-400" : remainingRatio < 0.5 ? "bg-amber-400" : "bg-indigo-500";
+
+  if (isOffsite) {
+    return (
+      <div className="h-full min-h-[230px] rounded-2xl border border-gray-100 bg-white p-6 flex flex-col">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+          <div className="min-w-0">
+            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${typeColor}`}>{balance.name}</span>
+            <p className="mt-2 text-xs leading-5 text-gray-400">จำนวนวันที่ทำงานนอกสถานที่สะสม</p>
+          </div>
+          <div className="text-right">
+            <p className="whitespace-nowrap text-3xl font-bold leading-none text-sky-600">{usedLabel}</p>
+            <p className="mt-2 whitespace-nowrap text-xs text-gray-400">ทำงานแล้ว</p>
+          </div>
+        </div>
+        <div className="mt-auto rounded-xl bg-sky-50 px-4 py-3 text-center text-sm font-medium text-sky-700">บวกสะสมต่อเนื่อง</div>
+      </div>
+    );
+  }
 
   if (isSickLeave) {
     return (

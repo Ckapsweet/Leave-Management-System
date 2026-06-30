@@ -1,4 +1,5 @@
 import type { LeavePool, LeaveRequest } from "./leaveService";
+import { isOffsiteWorkType } from "./leaveTime";
 
 function toNumber(value: number | string | null | undefined) {
   const parsed = Number(value ?? 0);
@@ -18,7 +19,7 @@ function balanceKey(name: string | null | undefined, id: number) {
   return (name || String(id)).trim().toLowerCase();
 }
 
-export function deriveLeavePoolFromRequests(pool: LeavePool | null, _requests: LeaveRequest[], _year = new Date().getFullYear()) {
+export function deriveLeavePoolFromRequests(pool: LeavePool | null, requests: LeaveRequest[], _year = new Date().getFullYear()) {
   if (!pool) return pool;
 
   const groupedBalances = new Map<string, NonNullable<LeavePool["balances"]>[number]>();
@@ -39,11 +40,20 @@ export function deriveLeavePoolFromRequests(pool: LeavePool | null, _requests: L
   const balances = Array.from(groupedBalances.values()).map((balance) => {
     const used_days = toNumber(balance.used_days);
     const total_days = toNumber(balance.total_days);
+    const offsiteUsed = isOffsiteWorkType(balance.name)
+      ? requests
+          .filter((request) => request.status === "approved" && request.request_type === "offsite" && request.leave_type_id === balance.leave_type_id)
+          .reduce((sum, request) => sum + getLeaveUsageDays(request), 0)
+      : 0;
+    const nextUsedDays = roundLeaveDays(used_days + offsiteUsed);
     return {
       ...balance,
       total_days,
-      used_days,
-      remaining: Math.max(0, roundLeaveDays(total_days - used_days)),
+      used_days: nextUsedDays,
+      used_day_units: isOffsiteWorkType(balance.name)
+        ? roundLeaveDays(toNumber(balance.used_day_units) + offsiteUsed)
+        : balance.used_day_units,
+      remaining: Math.max(0, roundLeaveDays(total_days - nextUsedDays)),
     };
   });
 

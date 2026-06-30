@@ -35,7 +35,6 @@ export default function HrDashboard() {
     setShowEditProfile,
     updateUser,
     handleLogout,
-    navigate,
   } = useAdminAuthUser();
 
   const {
@@ -222,7 +221,6 @@ export default function HrDashboard() {
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab as HrTab)}
         onEditProfile={() => setShowEditProfile(true)}
-        onMyLeave={() => navigate("/dashboard")}
         onLogout={handleLogout}
       />
 

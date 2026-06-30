@@ -8,7 +8,7 @@ import { calculateLateLeaveHours, calculateLeaveHours } from "./leaveTime";
 
 export type LeaveStatus = "pending" | "approved" | "rejected";
 export type LeaveUnit   = "day" | "half_day" | "hour";
-export type RequestKind = "leave" | "late";
+export type RequestKind = "leave" | "late" | "offsite";
 
 export interface LeaveType {
   id:          number;

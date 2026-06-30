@@ -7,6 +7,15 @@ export function isUnlimitedSickLeave(name: string | null | undefined): boolean {
   return normalized.includes("ลาป่วย") || normalized === "sick" || normalized === "sick leave";
 }
 
+export function isOffsiteWorkType(name: string | null | undefined): boolean {
+  const normalized = String(name ?? "").trim().toLowerCase();
+  return normalized.includes("ทำงานนอกสถานที่") || normalized.includes("offsite") || normalized.includes("work outside");
+}
+
+export function isUsageOnlyLeaveType(name: string | null | undefined): boolean {
+  return isUnlimitedSickLeave(name) || isOffsiteWorkType(name);
+}
+
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 13 * 60;
 const HOURLY_ROUNDING_MINUTES = 30;

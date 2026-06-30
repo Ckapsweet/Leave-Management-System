@@ -12,6 +12,10 @@ function isSameId(a: number | string | null | undefined, b: number | string | nu
     return a != null && b != null && String(a) === String(b);
 }
 
+function isOffsiteRequest(request: LeaveRequest) {
+    return request.request_type === "offsite";
+}
+
 function filterByScope(
     leaves: LeaveRequest[],
     departmentScope?: string | null,
@@ -64,10 +68,20 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                         </div>
                         <div className="flex-1 min-w-0 space-y-0.5">
                             <p className="text-sm font-semibold truncate text-gray-900">{req.user?.full_name}</p>
+                            {isOffsiteRequest(req) && (
+                                <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                    ทำงานนอกสถานที่
+                                </span>
+                            )}
                             <p className="text-xs truncate text-gray-500">{req.user?.department}</p>
                             {req.user?.email && <p className="text-xs truncate text-gray-500">{req.user.email}</p>}
                             {req.user?.email_2 && <p className="text-xs truncate text-gray-500">{req.user.email_2}</p>}
                             {req.user?.phone && <p className="text-xs truncate text-gray-500">{req.user.phone}</p>}
+                            {req.reason && (
+                                <p className="text-xs leading-5 text-gray-500">
+                                    <span className="font-medium text-gray-600">หมายเหตุ:</span> {req.reason}
+                                </p>
+                            )}
                         </div>
                     </div>
                 ))}

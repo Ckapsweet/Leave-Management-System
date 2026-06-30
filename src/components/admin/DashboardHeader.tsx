@@ -13,7 +13,7 @@ interface DashboardHeaderProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onEditProfile: () => void;
-  onMyLeave: () => void;
+  onMyLeave?: () => void;
   onLogout: () => void;
 }
 
@@ -85,15 +85,17 @@ export function DashboardHeader({
             <p className="text-xs text-gray-400 capitalize">{user?.role}</p>
           </div>
         </div>
-        <button onClick={onMyLeave} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-            <path d="M16 2v4" />
-            <path d="M8 2v4" />
-            <path d="M3 10h18" />
-          </svg>
-          วันลาของฉัน
-        </button>
+        {onMyLeave && (
+          <button onClick={onMyLeave} className="text-xs text-indigo-600 hover:text-indigo-800 px-2.5 py-1.5 rounded-xl border border-indigo-200 hover:bg-indigo-50 transition-colors font-medium flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+              <path d="M16 2v4" />
+              <path d="M8 2v4" />
+              <path d="M3 10h18" />
+            </svg>
+            วันลาของฉัน
+          </button>
+        )}
         <button onClick={onLogout} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 rounded-lg hover:bg-gray-100 transition-colors">
           ออกจากระบบ
         </button>
