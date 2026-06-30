@@ -4,7 +4,7 @@ import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
 import { deriveLeavePoolFromRequests } from "../services/leavePoolHelpers";
-import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload } from "../services/leaveService";
+import type { LeaveType, LeavePool, LeaveRequest, LeaveStatus, LeaveRequestPayload, RequestKind } from "../services/leaveService";
 import { LeaveRequestModal } from "../components/Leaverequestmodal";
 import type { LeaveRequestForm } from "../components/Leaverequestmodal";
 import { ToastContainer, toast } from "../components/Toast";
@@ -13,7 +13,7 @@ import type { AuthUser } from "../services/authService";
 import Footer from "../components/Footer";
 import { TodayLeavesWidget } from "../components/TodayLeavesWidget";
 import { LeaveBalanceCard } from "../components/LeaveBalanceCard";
-import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave } from "../services/leaveTime";
+import { formatLeaveDays, formatLeaveHours, formatLeaveRemaining, formatLeaveUsage, isUnlimitedSickLeave, isUsageOnlyLeaveType } from "../services/leaveTime";
 import { logoutAndRedirect, readStoredUser, writeStoredUser } from "../services/authSession";
 import { useLeaveRequestFilters } from "../hooks/useLeaveRequestFilters";
 import { getMyEvents, isWorkEventActive, submitEventAttendance, type EventAttendance, type WorkEvent } from "../services/eventService";
@@ -45,6 +45,10 @@ function isLateRequest(req: LeaveRequest) {
   return req.request_type === "late";
 }
 
+function isOffsiteRequest(req: LeaveRequest) {
+  return req.request_type === "offsite";
+}
+
 function getLeaveTypeDescription(leaveTypes: LeaveType[], leaveTypeId: number) {
   return leaveTypes.find((type) => type.id === leaveTypeId)?.description ?? "";
 }
@@ -72,6 +76,7 @@ function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: ()
   const meta = STATUS_META[req.status];
   const typeColor = TYPE_COLORS[req.leave_type_id] ?? "bg-gray-100 text-gray-600";
   const isHourly = req.leave_unit === "hour";
+  const isOffsite = isOffsiteRequest(req);
   return (
     <tr className="hover:bg-slate-50/70 cursor-pointer transition-colors" onClick={onClick}>
       <td className="px-5 py-4">
@@ -84,6 +89,7 @@ function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: ()
       <td className="px-5 py-4">
         <div className="flex flex-col gap-1">
           <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${typeColor}`}>{req.leave_type.name}</span>
+          {isOffsite && <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium w-fit">ทำงานนอกสถานที่</span>}
           {isHourly && <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium w-fit">ลาชั่วโมง</span>}
         </div>
       </td>
@@ -321,7 +327,7 @@ export default function UserLeaveDashboard() {
   const [eventActionLoading, setEventActionLoading] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<LeaveRequest | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [modalRequestType, setModalRequestType] = useState<RequestKind | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
@@ -376,7 +382,7 @@ export default function UserLeaveDashboard() {
       const newReq = await createLeaveRequest(form as LeaveRequestPayload);
       const requestWithType = { ...newReq, request_type: newReq.request_type ?? form.request_type };
       setRequests((prev) => [requestWithType, ...prev]);
-      setShowModal(false);
+      setModalRequestType(null);
     } catch (err) {
       throw err;
     } finally {
@@ -493,13 +499,14 @@ export default function UserLeaveDashboard() {
 
       <ToastContainer />
 
-      {showModal && (
+      {modalRequestType && (
         <LeaveRequestModal
           leaveTypes={leaveTypes}
           pool={displayLeavePool}
           onSubmit={handleAddLeave}
-          onClose={() => setShowModal(false)}
+          onClose={() => setModalRequestType(null)}
           isLoading={submitting}
+          initialRequestType={modalRequestType}
         />
       )}
 
@@ -527,10 +534,14 @@ export default function UserLeaveDashboard() {
             <p className="text-xs text-gray-400">Ckapsweet</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          <button onClick={() => setModalRequestType("leave")} className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
             เพิ่มการลา
+          </button>
+          <button onClick={() => setModalRequestType("offsite")} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl transition-colors">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h1M9 13h1M9 17h1M15 13h1M15 17h1" /></svg>
+            แจ้งทำงานนอกสถานที่
           </button>
           {pendingCount > 0 && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full">
@@ -574,8 +585,8 @@ export default function UserLeaveDashboard() {
             <div className="flex flex-wrap items-start gap-x-6 gap-y-3 sm:justify-end sm:gap-x-8">
               {leaveBalances.map((balance) => (
                 <div key={balance.leave_type_id} className="min-w-[4.5rem] text-center">
-                  <p className={`text-2xl font-bold ${isUnlimitedSickLeave(balance.name) ? "text-sky-600" : balance.remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
-                    {isUnlimitedSickLeave(balance.name)
+                  <p className={`text-2xl font-bold ${isUsageOnlyLeaveType(balance.name) ? "text-sky-600" : balance.remaining <= 3 ? "text-red-600" : "text-indigo-600"}`}>
+                    {isUsageOnlyLeaveType(balance.name)
                       ? formatLeaveUsage(balance.used_days, balance.used_day_units, balance.used_hours)
                       : formatLeaveRemaining(balance.remaining)}
                   </p>
