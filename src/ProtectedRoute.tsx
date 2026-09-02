@@ -1,5 +1,5 @@
 // ProtectedRoute.tsx
-import { Navigate } from "react-router-dom";
+import { Navigate } from "react-router";
 import type { ReactNode } from "react";
 
 type Role = "user" | "lead" | "assistant manager" | "manager" | "hr" | "admin";

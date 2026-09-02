@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import {
   getLeaveTypes, getLeavePool, getMyLeaveRequests, createLeaveRequest, cancelLeaveRequest
 } from "../services/leaveService";
@@ -555,6 +555,7 @@ export default function UserLeaveDashboard() {
             </div>
             <div className="hidden sm:block text-right cursor-pointer hover:opacity-80 transition-opacity">
               <p className="text-xs font-semibold text-gray-800">{user?.full_name ?? ""}</p>
+              {user?.english_name && <p className="text-xs text-gray-500">{user.english_name}</p>}
               <p className="text-xs text-gray-400">{user?.employee_code ?? ""}</p>
             </div>
           </div>
@@ -580,6 +581,7 @@ export default function UserLeaveDashboard() {
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-gray-900">{user?.full_name ?? ""}</h2>
+              {user?.english_name && <p className="text-sm text-gray-500">{user.english_name}</p>}
               <p className="text-sm text-gray-500">{user?.department ?? ""} · {user?.employee_code ?? ""}</p>
             </div>
             <div className="flex flex-wrap items-start gap-x-6 gap-y-3 sm:justify-end sm:gap-x-8">

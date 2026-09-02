@@ -1,4 +1,4 @@
-import type { NavigateFunction } from "react-router-dom";
+import type { NavigateFunction } from "react-router";
 import { logout } from "./authService";
 import type { AuthUser } from "./authService";
 

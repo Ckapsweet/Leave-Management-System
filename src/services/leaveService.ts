@@ -67,6 +67,7 @@ export interface LeaveRequest {
   user?: {
     id:            number;
     full_name:     string;
+    english_name?:  string | null;
     employee_code: string;
     department:    string;
     role:          UserRole;

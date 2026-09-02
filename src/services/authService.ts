@@ -7,6 +7,7 @@ export interface AuthUser {
   id: number;
   employee_code: string;
   full_name: string;
+  english_name?: string | null;
   department: string;
   role: UserRole;
   supervisor_id?: number | null;
@@ -31,6 +32,7 @@ export async function getMe(): Promise<AuthUser> {
 
 export async function updateProfile(data: {
   full_name: string;
+  english_name?: string | null;
   email?: string | null;
   email_2?: string | null;
   phone?: string | null;

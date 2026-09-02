@@ -7,6 +7,7 @@ export interface Employee {
   id: number;
   employee_code: string;
   full_name: string;
+  english_name?: string | null;
   department: string;
   role: string;
   supervisor_id?: number | null;

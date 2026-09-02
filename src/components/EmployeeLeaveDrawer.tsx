@@ -42,6 +42,7 @@ export function EmployeeLeaveDrawer({
             </div>
             <div>
               <h3 className="font-semibold text-gray-900 text-sm">{emp.full_name}</h3>
+              <p className="text-xs text-gray-500">{emp.english_name || "ยังไม่มีชื่ออังกฤษ"}</p>
               <p className="text-xs text-gray-400">{emp.department} · {emp.employee_code}</p>
             </div>
           </div>

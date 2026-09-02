@@ -50,6 +50,7 @@ export interface SuperAdminUser {
   id: number;
   employee_code: string;
   full_name: string;
+  english_name?: string | null;
   department: string | null;
   role: UserRole;
   supervisor_id: number | null;
@@ -92,6 +93,7 @@ export async function getSuperAdminUsers(params?: {
 export async function createUser(payload: {
   employee_code: string;
   full_name: string;
+  english_name?: string | null;
   department?: string;
   password: string;
   role: UserRole | string;
@@ -107,6 +109,10 @@ export async function createUser(payload: {
 
 export async function changeUserSupervisor(id: number, supervisor_id: number | null): Promise<void> {
   await api.patch(`/api/super-admin/users/${id}/supervisor`, { supervisor_id });
+}
+
+export async function changeUserEnglishName(id: number, english_name: string | null): Promise<void> {
+  await api.patch(`/api/super-admin/users/${id}/english-name`, { english_name });
 }
 
 export async function deleteUser(id: number): Promise<void> {
