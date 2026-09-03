@@ -86,7 +86,7 @@ function RequestRow({ req, onClick, onCancel }: { req: LeaveRequest; onClick: ()
           {isHourly && req.start_time && <p className="text-xs text-gray-400">{req.start_time} – {req.end_time} น.</p>}
         </div>
       </td>
-      <td className="px-5 py-4">
+      <td className="px-5 py-4"> 
         <div className="flex flex-col gap-1">
           <span className={`px-2.5 py-1 rounded-full text-xs font-medium w-fit ${typeColor}`}>{req.leave_type.name}</span>
           {isOffsite && <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium w-fit">ทำงานนอกสถานที่</span>}
