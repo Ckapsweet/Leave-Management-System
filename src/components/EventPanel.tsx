@@ -87,6 +87,7 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
     ...(event.participants ?? []).map((participant) => ({
       key: `user:${participant.id}`,
       full_name: participant.full_name,
+      english_name: participant.english_name,
       employee_code: participant.employee_code,
       department: participant.department,
     })),
@@ -99,10 +100,11 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
     ...attendance.map((item) => ({
       key: item.external_participant_id ? `external:${item.external_participant_id}` : `user:${item.user_id ?? 0}`,
       full_name: item.full_name ?? "",
+      english_name: item.english_name,
       employee_code: item.employee_code ?? "",
       department: item.department ?? "",
     })),
-  ].reduce<{ key: string; full_name: string; employee_code?: string | null; department?: string | null }[]>((unique, participant) => {
+  ].reduce<{ key: string; full_name: string; english_name?: string | null; employee_code?: string | null; department?: string | null }[]>((unique, participant) => {
     if (!participant.key || participant.key.endsWith(":0") || unique.some((item) => item.key === participant.key)) return unique;
     return [...unique, participant];
   }, []);
@@ -128,6 +130,7 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
         <td class="col-no">${index + 1}</td>
         <td class="employee-name">
           <div>${escapeHtml(participant.full_name || "-")}</div>
+          ${participant.english_name ? `<div class="muted">${escapeHtml(participant.english_name)}</div>` : ""}
         </td>
         ${dayCells}
         <td class="signature-cell"><span></span></td>
@@ -158,6 +161,7 @@ function printEventReport(event: WorkEvent, attendance: EventAttendance[]) {
           .col-no { width: 26px; }
           .employee-name { width: 150px; text-align: left; font-weight: 700; }
           .employee-name small { display: block; color: #6b7280; font-weight: 400; margin-top: 2px; }
+          .muted { color: #6b7280; font-weight: 400; margin-top: 2px; }
           .date-head { background: #dbeafe; }
           .time-head { background: #eef2ff; font-size: 8px; }
           .signature-head, .signature-cell { width: 58px; background: #eef2f7; font-weight: 700; }
@@ -532,6 +536,7 @@ function EventModal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{lead.full_name}</p>
+                          {lead.english_name && <p className="text-xs text-gray-500 truncate">{lead.english_name}</p>}
                           <p className="text-xs text-gray-400 truncate">{lead.department} / {lead.employee_code}</p>
                         </div>
                       </label>
@@ -596,6 +601,7 @@ function EventModal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{participant.full_name}</p>
+                          {participant.english_name && <p className="text-xs text-gray-500 truncate">{participant.english_name}</p>}
                           <p className="text-xs text-gray-400 truncate">
                             {participant.department} / {participant.employee_code}
                             {participant.selected_by_lead_name ? ` / Lead: ${participant.selected_by_lead_name}` : ""}
@@ -716,6 +722,7 @@ function EventModal({
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                           <div>
                             <p className="text-sm font-medium text-gray-800">{item.full_name} / {fmtDate(item.event_date)}</p>
+                            {item.english_name && <p className="text-xs text-gray-500">{item.english_name}</p>}
                             <p className="text-xs text-gray-400">เวลา {item.check_in_time?.slice(0, 5)} - {item.check_out_time?.slice(0, 5)}</p>
                             {!!item.attachments?.length && (
                               <div className="flex flex-wrap gap-2 mt-1">
@@ -833,6 +840,7 @@ function EventModal({
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{member.full_name}</p>
+                          {member.english_name && <p className="text-xs text-gray-500 truncate">{member.english_name}</p>}
                           <p className="text-xs text-gray-400 truncate">
                             {member.department} / {member.employee_code}
                             {"lead_name" in member && member.lead_name ? ` / Lead: ${member.lead_name}` : ""}

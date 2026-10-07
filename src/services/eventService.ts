@@ -54,6 +54,7 @@ export interface EventAttendance {
   status?: "draft" | "pending" | "approved" | "rejected";
   approval_comment?: string | null;
   full_name?: string;
+  english_name?: string | null;
   employee_code?: string;
   department?: string;
   approver_name?: string | null;

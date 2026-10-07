@@ -7,6 +7,7 @@ interface CreateUserModalProps {
   onSubmit: (data: {
     employee_code: string;
     full_name: string;
+    english_name?: string | null;
     department: string;
     password: string;
     role: UserRole;
@@ -19,6 +20,7 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
   const [form, setForm] = useState({
     employee_code: "",
     full_name: "",
+    english_name: "",
     department: "",
     password: "",
     role: "user" as UserRole,
@@ -67,6 +69,10 @@ export function CreateUserModal({ onSubmit, onClose, loading }: CreateUserModalP
               <label className="block text-xs font-medium text-gray-500 mb-1.5">ชื่อ-นามสกุล *</label>
               <input className={INPUT} placeholder="ชื่อ นามสกุล" value={form.full_name} onChange={(e) => set("full_name", e.target.value)} />
             </div>
+          </div>
+          <div className="text-[#000]">
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">English Name</label>
+            <input className={INPUT} placeholder="First Last" value={form.english_name} onChange={(e) => set("english_name", e.target.value)} />
           </div>
           <div className="text-[#000]">
             <label className="block text-xs font-medium text-gray-500 mb-1.5">แผนก</label>

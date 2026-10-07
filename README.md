@@ -97,4 +97,6 @@ settime มาเวลามา setครึ่งชั่วโมง
 admin re-set password
 1วัน = 7:30ชม
 type ลาสาย
+
+AWS Cloud Practitioner
 ```

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../../services/api";
 import type { LeaveStatus } from "../../services/leaveService";
 import { AddLeaveBalanceModal } from "../../components/AddLeaveBalanceModal";
-import { ToastContainer } from "../../components/Toast";
+import { ToastContainer, toast } from "../../components/Toast";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { DetailDrawer } from "../../components/DetailDrawer";
 import { EmployeeLeaveDrawer } from "../../components/EmployeeLeaveDrawer";
@@ -80,6 +80,7 @@ export default function AdminDashboard() {
 
   const {
     employees,
+    setEmployees,
     empLoading,
     empSearch,
     setEmpSearch,
@@ -105,6 +106,37 @@ export default function AdminDashboard() {
     departmentScope,
   });
   const employeesById = new Map(employees.map((employee) => [String(employee.id), employee]));
+  const [englishNameEditingId, setEnglishNameEditingId] = useState<number | null>(null);
+  const [englishNameDraft, setEnglishNameDraft] = useState("");
+  const [englishNameUpdatingId, setEnglishNameUpdatingId] = useState<number | null>(null);
+
+  const openEnglishNameEditor = (employee: (typeof employees)[number]) => {
+    setEnglishNameEditingId(employee.id);
+    setEnglishNameDraft(employee.english_name ?? "");
+  };
+
+  const cancelEnglishNameEditor = () => {
+    setEnglishNameEditingId(null);
+    setEnglishNameDraft("");
+  };
+
+  const handleUpdateEnglishName = async (employeeId: number) => {
+    const english_name = englishNameDraft.trim() || null;
+    setEnglishNameUpdatingId(employeeId);
+    try {
+      await api.patch(`/api/super-admin/users/${employeeId}/english-name`, { english_name });
+      setEmployees((prev) =>
+        prev.map((employee) => employee.id === employeeId ? { ...employee, english_name } : employee)
+      );
+      toast.success("อัปเดต English Name เรียบร้อย");
+      cancelEnglishNameEditor();
+    } catch (err) {
+      console.error("update english name failed", err);
+      toast.error("อัปเดต English Name ไม่สำเร็จ");
+    } finally {
+      setEnglishNameUpdatingId(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === "employees") fetchEmployees();
@@ -415,7 +447,7 @@ export default function AdminDashboard() {
                     <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                    placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..." value={empSearch}
+                    placeholder="ค้นหาชื่อ ไทย/อังกฤษ หรือ รหัสพนักงาน..." value={empSearch}
                     onChange={(e) => setEmpSearch(e.target.value)} />
                 </div>
                 <select className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-slate-300"
@@ -472,6 +504,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <div>
                                   <p className="text-sm font-medium text-gray-800 whitespace-nowrap">{emp.full_name}</p>
+                                  <p className="text-xs text-gray-500 whitespace-nowrap">{emp.english_name || "ยังไม่มีชื่ออังกฤษ"}</p>
                                   <p className="text-xs text-gray-400">{emp.department} · {emp.employee_code}</p>
                                 </div>
                               </div>
@@ -497,6 +530,44 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
+                                {user?.role === "manager" || user?.role === "admin" ? (
+                                  englishNameEditingId === emp.id ? (
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        className="w-36 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300"
+                                        placeholder="English Name"
+                                        value={englishNameDraft}
+                                        onChange={(e) => setEnglishNameDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter") handleUpdateEnglishName(emp.id);
+                                          if (e.key === "Escape") cancelEnglishNameEditor();
+                                        }}
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleUpdateEnglishName(emp.id)}
+                                        disabled={englishNameUpdatingId === emp.id}
+                                        className="px-2 py-1.5 text-xs bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
+                                      >
+                                        บันทึก
+                                      </button>
+                                      <button
+                                        onClick={cancelEnglishNameEditor}
+                                        disabled={englishNameUpdatingId === emp.id}
+                                        className="px-2 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                                      >
+                                        ยกเลิก
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => openEnglishNameEditor(emp)}
+                                      className="px-3 py-1.5 text-xs border border-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-50 font-medium whitespace-nowrap"
+                                    >
+                                      {emp.english_name ? "แก้ชื่ออังกฤษ" : "เพิ่มชื่ออังกฤษ"}
+                                    </button>
+                                  )
+                                ) : null}
                                 {canEditBalance && (
                                   <button
                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}

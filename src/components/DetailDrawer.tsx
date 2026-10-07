@@ -152,6 +152,7 @@ export function DetailDrawer({ request: req, onClose, onApprove, onReject, canAp
             </div>
             <div>
               <p className="font-semibold text-gray-900 text-sm">{req.user?.full_name}</p>
+              <p className="text-xs text-gray-500">{req.user?.english_name || "ยังไม่มีชื่ออังกฤษ"}</p>
               <p className="text-xs text-gray-500">{req.user?.department} · {req.user?.employee_code}</p>
             </div>
           </div>

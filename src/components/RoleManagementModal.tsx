@@ -7,6 +7,7 @@ export type ManageableRole = Exclude<UserRole, "admin">;
 export interface RoleCreateForm {
   employee_code: string;
   full_name: string;
+  english_name?: string | null;
   department: string;
   password: string;
   role: ManageableRole;
@@ -49,6 +50,7 @@ export function RoleManagementModal({
   const [createForm, setCreateForm] = useState<RoleCreateForm>({
     employee_code: "",
     full_name: "",
+    english_name: "",
     department: "",
     password: "",
     role: "user",
@@ -66,6 +68,7 @@ export function RoleManagementModal({
       [employee.full_name, employee.employee_code, employee.department, employee.role]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term))
+      || String(employee.english_name ?? "").toLowerCase().includes(term)
     );
   }, [employees, search]);
 
@@ -85,6 +88,7 @@ export function RoleManagementModal({
     setCreateForm({
       employee_code: "",
       full_name: "",
+      english_name: "",
       department: "",
       password: "",
       role: "user",
@@ -165,6 +169,12 @@ export function RoleManagementModal({
                 />
                 <input
                   className={INPUT}
+                  placeholder="English Name"
+                  value={createForm.english_name ?? ""}
+                  onChange={(event) => setCreate("english_name", event.target.value)}
+                />
+                <input
+                  className={INPUT}
                   list="role-management-departments"
                   placeholder="แผนก"
                   value={createForm.department}
@@ -231,6 +241,7 @@ export function RoleManagementModal({
                       <tr key={employee.id} className="hover:bg-slate-50/70">
                         <td className="px-5 py-4">
                           <p className="text-sm font-medium text-gray-800">{employee.full_name}</p>
+                          <p className="text-xs text-gray-500">{employee.english_name || "-"}</p>
                           <p className="text-xs text-gray-400">{employee.department} · {employee.employee_code}</p>
                         </td>
                         <td className="px-5 py-4">

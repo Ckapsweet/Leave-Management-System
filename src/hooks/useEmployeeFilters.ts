@@ -21,9 +21,12 @@ export function useEmployeeFilters(employees: EmployeeWithBalance[]) {
         const matchDepartment =
           empDeptFilter === "all" ||
           isSameDepartment(employee.department, empDeptFilter);
-        const query = empSearch.trim();
+        const query = empSearch.trim().toLowerCase();
         const matchSearch =
-          !query || employee.full_name.includes(query) || employee.employee_code.includes(query);
+          !query ||
+          employee.full_name.toLowerCase().includes(query) ||
+          String(employee.english_name ?? "").toLowerCase().includes(query) ||
+          employee.employee_code.toLowerCase().includes(query);
         return matchDepartment && matchSearch;
       }),
     [empDeptFilter, empSearch, employees]

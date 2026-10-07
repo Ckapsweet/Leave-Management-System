@@ -1,5 +1,5 @@
 // App.tsx
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import LoginPage from "./page/LoginPage";
 import Dashboard from "./page/Dashboard";
 import LeadDashboard from "./page/admin/LeadDashboard";

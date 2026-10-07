@@ -6,7 +6,7 @@ const { navigateMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(({ to }: { to: string }) => <div data-testid="navigate">{to}</div>),
 }));
 
-vi.mock("react-router-dom", () => ({
+vi.mock("react-router", () => ({
   Navigate: navigateMock,
 }));
 
