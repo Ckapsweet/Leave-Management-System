@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { getThisWeekLeaves, getTodayLeaves } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
 import { isSameDepartment } from "../services/leaveFilters";
+import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 
 interface TodayLeavesWidgetProps {
     departmentScope?: string | null;
@@ -14,6 +15,28 @@ function isSameId(a: number | string | null | undefined, b: number | string | nu
 
 function isOffsiteRequest(request: LeaveRequest) {
     return request.request_type === "offsite";
+}
+
+function formatThaiDate(value: string) {
+    return new Date(value).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function formatLeaveDateRange(request: LeaveRequest) {
+    const start = formatThaiDate(request.start_date);
+    const end = request.end_date ? formatThaiDate(request.end_date) : start;
+    return start === end ? start : `${start} – ${end}`;
+}
+
+function formatLeaveDuration(request: LeaveRequest) {
+    if (request.leave_unit === "hour") {
+        const time = request.start_time && request.end_time
+            ? `${request.start_time.slice(0, 5)}–${request.end_time.slice(0, 5)} น.`
+            : null;
+        const hours = request.total_hours ? formatLeaveHours(request.total_hours) : null;
+        return [time, hours && `(${hours})`].filter(Boolean).join(" ");
+    }
+    if (request.leave_unit === "half_day") return "ครึ่งวัน";
+    return request.total_days ? `(${formatLeaveDays(request.total_days)})` : "";
 }
 
 function filterByScope(
@@ -32,6 +55,7 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
     const [todayLeaves, setTodayLeaves] = useState<LeaveRequest[]>([]);
     const [weekLeaves, setWeekLeaves] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
 
     useEffect(() => {
         Promise.all([getTodayLeaves(), getThisWeekLeaves()])
@@ -59,9 +83,11 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
                 {leaves.map((req) => (
-                    <div
+                    <button
+                        type="button"
                         key={req.id}
-                        className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-slate-50"
+                        onClick={() => setSelectedLeave(req)}
+                        className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-slate-50 text-left cursor-pointer transition hover:border-indigo-200 hover:bg-indigo-50/40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     >
                         <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
                             {req.user?.full_name?.slice(0, 2) ?? "??"}
@@ -73,6 +99,11 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                                     ทำงานนอกสถานที่
                                 </span>
                             )}
+                            {req.start_date && (
+                                <p className="text-xs font-medium text-indigo-700">
+                                    {formatLeaveDateRange(req)} {formatLeaveDuration(req)}
+                                </p>
+                            )}
                             <p className="text-xs truncate text-gray-500">{req.user?.department}</p>
                             {req.user?.email && <p className="text-xs truncate text-gray-500">{req.user.email}</p>}
                             {req.user?.email_2 && <p className="text-xs truncate text-gray-500">{req.user.email_2}</p>}
@@ -83,7 +114,7 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                                 </p>
                             )}
                         </div>
-                    </div>
+                    </button>
                 ))}
             </div>
         );
@@ -106,6 +137,81 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                 </h3>
                 <div className="rounded-2xl border overflow-hidden bg-white border-gray-100">
                     {renderLeaves(weekLeaves, "ไม่มีผู้ลาในสัปดาห์นี้")}
+                </div>
+            </div>
+
+            {selectedLeave && <LeaveDetailModal request={selectedLeave} onClose={() => setSelectedLeave(null)} />}
+        </div>
+    );
+}
+
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+    if (!value) return null;
+    return (
+        <div className="flex gap-4 py-2 border-b border-gray-100 last:border-b-0">
+            <span className="w-28 flex-shrink-0 text-sm text-gray-500">{label}</span>
+            <span className="flex-1 min-w-0 text-sm font-medium text-gray-900 break-words whitespace-pre-wrap">{value}</span>
+        </div>
+    );
+}
+
+function LeaveDetailModal({ request, onClose }: { request: LeaveRequest; onClose: () => void }) {
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", onKeyDown);
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [onClose]);
+
+    const duration = formatLeaveDuration(request).replace(/^\((.*)\)$/, "$1");
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+            <div role="dialog" aria-modal="true" className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
+                        {request.user?.full_name?.slice(0, 2) ?? "??"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-semibold text-gray-900">{request.user?.full_name}</h3>
+                        <p className="text-sm text-gray-500">{request.user?.department}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="ปิด"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="px-6 py-5 space-y-4">
+                    <div className="rounded-xl bg-indigo-50 px-4 py-3">
+                        <p className="text-xs font-medium text-indigo-500">วันที่ลา</p>
+                        <p className="text-base font-semibold text-indigo-800">{formatLeaveDateRange(request)}</p>
+                        {duration && <p className="text-sm text-indigo-700">{duration}</p>}
+                    </div>
+
+                    <div>
+                        <DetailRow label="ประเภท" value={isOffsiteRequest(request) ? "ทำงานนอกสถานที่" : request.leave_type?.name} />
+                        <DetailRow label="หมายเหตุ" value={request.reason} />
+                        <DetailRow label="อีเมล" value={request.user?.email} />
+                        <DetailRow label="อีเมลสำรอง" value={request.user?.email_2} />
+                        <DetailRow label="เบอร์โทร" value={request.user?.phone} />
+                    </div>
+                </div>
+
+                <div className="px-6 pb-6 flex justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-xl bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                    >
+                        ปิด
+                    </button>
                 </div>
             </div>
         </div>
