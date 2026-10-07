@@ -108,9 +108,9 @@ export default function OverviewDashboard() {
 
     // ---- Role Update State (NEW) ----
     const [roleUpdatingId, setRoleUpdatingId] = useState<number | null>(null);
-    const [englishNameEditingId, setEnglishNameEditingId] = useState<number | null>(null);
-    const [englishNameDraft, setEnglishNameDraft] = useState("");
-    const [englishNameUpdatingId, setEnglishNameUpdatingId] = useState<number | null>(null);
+    const [nameEditTarget, setNameEditTarget] = useState<EmployeeWithBalance | null>(null);
+    const [nameForm, setNameForm] = useState({ full_name: "", english_name: "" });
+    const [nameSaving, setNameSaving] = useState(false);
     const [resetPasswordTarget, setResetPasswordTarget] = useState<EmployeeWithBalance | null>(null);
     const [resetPasswordForm, setResetPasswordForm] = useState({ password: "", confirm: "" });
     const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
@@ -486,33 +486,39 @@ export default function OverviewDashboard() {
         }
     };
 
-    const openEnglishNameEditor = (employee: EmployeeWithBalance) => {
-        setEnglishNameEditingId(employee.id);
-        setEnglishNameDraft(employee.english_name ?? "");
+    const openNameEditor = (employee: EmployeeWithBalance) => {
+        setNameEditTarget(employee);
+        setNameForm({ full_name: employee.full_name, english_name: employee.english_name ?? "" });
     };
 
-    const cancelEnglishNameEditor = () => {
-        setEnglishNameEditingId(null);
-        setEnglishNameDraft("");
+    const closeNameEditor = () => {
+        if (nameSaving) return;
+        setNameEditTarget(null);
     };
 
-    const handleUpdateEnglishName = async (employeeId: number) => {
-        const english_name = englishNameDraft.trim() || null;
-        setEnglishNameUpdatingId(employeeId);
+    const handleUpdateName = async () => {
+        if (!nameEditTarget || nameSaving) return;
+        const full_name = nameForm.full_name.trim();
+        const english_name = nameForm.english_name.trim() || null;
+        if (!full_name) {
+            toast.error("กรุณาระบุชื่อภาษาไทย");
+            return;
+        }
+        const employeeId = nameEditTarget.id;
+        setNameSaving(true);
         try {
-            await api.patch(`/api/super-admin/users/${employeeId}/english-name`, { english_name });
-            setEmployees((prev) => prev.map((employee) =>
-                employee.id === employeeId ? { ...employee, english_name } : employee
-            ));
-            setAllUsers((prev) => prev.map((employee) =>
-                employee.id === employeeId ? { ...employee, english_name } : employee
-            ));
-            toast.success("อัปเดต English Name เรียบร้อย");
-            cancelEnglishNameEditor();
+            await api.patch(`/api/super-admin/users/${employeeId}/name`, { full_name, english_name });
+            const applyName = <T extends { id: number }>(employee: T): T =>
+                employee.id === employeeId ? { ...employee, full_name, english_name } : employee;
+            setEmployees((prev) => prev.map(applyName));
+            setAllUsers((prev) => prev.map(applyName));
+            setSelectedEmployee((prev) => (prev ? applyName(prev) : prev));
+            toast.success("อัปเดตชื่อเรียบร้อย");
+            setNameEditTarget(null);
         } catch (err: any) {
-            toast.error(err.response?.data?.message || "อัปเดต English Name ไม่สำเร็จ");
+            toast.error(err.response?.data?.message || "อัปเดตชื่อไม่สำเร็จ");
         } finally {
-            setEnglishNameUpdatingId(null);
+            setNameSaving(false);
         }
     };
 
@@ -778,6 +784,70 @@ export default function OverviewDashboard() {
                     log={selectedLog}
                     onClose={() => setSelectedLog(null)}
                 />
+            )}
+            {nameEditTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" onClick={closeNameEditor} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+                        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-900">แก้ไขชื่อพนักงาน</h3>
+                                <p className="text-xs text-gray-400">{nameEditTarget.employee_code} · {nameEditTarget.department}</p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">ชื่อ-นามสกุล (ไทย) *</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    value={nameForm.full_name}
+                                    maxLength={255}
+                                    onChange={(e) => setNameForm((form) => ({ ...form, full_name: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleUpdateName();
+                                        if (e.key === "Escape") closeNameEditor();
+                                    }}
+                                    autoFocus
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">ชื่อภาษาอังกฤษ</label>
+                                <input
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 bg-white text-gray-800"
+                                    placeholder="First Last"
+                                    value={nameForm.english_name}
+                                    maxLength={255}
+                                    onChange={(e) => setNameForm((form) => ({ ...form, english_name: e.target.value }))}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleUpdateName();
+                                        if (e.key === "Escape") closeNameEditor();
+                                    }}
+                                />
+                            </div>
+                        </div>
+                        <div className="px-6 pb-6 flex gap-3 justify-end">
+                            <button
+                                onClick={closeNameEditor}
+                                disabled={nameSaving}
+                                className="px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 font-medium disabled:opacity-50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleUpdateName}
+                                disabled={nameSaving || !nameForm.full_name.trim()}
+                                className="px-4 py-2.5 text-sm bg-slate-800 text-white rounded-xl hover:bg-slate-700 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {nameSaving ? "กำลังบันทึก..." : "บันทึก"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
             {resetPasswordTarget && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1428,42 +1498,12 @@ export default function OverviewDashboard() {
                                                         </td>
                                                         <td className="px-5 py-4" onClick={(e) => e.stopPropagation()}>
                                                             <div className="flex items-center gap-2">
-                                                                {englishNameEditingId === emp.id ? (
-                                                                    <div className="flex items-center gap-1">
-                                                                        <input
-                                                                            className="w-36 border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300"
-                                                                            placeholder="English Name"
-                                                                            value={englishNameDraft}
-                                                                            onChange={(e) => setEnglishNameDraft(e.target.value)}
-                                                                            onKeyDown={(e) => {
-                                                                                if (e.key === "Enter") handleUpdateEnglishName(emp.id);
-                                                                                if (e.key === "Escape") cancelEnglishNameEditor();
-                                                                            }}
-                                                                            autoFocus
-                                                                        />
-                                                                        <button
-                                                                            onClick={() => handleUpdateEnglishName(emp.id)}
-                                                                            disabled={englishNameUpdatingId === emp.id}
-                                                                            className="px-2 py-1.5 text-xs bg-slate-800 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
-                                                                        >
-                                                                            บันทึก
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={cancelEnglishNameEditor}
-                                                                            disabled={englishNameUpdatingId === emp.id}
-                                                                            className="px-2 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                                                                        >
-                                                                            ยกเลิก
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => openEnglishNameEditor(emp)}
-                                                                        className="px-3 py-1.5 text-xs border border-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-50 font-medium whitespace-nowrap"
-                                                                    >
-                                                                        {emp.english_name ? "แก้ชื่ออังกฤษ" : "เพิ่มชื่ออังกฤษ"}
-                                                                    </button>
-                                                                )}
+                                                                <button
+                                                                    onClick={() => openNameEditor(emp)}
+                                                                    className="px-3 py-1.5 text-xs border border-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-50 font-medium whitespace-nowrap"
+                                                                >
+                                                                    แก้ไขชื่อ
+                                                                </button>
                                                                 <button
                                                                     onClick={() => openBalanceModal({ id: emp.id, full_name: emp.full_name, employee_code: emp.employee_code, department: emp.department })}
                                                                     className="px-3 py-1.5 text-xs border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 font-medium whitespace-nowrap">
