@@ -9,6 +9,12 @@ interface TodayLeavesWidgetProps {
     supervisorScopeId?: number | string | null;
 }
 
+interface LeaveGroup {
+    key: string;
+    user: LeaveRequest["user"];
+    requests: LeaveRequest[];
+}
+
 function isSameId(a: number | string | null | undefined, b: number | string | null | undefined) {
     return a != null && b != null && String(a) === String(b);
 }
@@ -39,6 +45,10 @@ function formatLeaveDuration(request: LeaveRequest) {
     return request.total_days ? `(${formatLeaveDays(request.total_days)})` : "";
 }
 
+function leaveTypeLabel(request: LeaveRequest) {
+    return isOffsiteRequest(request) ? "ทำงานนอกสถานที่" : request.leave_type?.name;
+}
+
 function filterByScope(
     leaves: LeaveRequest[],
     departmentScope?: string | null,
@@ -51,23 +61,38 @@ function filterByScope(
     );
 }
 
+// รวมรายการลาของคนเดียวกันไว้ในการ์ดเดียว เช่น ลานอกสถานที่วันที่ 10 และ 13
+function groupByUser(leaves: LeaveRequest[]): LeaveGroup[] {
+    const groups = new Map<string, LeaveGroup>();
+    leaves.forEach((leave) => {
+        const key = String(leave.user_id ?? leave.user?.id ?? `request-${leave.id}`);
+        const group = groups.get(key);
+        if (group) group.requests.push(leave);
+        else groups.set(key, { key, user: leave.user, requests: [leave] });
+    });
+    return Array.from(groups.values()).map((group) => ({
+        ...group,
+        requests: [...group.requests].sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))),
+    }));
+}
+
 export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = null }: TodayLeavesWidgetProps) {
-    const [todayLeaves, setTodayLeaves] = useState<LeaveRequest[]>([]);
-    const [weekLeaves, setWeekLeaves] = useState<LeaveRequest[]>([]);
+    const [todayLeaves, setTodayLeaves] = useState<LeaveGroup[]>([]);
+    const [weekLeaves, setWeekLeaves] = useState<LeaveGroup[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedLeave, setSelectedLeave] = useState<LeaveRequest | null>(null);
+    const [selectedGroup, setSelectedGroup] = useState<LeaveGroup | null>(null);
 
     useEffect(() => {
         Promise.all([getTodayLeaves(), getThisWeekLeaves()])
             .then(([today, week]) => {
-                setTodayLeaves(filterByScope(today, departmentScope, supervisorScopeId));
-                setWeekLeaves(filterByScope(week, departmentScope, supervisorScopeId));
+                setTodayLeaves(groupByUser(filterByScope(today, departmentScope, supervisorScopeId)));
+                setWeekLeaves(groupByUser(filterByScope(week, departmentScope, supervisorScopeId)));
             })
             .catch((err) => console.error("Failed to load department leaves", err))
             .finally(() => setLoading(false));
     }, [departmentScope, supervisorScopeId]);
 
-    const renderLeaves = (leaves: LeaveRequest[], emptyText: string) => {
+    const renderLeaves = (groups: LeaveGroup[], emptyText: string) => {
         if (loading) {
             return (
                 <div className="py-8 flex justify-center">
@@ -76,46 +101,50 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
             );
         }
 
-        if (leaves.length === 0) {
+        if (groups.length === 0) {
             return <div className="py-8 text-center text-sm text-gray-400">{emptyText}</div>;
         }
 
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-                {leaves.map((req) => (
-                    <button
-                        type="button"
-                        key={req.id}
-                        onClick={() => setSelectedLeave(req)}
-                        className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-slate-50 text-left cursor-pointer transition hover:border-indigo-200 hover:bg-indigo-50/40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    >
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
-                            {req.user?.full_name?.slice(0, 2) ?? "??"}
-                        </div>
-                        <div className="flex-1 min-w-0 space-y-0.5">
-                            <p className="text-sm font-semibold truncate text-gray-900">{req.user?.full_name}</p>
-                            {isOffsiteRequest(req) && (
-                                <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                    ทำงานนอกสถานที่
-                                </span>
-                            )}
-                            {req.start_date && (
-                                <p className="text-xs font-medium text-indigo-700">
-                                    {formatLeaveDateRange(req)} {formatLeaveDuration(req)}
-                                </p>
-                            )}
-                            <p className="text-xs truncate text-gray-500">{req.user?.department}</p>
-                            {req.user?.email && <p className="text-xs truncate text-gray-500">{req.user.email}</p>}
-                            {req.user?.email_2 && <p className="text-xs truncate text-gray-500">{req.user.email_2}</p>}
-                            {req.user?.phone && <p className="text-xs truncate text-gray-500">{req.user.phone}</p>}
-                            {req.reason && (
-                                <p className="text-xs leading-5 text-gray-500">
-                                    <span className="font-medium text-gray-600">หมายเหตุ:</span> {req.reason}
-                                </p>
-                            )}
-                        </div>
-                    </button>
-                ))}
+                {groups.map((group) => {
+                    const { user, requests } = group;
+                    const reasons = Array.from(new Set(requests.map((req) => req.reason).filter(Boolean)));
+                    return (
+                        <button
+                            type="button"
+                            key={group.key}
+                            onClick={() => setSelectedGroup(weekLeaves.find((weekGroup) => weekGroup.key === group.key) ?? group)}
+                            className="flex items-start gap-3 p-3 rounded-xl border border-gray-100 bg-slate-50 text-left cursor-pointer transition hover:border-indigo-200 hover:bg-indigo-50/40 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        >
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
+                                {user?.full_name?.slice(0, 2) ?? "??"}
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-0.5">
+                                <p className="text-sm font-semibold truncate text-gray-900">{user?.full_name}</p>
+                                {requests.some(isOffsiteRequest) && (
+                                    <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                        ทำงานนอกสถานที่
+                                    </span>
+                                )}
+                                {requests.filter((req) => req.start_date).map((req) => (
+                                    <p key={req.id} className="text-xs font-medium text-indigo-700">
+                                        {formatLeaveDateRange(req)} {formatLeaveDuration(req)}
+                                    </p>
+                                ))}
+                                <p className="text-xs truncate text-gray-500">{user?.department}</p>
+                                {user?.email && <p className="text-xs truncate text-gray-500">{user.email}</p>}
+                                {user?.email_2 && <p className="text-xs truncate text-gray-500">{user.email_2}</p>}
+                                {user?.phone && <p className="text-xs truncate text-gray-500">{user.phone}</p>}
+                                {reasons.length > 0 && (
+                                    <p className="text-xs leading-5 text-gray-500">
+                                        <span className="font-medium text-gray-600">หมายเหตุ:</span> {reasons.join(", ")}
+                                    </p>
+                                )}
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
         );
     };
@@ -140,7 +169,7 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                 </div>
             </div>
 
-            {selectedLeave && <LeaveDetailModal request={selectedLeave} onClose={() => setSelectedLeave(null)} />}
+            {selectedGroup && <LeaveDetailModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />}
         </div>
     );
 }
@@ -155,7 +184,7 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
     );
 }
 
-function LeaveDetailModal({ request, onClose }: { request: LeaveRequest; onClose: () => void }) {
+function LeaveDetailModal({ group, onClose }: { group: LeaveGroup; onClose: () => void }) {
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") onClose();
@@ -164,7 +193,7 @@ function LeaveDetailModal({ request, onClose }: { request: LeaveRequest; onClose
         return () => window.removeEventListener("keydown", onKeyDown);
     }, [onClose]);
 
-    const duration = formatLeaveDuration(request).replace(/^\((.*)\)$/, "$1");
+    const { user, requests } = group;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -172,11 +201,11 @@ function LeaveDetailModal({ request, onClose }: { request: LeaveRequest; onClose
             <div role="dialog" aria-modal="true" className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
                 <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start gap-3">
                     <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 bg-indigo-100 text-indigo-700">
-                        {request.user?.full_name?.slice(0, 2) ?? "??"}
+                        {user?.full_name?.slice(0, 2) ?? "??"}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900">{request.user?.full_name}</h3>
-                        <p className="text-sm text-gray-500">{request.user?.department}</p>
+                        <h3 className="text-lg font-semibold text-gray-900">{user?.full_name}</h3>
+                        <p className="text-sm text-gray-500">{user?.department}</p>
                     </div>
                     <button
                         type="button"
@@ -189,18 +218,33 @@ function LeaveDetailModal({ request, onClose }: { request: LeaveRequest; onClose
                 </div>
 
                 <div className="px-6 py-5 space-y-4">
-                    <div className="rounded-xl bg-indigo-50 px-4 py-3">
-                        <p className="text-xs font-medium text-indigo-500">วันที่ลา</p>
-                        <p className="text-base font-semibold text-indigo-800">{formatLeaveDateRange(request)}</p>
-                        {duration && <p className="text-sm text-indigo-700">{duration}</p>}
+                    <div className="space-y-2">
+                        <p className="text-xs font-medium text-gray-500">
+                            วันที่ลา{requests.length > 1 ? ` (${requests.length} รายการ)` : ""}
+                        </p>
+                        {requests.map((request) => {
+                            const duration = formatLeaveDuration(request).replace(/^\((.*)\)$/, "$1");
+                            const type = leaveTypeLabel(request);
+                            return (
+                                <div key={request.id} className="rounded-xl bg-indigo-50 px-4 py-3">
+                                    <p className="text-base font-semibold text-indigo-800">{formatLeaveDateRange(request)}</p>
+                                    {(duration || type) && (
+                                        <p className="text-sm text-indigo-700">{[type, duration].filter(Boolean).join(" · ")}</p>
+                                    )}
+                                    {request.reason && (
+                                        <p className="mt-1 text-sm text-gray-600 break-words whitespace-pre-wrap">
+                                            <span className="font-medium">หมายเหตุ:</span> {request.reason}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     <div>
-                        <DetailRow label="ประเภท" value={isOffsiteRequest(request) ? "ทำงานนอกสถานที่" : request.leave_type?.name} />
-                        <DetailRow label="หมายเหตุ" value={request.reason} />
-                        <DetailRow label="อีเมล" value={request.user?.email} />
-                        <DetailRow label="อีเมลสำรอง" value={request.user?.email_2} />
-                        <DetailRow label="เบอร์โทร" value={request.user?.phone} />
+                        <DetailRow label="อีเมล" value={user?.email} />
+                        <DetailRow label="อีเมลสำรอง" value={user?.email_2} />
+                        <DetailRow label="เบอร์โทร" value={user?.phone} />
                     </div>
                 </div>
 
