@@ -6,7 +6,7 @@ import { readStoredUser } from "../services/authSession";
 import type { AuthUser } from "../services/authService";
 import { isSameDepartment } from "../services/leaveFilters";
 import { formatLeaveDateRange, formatLeaveDuration, isOffsiteRequest, leaveTypeLabel, leaveUserKey, toDateKey } from "./leaveDisplay";
-import { LeaveWeekCalendar } from "./LeaveWeekCalendar";
+import { CALENDAR_DAYS, LeaveWeekCalendar } from "./LeaveWeekCalendar";
 
 interface TodayLeavesWidgetProps {
     departmentScope?: string | null;
@@ -73,7 +73,7 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
     const [currentUser] = useState(() => readStoredUser());
 
     const fetchGroups = useCallback(async () => {
-        const [today, week] = await Promise.all([getTodayLeaves(), getThisWeekLeaves()]);
+        const [today, week] = await Promise.all([getTodayLeaves(), getThisWeekLeaves(CALENDAR_DAYS)]);
         return {
             todayGroups: groupByUser(filterByScope(today, departmentScope, supervisorScopeId)),
             weekGroups: groupByUser(filterByScope(week, departmentScope, supervisorScopeId)),

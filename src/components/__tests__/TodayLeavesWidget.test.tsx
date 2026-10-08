@@ -90,6 +90,9 @@ describe("TodayLeavesWidget calendar", () => {
     expect(within(day13).getByText("ไม่มีผู้ลา")).toBeInTheDocument();
     expect(within(day14).getByRole("button", { name: /นายธีรพงศ์/ })).toBeInTheDocument();
     expect(screen.getByTestId("calendar-day-2026-10-10")).toHaveTextContent("วันนี้");
+    expect(screen.getByTestId("calendar-day-2026-10-23")).toBeInTheDocument();
+    expect(screen.queryByTestId("calendar-day-2026-10-24")).not.toBeInTheDocument();
+    expect(getThisWeekLeaves).toHaveBeenCalledWith(14);
   });
 
   it("opens a printable report", async () => {

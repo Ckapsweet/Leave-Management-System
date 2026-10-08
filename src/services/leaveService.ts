@@ -148,8 +148,8 @@ export async function getTodayLeaves(): Promise<LeaveRequest[]> {
   return res.data;
 }
 
-export async function getThisWeekLeaves(): Promise<LeaveRequest[]> {
-  const res = await api.get("/api/leave-requests/week");
+export async function getThisWeekLeaves(days?: number): Promise<LeaveRequest[]> {
+  const res = await api.get("/api/leave-requests/week", days ? { params: { days } } : undefined);
   return res.data;
 }
 
