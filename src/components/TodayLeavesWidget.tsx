@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import dayjs from "dayjs";
 import { getThisWeekLeaves, getTodayLeaves, updateAdminLeaveRequest, updateMyOffsiteRequest } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
 import { readStoredUser } from "../services/authSession";
 import type { AuthUser } from "../services/authService";
 import { isSameDepartment } from "../services/leaveFilters";
-import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
+import { formatLeaveDateRange, formatLeaveDuration, isOffsiteRequest, leaveTypeLabel, leaveUserKey, toDateKey } from "./leaveDisplay";
+import { LeaveWeekCalendar } from "./LeaveWeekCalendar";
 
 interface TodayLeavesWidgetProps {
     departmentScope?: string | null;
@@ -22,32 +23,6 @@ function isSameId(a: number | string | null | undefined, b: number | string | nu
     return a != null && b != null && String(a) === String(b);
 }
 
-function isOffsiteRequest(request: LeaveRequest) {
-    return request.request_type === "offsite";
-}
-
-function formatThaiDate(value: string) {
-    return new Date(value).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatLeaveDateRange(request: LeaveRequest) {
-    const start = formatThaiDate(request.start_date);
-    const end = request.end_date ? formatThaiDate(request.end_date) : start;
-    return start === end ? start : `${start} – ${end}`;
-}
-
-function formatLeaveDuration(request: LeaveRequest) {
-    if (request.leave_unit === "hour") {
-        const time = request.start_time && request.end_time
-            ? `${request.start_time.slice(0, 5)}–${request.end_time.slice(0, 5)} น.`
-            : null;
-        const hours = request.total_hours ? formatLeaveHours(request.total_hours) : null;
-        return [time, hours && `(${hours})`].filter(Boolean).join(" ");
-    }
-    if (request.leave_unit === "half_day") return "ครึ่งวัน";
-    return request.total_days ? `(${formatLeaveDays(request.total_days)})` : "";
-}
-
 // ผู้ดูแลแก้ได้ทุกรายการ (ผ่าน API admin ที่ปรับยอดวันลาให้) ส่วนเจ้าของแก้ได้เฉพาะรายการนอกสถานที่ของตัวเอง
 const LEAVE_EDITOR_ROLES = ["admin", "manager", "hr"];
 
@@ -61,14 +36,6 @@ function isOwnOffsite(request: LeaveRequest, user: AuthUser | null) {
 
 function canEditRequest(request: LeaveRequest, user: AuthUser | null) {
     return isLeaveEditor(user) || isOwnOffsite(request, user);
-}
-
-function toDateInput(value?: string | null) {
-    return value ? dayjs(value).format("YYYY-MM-DD") : "";
-}
-
-function leaveTypeLabel(request: LeaveRequest) {
-    return isOffsiteRequest(request) ? "ทำงานนอกสถานที่" : request.leave_type?.name;
 }
 
 function filterByScope(
@@ -87,7 +54,7 @@ function filterByScope(
 function groupByUser(leaves: LeaveRequest[]): LeaveGroup[] {
     const groups = new Map<string, LeaveGroup>();
     leaves.forEach((leave) => {
-        const key = String(leave.user_id ?? leave.user?.id ?? `request-${leave.id}`);
+        const key = leaveUserKey(leave);
         const group = groups.get(key);
         if (group) group.requests.push(leave);
         else groups.set(key, { key, user: leave.user, requests: [leave] });
@@ -130,6 +97,8 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
         setWeekLeaves(weekGroups);
         setSelectedGroup(weekGroups.find((group) => group.key === key) ?? todayGroups.find((group) => group.key === key) ?? null);
     };
+
+    const weekRequests = useMemo(() => weekLeaves.flatMap((group) => group.requests), [weekLeaves]);
 
     const renderLeaves = (groups: LeaveGroup[], emptyText: string) => {
         if (loading) {
@@ -201,14 +170,11 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                 </div>
             </div>
 
-            <div>
-                <h3 className="text-sm font-semibold uppercase tracking-wider mb-3 px-1 flex items-center gap-2 text-gray-500">
-                    ผู้ที่ลาในสัปดาห์นี้
-                </h3>
-                <div className="rounded-2xl border overflow-hidden bg-white border-gray-100">
-                    {renderLeaves(weekLeaves, "ไม่มีผู้ลาในสัปดาห์นี้")}
-                </div>
-            </div>
+            <LeaveWeekCalendar
+                requests={weekRequests}
+                loading={loading}
+                onSelectUser={(key) => setSelectedGroup(weekLeaves.find((group) => group.key === key) ?? null)}
+            />
 
             {selectedGroup && (
                 <LeaveDetailModal
@@ -278,8 +244,8 @@ function LeaveEditForm({
 }) {
     const singleDay = request.leave_unit === "hour" || request.leave_unit === "half_day";
     const [draft, setDraft] = useState<LeaveDraft>({
-        start_date: toDateInput(request.start_date),
-        end_date: toDateInput(request.end_date || request.start_date),
+        start_date: toDateKey(request.start_date),
+        end_date: toDateKey(request.end_date || request.start_date),
         reason: request.reason ?? "",
     });
     const [saving, setSaving] = useState(false);

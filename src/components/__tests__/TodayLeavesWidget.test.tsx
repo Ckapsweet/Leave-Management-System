@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TodayLeavesWidget } from "../TodayLeavesWidget";
@@ -67,8 +67,49 @@ async function openPopup() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 10, 9, 0, 0));
   getTodayLeaves.mockResolvedValue([]);
   getThisWeekLeaves.mockResolvedValue([makeLeave(1, "2026-10-12"), makeLeave(2, "2026-10-14")]);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("TodayLeavesWidget calendar", () => {
+  it("lists each person under every day they are away", async () => {
+    asUser({ id: 99, role: "user" });
+    render(<TodayLeavesWidget />);
+
+    const day12 = await screen.findByTestId("calendar-day-2026-10-12");
+    const day13 = screen.getByTestId("calendar-day-2026-10-13");
+    const day14 = screen.getByTestId("calendar-day-2026-10-14");
+    expect(within(day12).getByRole("button", { name: /นายธีรพงศ์/ })).toBeInTheDocument();
+    expect(within(day13).queryByRole("button", { name: /นายธีรพงศ์/ })).not.toBeInTheDocument();
+    expect(within(day13).getByText("ไม่มีผู้ลา")).toBeInTheDocument();
+    expect(within(day14).getByRole("button", { name: /นายธีรพงศ์/ })).toBeInTheDocument();
+    expect(screen.getByTestId("calendar-day-2026-10-10")).toHaveTextContent("วันนี้");
+  });
+
+  it("opens a printable report", async () => {
+    asUser({ id: 99, role: "user" });
+    const doc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const win = { document: doc, focus: vi.fn(), print: vi.fn(), setTimeout: (fn: () => void) => fn() };
+    const open = vi.spyOn(window, "open").mockReturnValue(win as unknown as Window);
+    render(<TodayLeavesWidget />);
+    await screen.findByTestId("calendar-day-2026-10-12");
+
+    await userEvent.click(screen.getByRole("button", { name: /พิมพ์รายงาน/ }));
+
+    expect(open).toHaveBeenCalled();
+    const html = doc.write.mock.calls[0][0] as string;
+    expect(html).toContain("รายงานผู้ลา");
+    expect(html).toContain("MKT-0018");
+    expect(html).toContain("ไม่มีผู้ลา");
+    expect(win.print).toHaveBeenCalled();
+    open.mockRestore();
+  });
 });
 
 describe("TodayLeavesWidget popup", () => {
