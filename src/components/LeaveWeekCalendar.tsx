@@ -5,7 +5,8 @@ import { coversDate, formatLeaveDuration, isOffsiteRequest, leaveTypeLabel, leav
 import { printLeaveReport } from "./leaveReport";
 import type { LeaveReportDay } from "./leaveReport";
 
-const DAYS_IN_VIEW = 7;
+// แสดงวันนี้ + 13 วันข้างหน้า (2 สัปดาห์)
+export const CALENDAR_DAYS = 14;
 
 interface LeaveWeekCalendarProps {
     requests: LeaveRequest[];
@@ -22,10 +23,10 @@ function chipTone(request: LeaveRequest) {
 export function LeaveWeekCalendar({ requests, loading, onSelectUser }: LeaveWeekCalendarProps) {
     const [printBlocked, setPrintBlocked] = useState(false);
 
-    // วันนี้ + 6 วันข้างหน้า แต่ละวันมีรายการลาที่ครอบคลุมวันนั้น
+    // แต่ละวันมีรายการลาที่ครอบคลุมวันนั้น
     const days: LeaveReportDay[] = useMemo(() => {
         const today = dayjs();
-        return Array.from({ length: DAYS_IN_VIEW }, (_, index) => {
+        return Array.from({ length: CALENDAR_DAYS }, (_, index) => {
             const date = today.add(index, "day").format("YYYY-MM-DD");
             const dayRequests = requests
                 .filter((request) => coversDate(request, date))
@@ -44,7 +45,7 @@ export function LeaveWeekCalendar({ requests, loading, onSelectUser }: LeaveWeek
         <div>
             <div className="mb-3 px-1 flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
-                    ผู้ที่ลาในสัปดาห์นี้ <span className="normal-case font-normal text-gray-400">({rangeLabel})</span>
+                    ผู้ที่ลาใน 2 สัปดาห์นี้ <span className="normal-case font-normal text-gray-400">({rangeLabel})</span>
                 </h3>
                 <button
                     type="button"
@@ -70,7 +71,7 @@ export function LeaveWeekCalendar({ requests, loading, onSelectUser }: LeaveWeek
                         <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 divide-y sm:divide-y-0 divide-gray-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-px bg-gray-100">
                         {days.map((day, index) => {
                             const date = dayjs(day.date);
                             const isToday = index === 0;
@@ -79,7 +80,7 @@ export function LeaveWeekCalendar({ requests, loading, onSelectUser }: LeaveWeek
                                 <div
                                     key={day.date}
                                     data-testid={`calendar-day-${day.date}`}
-                                    className={`flex min-h-[9rem] flex-col border-gray-100 sm:border-r sm:border-b lg:border-b-0 last:border-r-0 ${isToday ? "bg-indigo-50/60" : isWeekend ? "bg-gray-50" : ""}`}
+                                    className={`flex min-h-[9rem] flex-col ${isToday ? "bg-indigo-50" : isWeekend ? "bg-gray-50" : "bg-white"}`}
                                 >
                                     <div className="flex items-center justify-between px-3 pt-3 pb-2">
                                         <div>
