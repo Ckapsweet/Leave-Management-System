@@ -276,6 +276,14 @@ export async function updateAdminLeaveRequest(
   return res.data;
 }
 
+// เจ้าของแก้วันที่/หมายเหตุของรายการทำงานนอกสถานที่ของตัวเอง
+export async function updateMyOffsiteRequest(
+  id: number,
+  payload: { start_date: string; end_date: string; reason: string }
+): Promise<void> {
+  await api.patch(`/api/leave-requests/${id}`, payload);
+}
+
 export async function cancelLeaveRequest(id: number): Promise<void> {
   await api.delete(`/api/leave-requests/${id}`);
 }
