@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
-import { getThisWeekLeaves, getTodayLeaves } from "../services/leaveService";
+import { useState, useEffect, useCallback } from "react";
+import dayjs from "dayjs";
+import { getThisWeekLeaves, getTodayLeaves, updateAdminLeaveRequest, updateMyOffsiteRequest } from "../services/leaveService";
 import type { LeaveRequest } from "../services/leaveService";
+import { readStoredUser } from "../services/authSession";
+import type { AuthUser } from "../services/authService";
 import { isSameDepartment } from "../services/leaveFilters";
 import { formatLeaveDays, formatLeaveHours } from "../services/leaveTime";
 
@@ -45,6 +48,25 @@ function formatLeaveDuration(request: LeaveRequest) {
     return request.total_days ? `(${formatLeaveDays(request.total_days)})` : "";
 }
 
+// ผู้ดูแลแก้ได้ทุกรายการ (ผ่าน API admin ที่ปรับยอดวันลาให้) ส่วนเจ้าของแก้ได้เฉพาะรายการนอกสถานที่ของตัวเอง
+const LEAVE_EDITOR_ROLES = ["admin", "manager", "hr"];
+
+function isLeaveEditor(user: AuthUser | null) {
+    return !!user && LEAVE_EDITOR_ROLES.includes(user.role);
+}
+
+function isOwnOffsite(request: LeaveRequest, user: AuthUser | null) {
+    return !!user && isOffsiteRequest(request) && isSameId(request.user_id, user.id);
+}
+
+function canEditRequest(request: LeaveRequest, user: AuthUser | null) {
+    return isLeaveEditor(user) || isOwnOffsite(request, user);
+}
+
+function toDateInput(value?: string | null) {
+    return value ? dayjs(value).format("YYYY-MM-DD") : "";
+}
+
 function leaveTypeLabel(request: LeaveRequest) {
     return isOffsiteRequest(request) ? "ทำงานนอกสถานที่" : request.leave_type?.name;
 }
@@ -81,16 +103,33 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
     const [weekLeaves, setWeekLeaves] = useState<LeaveGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedGroup, setSelectedGroup] = useState<LeaveGroup | null>(null);
+    const [currentUser] = useState(() => readStoredUser());
+
+    const fetchGroups = useCallback(async () => {
+        const [today, week] = await Promise.all([getTodayLeaves(), getThisWeekLeaves()]);
+        return {
+            todayGroups: groupByUser(filterByScope(today, departmentScope, supervisorScopeId)),
+            weekGroups: groupByUser(filterByScope(week, departmentScope, supervisorScopeId)),
+        };
+    }, [departmentScope, supervisorScopeId]);
 
     useEffect(() => {
-        Promise.all([getTodayLeaves(), getThisWeekLeaves()])
-            .then(([today, week]) => {
-                setTodayLeaves(groupByUser(filterByScope(today, departmentScope, supervisorScopeId)));
-                setWeekLeaves(groupByUser(filterByScope(week, departmentScope, supervisorScopeId)));
+        fetchGroups()
+            .then(({ todayGroups, weekGroups }) => {
+                setTodayLeaves(todayGroups);
+                setWeekLeaves(weekGroups);
             })
             .catch((err) => console.error("Failed to load department leaves", err))
             .finally(() => setLoading(false));
-    }, [departmentScope, supervisorScopeId]);
+    }, [fetchGroups]);
+
+    // หลังแก้ไข โหลดข้อมูลใหม่แล้วเปิด popup ของคนเดิมต่อ (ปิดถ้าไม่มีรายการเหลือในช่วงนี้แล้ว)
+    const handleSaved = async (key: string) => {
+        const { todayGroups, weekGroups } = await fetchGroups();
+        setTodayLeaves(todayGroups);
+        setWeekLeaves(weekGroups);
+        setSelectedGroup(weekGroups.find((group) => group.key === key) ?? todayGroups.find((group) => group.key === key) ?? null);
+    };
 
     const renderLeaves = (groups: LeaveGroup[], emptyText: string) => {
         if (loading) {
@@ -121,21 +160,23 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                                 {user?.full_name?.slice(0, 2) ?? "??"}
                             </div>
                             <div className="flex-1 min-w-0 space-y-0.5">
-                                <p className="text-sm font-semibold truncate text-gray-900">{user?.full_name}</p>
+                                <p className="text-sm font-semibold break-words text-gray-900">{user?.full_name}</p>
                                 {requests.some(isOffsiteRequest) && (
                                     <span className="inline-flex w-fit rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                                         ทำงานนอกสถานที่
                                     </span>
                                 )}
-                                {requests.filter((req) => req.start_date).map((req) => (
-                                    <p key={req.id} className="text-xs font-medium text-indigo-700">
-                                        {formatLeaveDateRange(req)} {formatLeaveDuration(req)}
-                                    </p>
-                                ))}
-                                <p className="text-xs truncate text-gray-500">{user?.department}</p>
-                                {user?.email && <p className="text-xs truncate text-gray-500">{user.email}</p>}
-                                {user?.email_2 && <p className="text-xs truncate text-gray-500">{user.email_2}</p>}
-                                {user?.phone && <p className="text-xs truncate text-gray-500">{user.phone}</p>}
+                                <div className={requests.length > 3 ? "max-h-[4.5rem] overflow-y-auto pr-1" : undefined}>
+                                    {requests.filter((req) => req.start_date).map((req) => (
+                                        <p key={req.id} className="text-xs leading-6 font-medium text-indigo-700">
+                                            {formatLeaveDateRange(req)} {formatLeaveDuration(req)}
+                                        </p>
+                                    ))}
+                                </div>
+                                <p className="text-xs break-words text-gray-500">{user?.department}</p>
+                                {user?.email && <p className="text-xs break-all text-gray-500">{user.email}</p>}
+                                {user?.email_2 && <p className="text-xs break-all text-gray-500">{user.email_2}</p>}
+                                {user?.phone && <p className="text-xs break-words text-gray-500">{user.phone}</p>}
                                 {reasons.length > 0 && (
                                     <p className="text-xs leading-5 text-gray-500">
                                         <span className="font-medium text-gray-600">หมายเหตุ:</span> {reasons.join(", ")}
@@ -169,7 +210,14 @@ export function TodayLeavesWidget({ departmentScope = null, supervisorScopeId = 
                 </div>
             </div>
 
-            {selectedGroup && <LeaveDetailModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />}
+            {selectedGroup && (
+                <LeaveDetailModal
+                    group={selectedGroup}
+                    currentUser={currentUser}
+                    onSaved={handleSaved}
+                    onClose={() => setSelectedGroup(null)}
+                />
+            )}
         </div>
     );
 }
@@ -184,7 +232,150 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
     );
 }
 
-function LeaveDetailModal({ group, onClose }: { group: LeaveGroup; onClose: () => void }) {
+interface LeaveDraft {
+    start_date: string;
+    end_date: string;
+    reason: string;
+}
+
+const EDIT_INPUT =
+    "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+function saveLeaveEdit(request: LeaveRequest, draft: LeaveDraft, currentUser: AuthUser | null) {
+    const singleDay = request.leave_unit === "hour" || request.leave_unit === "half_day";
+    const endDate = singleDay ? draft.start_date : draft.end_date;
+    const reason = draft.reason.trim();
+
+    if (isOwnOffsite(request, currentUser)) {
+        return updateMyOffsiteRequest(request.id, { start_date: draft.start_date, end_date: endDate, reason });
+    }
+
+    const timeOn = (time?: string) => (time ? dayjs(`${draft.start_date} ${time.slice(0, 5)}`) : null);
+    return updateAdminLeaveRequest(request.id, {
+        user_id: request.user_id,
+        leave_type_id: request.leave_type_id,
+        leave_unit: request.leave_unit,
+        request_type: request.request_type ?? "leave",
+        start_date: draft.start_date,
+        end_date: endDate,
+        start_time: request.leave_unit === "hour" ? timeOn(request.start_time) : null,
+        end_time: request.leave_unit === "hour" ? timeOn(request.end_time) : null,
+        reason,
+        status: request.status,
+    });
+}
+
+function LeaveEditForm({
+    request,
+    currentUser,
+    onCancel,
+    onSaved,
+}: {
+    request: LeaveRequest;
+    currentUser: AuthUser | null;
+    onCancel: () => void;
+    onSaved: () => Promise<void>;
+}) {
+    const singleDay = request.leave_unit === "hour" || request.leave_unit === "half_day";
+    const [draft, setDraft] = useState<LeaveDraft>({
+        start_date: toDateInput(request.start_date),
+        end_date: toDateInput(request.end_date || request.start_date),
+        reason: request.reason ?? "",
+    });
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSave = async () => {
+        if (!draft.start_date || (!singleDay && !draft.end_date) || !draft.reason.trim()) {
+            setError("กรุณากรอกวันที่และหมายเหตุให้ครบ");
+            return;
+        }
+        if (!singleDay && draft.end_date < draft.start_date) {
+            setError("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+            return;
+        }
+        try {
+            setSaving(true);
+            setError(null);
+            await saveLeaveEdit(request, draft, currentUser);
+            await onSaved();
+        } catch (err: unknown) {
+            const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            setError(message || "บันทึกไม่สำเร็จ");
+            setSaving(false);
+        }
+    };
+
+    return (
+        <div className="mt-3 space-y-3 rounded-lg border border-indigo-100 bg-white p-3">
+            <div className={singleDay ? "" : "grid grid-cols-2 gap-2"}>
+                <label className="block text-xs font-medium text-gray-500">
+                    {singleDay ? "วันที่" : "วันที่เริ่ม"}
+                    <input
+                        type="date"
+                        className={`${EDIT_INPUT} mt-1`}
+                        value={draft.start_date}
+                        onChange={(event) => setDraft((current) => ({ ...current, start_date: event.target.value }))}
+                    />
+                </label>
+                {!singleDay && (
+                    <label className="block text-xs font-medium text-gray-500">
+                        วันที่สิ้นสุด
+                        <input
+                            type="date"
+                            className={`${EDIT_INPUT} mt-1`}
+                            value={draft.end_date}
+                            min={draft.start_date || undefined}
+                            onChange={(event) => setDraft((current) => ({ ...current, end_date: event.target.value }))}
+                        />
+                    </label>
+                )}
+            </div>
+            <label className="block text-xs font-medium text-gray-500">
+                หมายเหตุ
+                <textarea
+                    rows={2}
+                    className={`${EDIT_INPUT} mt-1 resize-none`}
+                    value={draft.reason}
+                    onChange={(event) => setDraft((current) => ({ ...current, reason: event.target.value }))}
+                />
+            </label>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <div className="flex justify-end gap-2">
+                <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-60"
+                >
+                    ยกเลิก
+                </button>
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                >
+                    {saving ? "กำลังบันทึก..." : "บันทึก"}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function LeaveDetailModal({
+    group,
+    currentUser,
+    onSaved,
+    onClose,
+}: {
+    group: LeaveGroup;
+    currentUser: AuthUser | null;
+    onSaved: (key: string) => Promise<void>;
+    onClose: () => void;
+}) {
+    const [editingId, setEditingId] = useState<number | null>(null);
+
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") onClose();
@@ -204,8 +395,11 @@ function LeaveDetailModal({ group, onClose }: { group: LeaveGroup; onClose: () =
                         {user?.full_name?.slice(0, 2) ?? "??"}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold text-gray-900">{user?.full_name}</h3>
-                        <p className="text-sm text-gray-500">{user?.department}</p>
+                        <h3 className="text-lg font-semibold text-gray-900 break-words">{user?.full_name}</h3>
+                        {user?.english_name && <p className="text-sm text-gray-600 break-words">{user.english_name}</p>}
+                        <p className="text-sm text-gray-500">
+                            {[user?.employee_code, user?.department].filter(Boolean).join(" · ")}
+                        </p>
                     </div>
                     <button
                         type="button"
@@ -222,26 +416,57 @@ function LeaveDetailModal({ group, onClose }: { group: LeaveGroup; onClose: () =
                         <p className="text-xs font-medium text-gray-500">
                             วันที่ลา{requests.length > 1 ? ` (${requests.length} รายการ)` : ""}
                         </p>
-                        {requests.map((request) => {
-                            const duration = formatLeaveDuration(request).replace(/^\((.*)\)$/, "$1");
-                            const type = leaveTypeLabel(request);
-                            return (
-                                <div key={request.id} className="rounded-xl bg-indigo-50 px-4 py-3">
-                                    <p className="text-base font-semibold text-indigo-800">{formatLeaveDateRange(request)}</p>
-                                    {(duration || type) && (
-                                        <p className="text-sm text-indigo-700">{[type, duration].filter(Boolean).join(" · ")}</p>
-                                    )}
-                                    {request.reason && (
-                                        <p className="mt-1 text-sm text-gray-600 break-words whitespace-pre-wrap">
-                                            <span className="font-medium">หมายเหตุ:</span> {request.reason}
-                                        </p>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        <div className={`space-y-2 ${requests.length > 3 ? "max-h-[22rem] overflow-y-auto pr-1" : ""}`}>
+                            {requests.map((request) => {
+                                const duration = formatLeaveDuration(request).replace(/^\((.*)\)$/, "$1");
+                                const type = leaveTypeLabel(request);
+                                const editing = editingId === request.id;
+                                return (
+                                    <div key={request.id} className="rounded-xl bg-indigo-50 px-4 py-3">
+                                        <div className="flex items-start gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-base font-semibold text-indigo-800">{formatLeaveDateRange(request)}</p>
+                                                {(duration || type) && (
+                                                    <p className="text-sm text-indigo-700">{[type, duration].filter(Boolean).join(" · ")}</p>
+                                                )}
+                                            </div>
+                                            {!editing && canEditRequest(request, currentUser) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingId(request.id)}
+                                                    className="flex-shrink-0 rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+                                                >
+                                                    แก้ไข
+                                                </button>
+                                            )}
+                                        </div>
+                                        {editing ? (
+                                            <LeaveEditForm
+                                                request={request}
+                                                currentUser={currentUser}
+                                                onCancel={() => setEditingId(null)}
+                                                onSaved={async () => {
+                                                    setEditingId(null);
+                                                    await onSaved(group.key);
+                                                }}
+                                            />
+                                        ) : (
+                                            request.reason && (
+                                                <p className="mt-1 text-sm text-gray-600 break-words whitespace-pre-wrap">
+                                                    <span className="font-medium">หมายเหตุ:</span> {request.reason}
+                                                </p>
+                                            )
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <div>
+                        <DetailRow label="รหัสพนักงาน" value={user?.employee_code} />
+                        <DetailRow label="ชื่อภาษาอังกฤษ" value={user?.english_name} />
+                        <DetailRow label="แผนก" value={user?.department} />
                         <DetailRow label="อีเมล" value={user?.email} />
                         <DetailRow label="อีเมลสำรอง" value={user?.email_2} />
                         <DetailRow label="เบอร์โทร" value={user?.phone} />
