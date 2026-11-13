@@ -62,12 +62,6 @@ function calcHours(form: LeaveRequestForm): number {
     : calculateLeaveHours(form.start_time, form.end_time);
 }
 
-function isWeekend(dateStr: string): boolean {
-  if (!dateStr) return false;
-  const day = new Date(dateStr).getUTCDay();
-  return day === 0 || day === 6;
-}
-
 function formatFileSize(size: number) {
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${Math.round((size / (1024 * 1024)) * 10) / 10} MB`;
@@ -90,15 +84,11 @@ function validate(form: LeaveRequestForm): FormErrors {
 
   if (!form.start_date) {
     errors.start_date = "กรุณาระบุวันที่";
-  } else if (isWeekend(form.start_date)) {
-    errors.start_date = "ไม่สามารถเลือกวันเสาร์หรืออาทิตย์ได้";
   }
 
   if (form.leave_unit === "day") {
     if (!form.end_date) {
       errors.end_date = "กรุณาระบุวันสิ้นสุด";
-    } else if (isWeekend(form.end_date)) {
-      errors.end_date = "ไม่สามารถเลือกวันเสาร์หรืออาทิตย์ได้";
     } else if (form.end_date < form.start_date) {
       errors.end_date = "วันสิ้นสุดต้องไม่น้อยกว่าวันเริ่มต้น";
     }
